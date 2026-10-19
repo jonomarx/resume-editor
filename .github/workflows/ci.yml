@@ -28,7 +28,20 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
+      # SpaServingTests serve the real Vite build (US-078 swap); REQUIRE_FRONTEND_BUILD makes a missing build fail.
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - working-directory: frontend
+        run: pnpm install --frozen-lockfile && pnpm build
       - run: mvn -q test
+        env:
+          REQUIRE_FRONTEND_BUILD: 'true'
 
   backend-postgres:
     name: Backend tests (Postgres profile, on demand)
