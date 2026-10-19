@@ -31,4 +31,5 @@ app:
   render:
     max-bytes: 1000000
   storage:
+    type: ${FILE_STORAGE:local}
     data-dir: ${DATA_DIR:./data}

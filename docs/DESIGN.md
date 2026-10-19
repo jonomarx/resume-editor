@@ -123,7 +123,7 @@ Header and footer are separate top-level nodes. The document is assembled as: lo
 
 ## 6. Tags and matching (backend part 1)
 
-**Tags.** Master resume nodes can be tagged (many per node). Tags come from one shared, user-extensible vocabulary: canonical name, slug, category (language, framework, domain, role type), aliases. Aliases (for example "reactjs" for React) are managed through the API: add and remove an alias on a tag, unique per user and never colliding with another tag's slug or alias. The v0 contract has no alias endpoint, so US-020 raises a `contract` story for it first. Free text is never stored as a tag; typing a new one creates a vocabulary entry first. The Job List Manager tags postings from the same list and may *propose* new entries, which wait for your approval. A story generates your starter list from your master resume for you to approve.
+**Tags.** Master resume nodes can be tagged (many per node). Tags come from one shared, user-extensible vocabulary: canonical name, slug, category (language, framework, domain, role type), aliases. Aliases (for example "reactjs" for React, or "C++" for the tag whose slug is `c-plus-plus`) are managed through the API: add and remove an alias on a tag. An alias is any printable ASCII text, stored as typed and compared case-insensitively; it is unique per user and never equals another tag's slug or alias. Canonical slugs stay normalized (lowercase letters, digits and hyphens, with `+` mapped to `plus` and `#` to `sharp`, so C, C++ and C# are distinct). Node tags always store slugs.
 
 **Matching** is done by the web controller on each request, not by the Job List Manager. Order of build:
 
