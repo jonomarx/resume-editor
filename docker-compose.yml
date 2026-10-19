@@ -1,0 +1,46 @@
+# Local infrastructure: Postgres and Redis. Values come from .env (see .env.example).
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: resume
+      POSTGRES_USER: ${DB_USER:-resume}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-resume} -d resume"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  # LaTeX renderer (US-012). Reachable only on the internal network, which has no outbound access;
+  # the app container joins `render` to call http://renderer:8080/render.
+  renderer:
+    build: ./renderer
+    read_only: true
+    tmpfs:
+      - /work:rw,size=64m,uid=10001
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 128
+    mem_limit: 512m
+    environment:
+      RENDER_TIMEOUT_SECONDS: ${RENDER_TIMEOUT_SECONDS:-20}
+      RENDER_MAX_BYTES: ${RENDER_MAX_BYTES:-1000000}
+    networks: [render]
+networks:
+  render:
+    internal: true
+volumes:
+  pgdata:

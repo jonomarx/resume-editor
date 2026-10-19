@@ -1,0 +1,14 @@
+{
+  "name": "api-contract",
+  "private": true,
+  "description": "OpenAPI contract tooling: lint and mock server",
+  "scripts": {
+    "lint": "redocly lint openapi.yaml",
+    "mock": "node mock-server.mjs",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "@redocly/cli": "1.34.5",
+    "@stoplight/prism-cli": "5.14.2"
+  }
+}

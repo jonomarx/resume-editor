@@ -1,0 +1,6 @@
+extends:
+  - recommended
+rules:
+  # Local-only server URL by design; no public license/contact yet.
+  info-license: off
+  no-server-example.com: off
