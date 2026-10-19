@@ -37,14 +37,17 @@ class RedisSessionPostgresTests extends PostgresContainerSupport {
     @Test
     void sessionIsStoredInRedisAndRemovedOnLogout() throws Exception {
         assertThat(sessions).isInstanceOf(RedisSessionRepository.class);
+        Set<String> before = redis.keys("spring:session:sessions:*");
         var res = mvc.perform(CsrfSupport.post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content(creds("redisuser")))
                 .andExpect(status().isCreated()).andReturn().getResponse();
         String setCookie = res.getHeaders("Set-Cookie").stream().filter(h -> h.startsWith("SESSION=")).findFirst().orElseThrow();
         assertThat(setCookie).contains("HttpOnly").contains("SameSite=Lax");
         Cookie cookie = res.getCookie("SESSION");
 
-        Set<String> keys = redis.keys("spring:session:sessions:*");
-        assertThat(keys).isNotEmpty();
+        // other tests share this Redis: only this test's own session key counts
+        Set<String> keys = new java.util.HashSet<>(redis.keys("spring:session:sessions:*"));
+        keys.removeAll(before);
+        assertThat(keys).hasSize(1);
         mvc.perform(get("/api/me").cookie(cookie)).andExpect(status().isOk());
 
         mvc.perform(CsrfSupport.post("/api/auth/logout").cookie(cookie)).andExpect(status().isNoContent());

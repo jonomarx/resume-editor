@@ -1,0 +1,108 @@
+package app.resume.tags;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
+
+/**
+ * The per-user tag vocabulary. Uniqueness is enforced by the database (unique (user_id, slug) and the single
+ * (user_id, tag_key) constraint over slugs and aliases), so concurrent creates cannot produce two rows.
+ */
+@Service
+public class TagService {
+    public record CreateResult(Tag tag, boolean created) {}
+
+    private final JdbcTemplate jdbc;
+    private final TransactionTemplate tx;
+
+    public TagService(JdbcTemplate jdbc, TransactionTemplate tx) {
+        this.jdbc = jdbc;
+        this.tx = tx;
+    }
+
+    /** Get-or-create: a name whose slug is an existing slug or alias returns that tag (created = false). */
+    public CreateResult getOrCreate(long userId, String name, TagCategory category) {
+        String slug = TagNormalizer.slug(name);
+        if (slug.isEmpty() || slug.length() > TagNormalizer.MAX_SLUG_LENGTH) {
+            throw new IllegalArgumentException("name does not produce a valid tag");
+        }
+        Optional<Tag> existing = findByKey(userId, slug);
+        if (existing.isPresent()) {
+            return new CreateResult(existing.get(), false);
+        }
+        try {
+            Tag created = tx.execute(status -> insert(userId, name.trim(), slug, category));
+            return new CreateResult(created, true);
+        } catch (DataIntegrityViolationException lostRace) {
+            // another request created the same slug (or alias) first; its row wins
+            return new CreateResult(findByKey(userId, slug).orElseThrow(() -> lostRace), false);
+        }
+    }
+
+    private Tag insert(long userId, String name, String slug, TagCategory category) {
+        jdbc.update("insert into tag (user_id, name, slug, category) values (?, ?, ?, ?)",
+                userId, name, slug, category.value());
+        long id = jdbc.queryForObject("select id from tag where user_id = ? and slug = ?", Long.class, userId, slug);
+        jdbc.update("insert into tag_key (user_id, tag_id, tag_key, is_alias) values (?, ?, ?, false)",
+                userId, id, slug);
+        return new Tag(id, name, slug, category, List.of());
+    }
+
+    /** Finds a tag by its slug or by an alias. */
+    public Optional<Tag> findByKey(long userId, String key) {
+        List<Long> ids = jdbc.queryForList(
+                "select tag_id from tag_key where user_id = ? and tag_key = ?", Long.class, userId, key);
+        return ids.isEmpty() ? Optional.empty() : Optional.of(load(userId, ids.get(0)));
+    }
+
+    private Tag load(long userId, long id) {
+        return list(userId, null, null, id).get(0);
+    }
+
+    /** Lists tags, optionally filtered by category and by a case-insensitive match on name, slug or alias. */
+    public List<Tag> list(long userId, TagCategory category, String q) {
+        return list(userId, category, q, null);
+    }
+
+    private List<Tag> list(long userId, TagCategory category, String q, Long onlyId) {
+        StringBuilder sql = new StringBuilder("select id, name, slug, category from tag t where t.user_id = ?");
+        List<Object> args = new ArrayList<>();
+        args.add(userId);
+        if (onlyId != null) {
+            sql.append(" and t.id = ?");
+            args.add(onlyId);
+        }
+        if (category != null) {
+            sql.append(" and t.category = ?");
+            args.add(category.value());
+        }
+        if (q != null && !q.isBlank()) {
+            String needle = q.trim().toLowerCase(java.util.Locale.ROOT);
+            String slugNeedle = TagNormalizer.slug(q);
+            sql.append(" and (position(? in lower(t.name)) > 0 or exists (select 1 from tag_key k where k.tag_id = t.id"
+                    + " and position(? in k.tag_key) > 0))");
+            args.add(needle);
+            args.add(slugNeedle.isEmpty() ? needle : slugNeedle);
+        }
+        sql.append(" order by t.name, t.id");
+        Map<Long, Tag> tags = new LinkedHashMap<>();
+        jdbc.query(sql.toString(), rs -> {
+            tags.put(rs.getLong("id"), new Tag(rs.getLong("id"), rs.getString("name"), rs.getString("slug"),
+                    TagCategory.fromValue(rs.getString("category")), new ArrayList<>()));
+        }, args.toArray());
+        if (!tags.isEmpty()) {
+            jdbc.query("select tag_id, tag_key from tag_key where user_id = ? and is_alias = true order by tag_key",
+                    rs -> {
+                        Tag t = tags.get(rs.getLong("tag_id"));
+                        if (t != null) t.aliases().add(rs.getString("tag_key"));
+                    }, userId);
+        }
+        return new ArrayList<>(tags.values());
+    }
+}
