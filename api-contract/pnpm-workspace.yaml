@@ -1,0 +1,2 @@
+# Lint and mock tooling needs no dependency build scripts.
+strictDepBuilds: false
