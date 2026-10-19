@@ -18,3 +18,12 @@ export const PLACEHOLDERS = {
   bullet:
     'Describe what you did, starting with a strong verb and ending with a result you can measure.',
 } as const
+
+export const AUTH = {
+  usernameMinLength: 3,
+  usernameMaxLength: 40,
+  passwordMinLength: 8,
+  passwordMaxLength: 200,
+} as const
+
+export const LOADING_TEXT = 'Loading...'
