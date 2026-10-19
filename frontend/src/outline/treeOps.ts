@@ -1,4 +1,4 @@
-import { CHILDREN_TOKEN, PLACEHOLDER_LATEX, PLACEHOLDERS, TOKEN_WARNINGS } from '../config/constants'
+import { childrenBlock, CHILDREN_TOKEN, LIST_WRAPPERS, PLACEHOLDER_LATEX, PLACEHOLDERS, TOKEN_WARNINGS } from '../config/constants'
 import type { NodeType, ResumeNode, ResumeTree } from './types'
 
 /**
@@ -26,16 +26,13 @@ export const isFixed = (n: ResumeNode) => n.type === 'header' || n.type === 'foo
 export type IdFactory = () => string
 export const defaultId: IdFactory = () => crypto.randomUUID()
 
-export function ensureChildrenToken(latex: string): string {
-  return latex.includes(CHILDREN_TOKEN) ? latex : `${latex}${latex === '' || latex.endsWith('\n') ? '' : '\n'}${CHILDREN_TOKEN}`
-}
-
 /** Problems the server would reject with 400 for this node's latex (api-contract ResumeNode). */
 export function childrenTokenProblems(node: ResumeNode): string[] {
   const out: string[] = []
   const count = node.latex.split(CHILDREN_TOKEN).length - 1
   if (node.children.length > 0 && count === 0) out.push(TOKEN_WARNINGS.missing)
   if (count > 1) out.push(TOKEN_WARNINGS.duplicate)
+  if (node.children.length === 0 && count === 1 && node.type in LIST_WRAPPERS) out.push(TOKEN_WARNINGS.emptyWrapper)
   for (const m of node.latex.matchAll(/\{\{[^{}]*\}\}/g)) {
     if (m[0] !== CHILDREN_TOKEN) out.push(TOKEN_WARNINGS.unknown(m[0]))
   }
@@ -105,13 +102,16 @@ export function addNode(tree: ResumeTree, parentId: string | null, type: NodeTyp
     throw new Error(`Cannot add ${type} under ${found.node.type}`)
   }
   const child = createNode(type, newId)
-  // A parent needs the children token once it has children: insert it if missing. Existing latex is never otherwise touched.
+  // The first child brings the list wrapper and token, appended after whatever the user already wrote.
+  // Later children never touch the parent's latex.
   return mapAll(tree, parentId, (n) => ({
     ...n,
-    latex: n.latex.includes(CHILDREN_TOKEN) ? n.latex : ensureChildrenToken(n.latex),
+    latex: n.children.length === 0 && !n.latex.includes(CHILDREN_TOKEN) ? n.latex + childrenBlock(wrapperType(n)) : n.latex,
     children: [...n.children, child],
   }))
 }
+
+const wrapperType = (n: ResumeNode) => n.type as keyof typeof LIST_WRAPPERS
 
 function filterTree(nodes: ResumeNode[], id: string): ResumeNode[] {
   return nodes.filter((n) => n.id !== id).map((n) => ({ ...n, children: filterTree(n.children, id) }))
@@ -121,7 +121,16 @@ export function deleteNode(tree: ResumeTree, id: string): ResumeTree {
   const found = findNode(tree, id)
   if (!found) return tree
   if (isFixed(found.node)) throw new Error('Header and footer cannot be deleted')
-  return { ...tree, sections: filterTree(tree.sections, id) }
+  const result = { ...tree, sections: filterTree(tree.sections, id) }
+  const parent = found.parent
+  if (parent && parent.children.length === 1 && parent.type in LIST_WRAPPERS) {
+    // The last child is gone: take the wrapper back out, but only if it is still exactly what addNode inserted.
+    const block = childrenBlock(wrapperType(parent))
+    if (parent.latex.endsWith(block)) {
+      return mapAll(result, parent.id, (n) => ({ ...n, latex: n.latex.slice(0, n.latex.length - block.length) }))
+    }
+  }
+  return result
 }
 
 function swap(list: ResumeNode[], id: string, delta: -1 | 1): ResumeNode[] {

@@ -1,13 +1,13 @@
 // DUMMY(US-014): hard-coded master resume standing in for GET /api/resumes/master. Delete when US-014 is ready.
 import type { ResumeNode, ResumeTree, NodeType } from '../outline/types'
 
-// Latex follows the {{children}} contract: parents carry the token inside their wrapper macros, leaves carry none.
-const latexFor = (type: NodeType, title: string): string => {
+// Latex follows the {{children}} contract: a parent carries wrapper macros and the token only while it has children.
+const latexFor = (type: NodeType, title: string, hasChildren: boolean): string => {
   switch (type) {
     case 'section':
-      return `\\section{${title}}\n\\resumeSubHeadingListStart\n{{children}}\n\\resumeSubHeadingListEnd`
+      return `\\section{${title}}` + (hasChildren ? '\n\\resumeSubHeadingListStart\n{{children}}\n\\resumeSubHeadingListEnd' : '')
     case 'subsection':
-      return `\\resumeSubheading{${title}}{City, ST}{Role}{Dates}\n\\resumeItemListStart\n{{children}}\n\\resumeItemListEnd`
+      return `\\resumeSubheading{${title}}{City, ST}{Role}{Dates}` + (hasChildren ? '\n\\resumeItemListStart\n{{children}}\n\\resumeItemListEnd' : '')
     case 'section_text':
       return `\\resumeSubheading{${title}}{}{}{}`
     case 'subsection_text':
@@ -21,7 +21,7 @@ const node = (id: string, type: NodeType, title: string, children: ResumeNode[] 
   id,
   type,
   title,
-  latex: latexFor(type, title),
+  latex: latexFor(type, title, children.length > 0),
   tags: [],
   children,
 })

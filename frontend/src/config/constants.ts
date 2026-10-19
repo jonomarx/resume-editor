@@ -68,21 +68,31 @@ export const EDITOR_LABELS = {
   editorAria: 'LaTeX editor',
 } as const
 
-// TEMPLATE: LaTeX for a new node, using Jake's macro names and list wrappers. Each string is a function of the
-// placeholder text above, so the visible words live only in PLACEHOLDERS. Nodes that can have children carry the
-// children token inside their wrapper macros; bullets and section text never do. Replace with the derivative
-// template's macros.
+// TEMPLATE: list wrapper macros (Jake's names) that surround a parent's children token. A node carries its
+// wrapper and token only while it has children, because an empty list environment does not compile.
+export const LIST_WRAPPERS = {
+  section: { start: '\\resumeSubHeadingListStart', end: '\\resumeSubHeadingListEnd' },
+  subsection: { start: '\\resumeItemListStart', end: '\\resumeItemListEnd' },
+} as const
+
+/** The text appended to a parent's latex when it gains its first child. */
+export const childrenBlock = (type: keyof typeof LIST_WRAPPERS): string =>
+  `\n${LIST_WRAPPERS[type].start}\n${CHILDREN_TOKEN}\n${LIST_WRAPPERS[type].end}`
+
+// TEMPLATE: LaTeX for a new node, using Jake's macro names. Each string is a function of the placeholder text
+// above, so the visible words live only in PLACEHOLDERS. A new section or subsection is only its heading line;
+// the wrapper and token arrive with its first child (see addNode).
 export const PLACEHOLDER_LATEX = {
-  section: (p: typeof PLACEHOLDERS) =>
-    `\\section{${p.section.title}}\n\\resumeSubHeadingListStart\n${CHILDREN_TOKEN}\n\\resumeSubHeadingListEnd`,
+  section: (p: typeof PLACEHOLDERS) => `\\section{${p.section.title}}`,
   sectionText: (p: typeof PLACEHOLDERS) => `\\resumeSubheading{${p.sectionText.text}}{}{}{}`,
   subsection: (p: typeof PLACEHOLDERS) =>
-    `\\resumeSubheading{${p.subsection.organization}}{${p.subsection.location}}{${p.subsection.role}}{${p.subsection.dates}}\n\\resumeItemListStart\n${CHILDREN_TOKEN}\n\\resumeItemListEnd`,
+    `\\resumeSubheading{${p.subsection.organization}}{${p.subsection.location}}{${p.subsection.role}}{${p.subsection.dates}}`,
   bullet: (p: typeof PLACEHOLDERS) => `\\resumeItem{${p.bullet}}`,
 } as const
 
 export const TOKEN_WARNINGS = {
   missing: `This node has children but its LaTeX has no ${CHILDREN_TOKEN} token, so it cannot be saved. Add the token where the children should go.`,
   duplicate: `This node's LaTeX has more than one ${CHILDREN_TOKEN} token. Keep exactly one.`,
+  emptyWrapper: `This node has no children but its LaTeX still has a ${CHILDREN_TOKEN} token inside list macros; an empty list does not compile. Remove the list macros and the token, or add a child.`,
   unknown: (token: string) => `Unknown token ${token}: the only token is ${CHILDREN_TOKEN} (it is case-sensitive).`,
 } as const

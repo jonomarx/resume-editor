@@ -7,7 +7,7 @@ describe('placeholder content for new nodes', () => {
   it('section', () => {
     const n = createNode('section', id)
     expect(n.title).toBe('New Section')
-    expect(n.latex).toBe('\\section{New Section}\n\\resumeSubHeadingListStart\n{{children}}\n\\resumeSubHeadingListEnd')
+    expect(n.latex).toBe('\\section{New Section}')
   })
 
   it('section text', () => {
@@ -29,10 +29,12 @@ describe('placeholder content for new nodes', () => {
     expect(n.latex).toContain('Describe what you did')
   })
 
-  it('includes exactly one children token for types that can have children, and none for leaves', () => {
-    const count = (t: Parameters<typeof createNode>[0]) => createNode(t, id).latex.split('{{children}}').length - 1
-    expect([count('section'), count('subsection')]).toEqual([1, 1])
-    expect([count('section_text'), count('subsection_text')]).toEqual([0, 0])
+  it('has no list wrapper and no children token on any new node', () => {
+    for (const t of ['section', 'section_text', 'subsection', 'subsection_text'] as const) {
+      const { latex } = createNode(t, id)
+      expect(latex).not.toContain('{{children}}')
+      expect(latex).not.toMatch(/ListStart|ListEnd/)
+    }
   })
 
   it('new nodes have no tags and no children', () => {
