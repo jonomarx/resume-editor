@@ -72,10 +72,11 @@ class TagConcurrencyPostgresTests extends PostgresContainerSupport {
         List<Future<Integer>> results = new ArrayList<>();
         for (int i = 0; i < n; i++) {
             String slug = i % 2 == 0 ? "alpha" : "beta";
+            String alias = i % 2 == 0 ? "Shared C++" : "SHARED c++"; // same alias key, different spelling
             results.add(pool.submit(() -> {
                 go.await();
                 return mvc.perform(CsrfSupport.post("/api/tags/" + slug + "/aliases").cookie(session)
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"alias\":\"shared\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"alias\":\"" + alias + "\"}"))
                         .andReturn().getResponse().getStatus();
             }));
         }
@@ -90,6 +91,6 @@ class TagConcurrencyPostgresTests extends PostgresContainerSupport {
         // one tag wins the alias: its 6 requests are 200 (one insert plus no-ops); the other tag's 6 are conflicts
         assertThat(ok).isEqualTo(n / 2);
         assertThat(conflict).isEqualTo(n / 2);
-        assertThat(jdbc.queryForObject("select count(*) from tag_key where tag_key = 'shared'", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from tag_key where tag_key = 'shared c++'", Integer.class)).isEqualTo(1);
     }
 }
