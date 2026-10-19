@@ -57,6 +57,7 @@ If a piece you need from another role is not ready, you write a temporary dummy 
 - **Migrations.** Flyway files with timestamp versions, never edited after merge.
 - **Tests.** Anything needing Postgres-only features, and all concurrency tests, carry `@Tag("postgres")`.
 - **Tags.** Always use the shared vocabulary; never store free-text tags.
+- **Git identity.** All commits are authored as `jonomarx <8230342+jonomarx@users.noreply.github.com>`. The repo-local git config (shared by every worktree) already sets this; never change it, never set a different `user.name` or `user.email`, and never use `--author` or a personal email. Before your first commit in a session, check `git config user.email`. Commit messages still end with the Co-Authored-By trailer your tooling requires.
 
 ## 6. Review checklist (author self-review and reviewing another agent)
 
