@@ -180,3 +180,50 @@ test('unauthenticated mock request without the session cookie is rejected', asyn
   const res = await fetch(`${base}/api/me`);
   assert.equal(res.status, 401);
 });
+
+test('save 400: children token examples name the node', async () => {
+  const tree = { id: 'r', header: { id: 'h', type: 'header', title: 'H', latex: '', tags: [], children: [] }, sections: [], footer: { id: 'f', type: 'footer', title: 'F', latex: '', tags: [], children: [] } };
+  for (const [name, text] of [['missingChildrenToken', '{{children}}'], ['unknownToken', 'unknown token'], ['duplicateChildrenToken', 'more than one']]) {
+    const res = await fetch(`${base}/api/resumes/master`, { method: 'PUT', headers: { ...json, prefer: `code=400, example=${name}` }, body: JSON.stringify({ baseVersion: 1, tree }) });
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.equal(body.code, 'validation_failed');
+    assert.ok(body.details[0].field.startsWith('n-exp'));
+    assert.ok(body.details[0].message.includes(text));
+  }
+});
+
+test('examples: every node with children carries the {{children}} token', async () => {
+  const doc = await (await fetch(`${base}/api/resumes/master`, { headers: json })).json();
+  const check = (n) => { if (n.children.length) assert.ok(n.latex.includes('{{children}}'), n.id); n.children.forEach(check); };
+  [doc.tree.header, ...doc.tree.sections, doc.tree.footer].forEach(check);
+});
+
+test('tag aliases: add returns the updated tag', async () => {
+  const res = await fetch(`${base}/api/tags/postgresql/aliases`, { method: 'POST', headers: json, body: JSON.stringify({ alias: 'postgres' }) });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.slug, 'postgresql');
+  assert.ok(body.aliases.includes('postgres'));
+});
+
+test('tag aliases: add rejects an empty alias, documents 409 alias_conflict and 403', async () => {
+  const bad = await fetch(`${base}/api/tags/postgresql/aliases`, { method: 'POST', headers: json, body: JSON.stringify({ alias: '' }) });
+  assert.equal(bad.status, 400);
+  const conflict = await fetch(`${base}/api/tags/postgresql/aliases`, { method: 'POST', headers: { ...json, prefer: 'code=409' }, body: JSON.stringify({ alias: 'mysql' }) });
+  assert.equal(conflict.status, 409);
+  const conflictBody = await conflict.json();
+  assert.equal(conflictBody.code, 'alias_conflict');
+  assert.equal(conflictBody.conflictingSlug, 'mysql');
+  const csrf = await fetch(`${base}/api/tags/postgresql/aliases`, { method: 'POST', headers: { ...json, prefer: 'code=403' }, body: JSON.stringify({ alias: 'pg' }) });
+  assert.equal(csrf.status, 403);
+  assert.equal((await csrf.json()).code, 'csrf_invalid');
+});
+
+test('tag aliases: remove returns the updated tag and 404 is documented', async () => {
+  const res = await fetch(`${base}/api/tags/postgresql/aliases/postgres`, { method: 'DELETE', headers: json });
+  assert.equal(res.status, 200);
+  assert.deepEqual((await res.json()).aliases, []);
+  const missing = await fetch(`${base}/api/tags/postgresql/aliases/nope`, { method: 'DELETE', headers: { ...json, prefer: 'code=404' } });
+  assert.equal(missing.status, 404);
+});

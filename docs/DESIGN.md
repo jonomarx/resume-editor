@@ -70,6 +70,7 @@ Postgres holds records and pointers; resume content lives on disk behind `FileSt
 | `app_user` | Account (username, password hash) |
 | `resume` | Master or draft; `storage_uri`, `content_hash`, `version`, `job_posting_id` for drafts |
 | `resume_version` | Snapshot history of the master |
+| `file_registry` | One row per stored file: `key`, `uri`, `size`, `sha256`, `user_id`, `state` (`PENDING`, `COMMITTED`), `created_at`; written as an intent row before the file; `FileStorage.list(prefix)` is answered from this table |
 | `tag`, `resume_node_tag`, `job_posting_tag` | Shared tag vocabulary and its links; the resume file stays the source of truth, `resume_node_tag` is a derived index |
 | `job_source` | Your career page links |
 | `job_posting` | One posting; `owner_user_id`, `origin` (crawl or ingest), `canonical_url`, `url_hash`, `content_hash`, `status` (active, stale, closed), requirements, eligibility fields; unique on (owner_user_id, url_hash) |
@@ -94,9 +95,9 @@ Postgres holds records and pointers; resume content lives on disk behind `FileSt
 | Subsection text (tagged) | What I did on the job | `\resumeItem` bullets |
 | Footer | Anything after the last section | Text before `\end{document}` |
 
-**Template status.** Jake's template is a **reference**, not the final template. Our actual template is a derivative of it and will differ (preamble, macros, layout details). The reference copy lives at `docs/reference/jake-resume-template.tex`; use it to understand structure and macro names, but do not hard-code its exact preamble or content. Keep the preamble, macro names, and starter tree in one replaceable place so the derivative template can be swapped in later. US-011 creates the derivative from the reference and records the differences in `docs/decision-002-template.md`; until then the reference is the stand-in. Mark any code that depends on Jake-specific details with a `TEMPLATE` comment.
+**Template status.** Jake's template is a **reference**, not the final template. Our actual template is a derivative of it and will differ (preamble, macros, layout details). The reference copy lives at `docs/reference/jake-resume-template.tex`; use it to understand structure and macro names, but do not hard-code its exact preamble or content. Keep the preamble, macro names, and starter tree in one replaceable place so the derivative template can be swapped in later. US-011 creates the derivative from the reference and records the decisions in `docs/decision-002-template.md`: for now it keeps Jake's layout, fonts and macro names, with the macro definitions in the hidden locked header, and its starter tree is Jake's sample content broken into nodes under Education, Experience, Projects and Skills; changes come as new stories. Until US-011 lands, the reference is the stand-in. Mark any code that depends on Jake-specific details with a `TEMPLATE` comment.
 
-Header and footer are separate top-level nodes. The document is assembled as: locked preamble from Jake's template, header, sections in order, footer, `\end{document}`. The preamble is visible only in an Advanced view. The assembler writes a comment marker per node so compile errors map back to nodes.
+Header and footer are separate top-level nodes. The document is assembled as: locked preamble (the template's hidden header: preamble plus macro definitions, never shown to the user and not editable), header, sections in order, footer, `\end{document}`. The assembler writes a comment marker per node so compile errors map back to nodes.
 
 **Layout.** Left: outline tree (add, rename, reorder, delete, collapse). Center: LaTeX editor for the selected node (CodeMirror 6) with snippet buttons, plus the tag editor (pick from the vocabulary, create new, many per node). Right: PDF preview (PDF.js) with a page counter and an error panel.
 
@@ -161,7 +162,7 @@ Recipes, not scripts: running LLM-written Python means executing untrusted code.
 | --- | --- |
 | Resume files | Immutable versioned files, temp file then atomic rename, one writer per resume via a per-resume lock |
 | Resume rows | Optimistic locking (`version`); a stale save returns 409 and the UI offers a reload |
-| File versus row | Write file first, then commit the row; never delete before commit; a reconciliation job removes orphans |
+| File versus row | Insert a `PENDING` `file_registry` row first, then write the file, then commit the resume row; the registry row becomes `COMMITTED` once a committed resume row references the file; never delete before commit; a scheduled reconciliation worker (Spring `@Scheduled`) removes orphans: `PENDING` rows older than a grace period with no referencing row get their file and row deleted, and `COMMITTED` rows whose file is missing are reported, never silently dropped |
 | Render | Idempotent on content hash; atomic cache writes; stateless renderer |
 | Daily run and ingest | Lock per source; unique (owner_user_id, url_hash) as final guard |
 | Tags | Unique (user_id, slug); get-or-create |
@@ -214,7 +215,7 @@ Roles: B Backend, F Frontend, J Job List Manager, I Integration, H you. **Depend
 
 | ID | Role | Story | Depends on | Dummy until ready |
 | --- | --- | --- | --- | --- |
-| US-010 | B | `FileStorage` plus local-disk implementation; immutable versions, atomic writes, per-resume lock, concurrency tests | US-001 | none |
+| US-010 | B | `FileStorage` plus local-disk implementation; immutable versions, atomic writes, per-resume lock, Postgres `file_registry` with intent rows, `list(prefix)` served from the database, concurrency tests | US-001 | none |
 | US-011 | B | Resume tree model with tags, JSON schema, tree-to-LaTeX assembler with node markers, and creation of our derivative template from the Jake reference (one replaceable resource plus a decision record) | US-001 | none |
 | US-012 | B | Renderer container (TeX Live, no network, timeout) and spike proving Jake's template compiles | none | none |
 | US-013 | B | `POST /api/render` with cache, page count, error-to-node mapping | US-006, US-011, US-012 | none |
@@ -280,7 +281,7 @@ Roles: B Backend, F Frontend, J Job List Manager, I Integration, H you. **Depend
 
 | ID | Role | Story | Depends on | Dummy until ready |
 | --- | --- | --- | --- | --- |
-| US-070 | B | Backups for Postgres and `DATA_DIR`; orphan reconciliation | US-014, US-060 | none |
+| US-070 | B | Backups for Postgres and `DATA_DIR`; scheduled orphan reconciliation worker driven by `file_registry` | US-014, US-060 | none |
 | US-071 | B | Rate and size limits on render and ingest | US-013 | Ingest endpoint (US-041) |
 | US-072 | B | Structured logs and metrics for render and LLM usage | US-013 | Crawl records (US-035) |
 | US-073 | F | Loading, empty, and error states everywhere | US-067 | none |

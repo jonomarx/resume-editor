@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Resume Editor API
-  version: 0.2.0
+  version: 0.3.0
   description: |
     Contract v0 (US-003, fixes in US-076): auth, master resume, tags, render.
     Changed only through stories labeled `contract`.
@@ -165,6 +165,9 @@ paths:
         Tags on nodes must be slugs in the tag vocabulary. A tree containing any unknown slug is rejected with 400,
         code `validation_failed`, and `details` has one entry per offending slug (`field` is the slug's node id
         path, `message` names the slug).
+
+        Node LaTeX follows the `{{children}}` rules in the `ResumeNode` schema: a node with children but no token,
+        or any other `{{...}}` token, is rejected with 400 `validation_failed` and `details` naming the node id.
       parameters:
         - { $ref: '#/components/parameters/XsrfToken' }
       requestBody:
@@ -188,11 +191,35 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-              example:
-                code: validation_failed
-                message: Request failed validation
-                details:
-                  - { field: n-exp-1-b1, message: unknown tag slug "javscript" }
+              examples:
+                unknownTag:
+                  summary: A tag slug that is not in the vocabulary
+                  value:
+                    code: validation_failed
+                    message: Request failed validation
+                    details:
+                      - { field: n-exp-1-b1, message: unknown tag slug "javscript" }
+                missingChildrenToken:
+                  summary: A node with children whose latex has no {{children}} token
+                  value:
+                    code: validation_failed
+                    message: Request failed validation
+                    details:
+                      - { field: n-exp-1, message: 'node has children but its latex has no {{children}} token' }
+                duplicateChildrenToken:
+                  summary: More than one {{children}} token in one node
+                  value:
+                    code: validation_failed
+                    message: Request failed validation
+                    details:
+                      - { field: n-exp, message: 'node latex has more than one {{children}} token' }
+                unknownToken:
+                  summary: A {{...}} token other than {{children}}
+                  value:
+                    code: validation_failed
+                    message: Request failed validation
+                    details:
+                      - { field: n-exp, message: 'unknown token {{items}} (the only token is {{children}})' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '409': { $ref: '#/components/responses/VersionConflict' }
   /api/resumes/master/versions:
@@ -238,6 +265,9 @@ paths:
         Copies the old content into a new version (history is never rewritten).
         Uses the same optimistic check as a save.
         A missing or invalid `baseVersion` returns 400.
+        If the stored tree of that version violates today's node rules (for example the `{{children}}` rules of the
+        `ResumeNode` schema), restore is rejected with the same 400 `validation_failed` as a save. No such stored data
+        exists yet.
       parameters:
         - { $ref: '#/components/parameters/XsrfToken' }
         - { $ref: '#/components/parameters/Version' }
@@ -316,6 +346,85 @@ paths:
               example: { id: 9, name: PostgreSQL, slug: postgresql, category: language, aliases: [] }
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/tags/{slug}/aliases:
+    post:
+      tags: [tags]
+      operationId: addTagAlias
+      summary: Add an alias to a tag
+      description: |
+        Normalization (applied to the raw `alias` and stored in this form), in this order: trim, Unicode NFKC, lowercase
+        (NFKC first, because lowercasing first can leave uppercase letters after NFKC, for example U+216B becomes
+        "XII"), collapse every run of characters outside `[a-z0-9]` into one hyphen, strip leading and trailing hyphens.
+        Non-ASCII letters are not transliterated: they are separators like any other character outside `[a-z0-9]`
+        (for example "café" normalizes to "caf"). The normalized output therefore always matches the slug pattern
+        `^[a-z0-9]+(-[a-z0-9]+)*$`. The 60-character limit counts Unicode code points of the raw input. An alias with no
+        letter or digit after normalizing is rejected with 400 `validation_failed`.
+
+        Afterwards `POST /api/tags` and `GET /api/tags?q=` resolve the alias to this tag (200, existing).
+
+        Adding an alias that the tag already has, or one equal to the tag's own slug, is a no-op: 200 with the
+        unchanged canonical Tag. The canonical slug never changes through these operations. There is no cap on the
+        number of aliases per tag.
+
+        Aliases are unique per user: an alias equal to another tag's slug or another tag's alias is rejected with 409
+        `alias_conflict`. Clients must not parse the free-text `message`; use `conflictingSlug`.
+
+        Adding or removing an alias never changes the tags on any resume node (nodes reference tags by slug).
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+        - { $ref: '#/components/parameters/TagSlug' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddAliasRequest' }
+            example: { alias: postgres }
+      responses:
+        '200':
+          description: The updated tag
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tag' }
+              example: { id: 9, name: PostgreSQL, slug: postgresql, category: language, aliases: [postgres] }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The alias is already another tag's slug or alias
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AliasConflictError' }
+              example: { code: alias_conflict, message: That alias already belongs to another tag, conflictingSlug: mysql }
+  /api/tags/{slug}/aliases/{alias}:
+    delete:
+      tags: [tags]
+      operationId: removeTagAlias
+      summary: Remove an alias from a tag
+      description: |
+        `{alias}` is the normalized alias as listed in the tag's `aliases`. Removing an alias the tag does not have
+        returns 404, as does an unknown tag, and so does a `{slug}` or `{alias}` that is not a valid slug. The tag's
+        slug itself is not an alias and cannot be removed here. The canonical slug never changes through this
+        operation, and removing an alias never changes the tags on any resume node.
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+        - { $ref: '#/components/parameters/TagSlug' }
+        - name: alias
+          in: path
+          required: true
+          description: A normalized alias (a slug); anything else is 404.
+          schema: { type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$' }
+          example: postgres
+      responses:
+        '200':
+          description: The updated tag
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tag' }
+              example: { id: 9, name: PostgreSQL, slug: postgresql, category: language, aliases: [] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/render:
     post:
       tags: [render]
@@ -420,6 +529,13 @@ components:
       description: The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
       schema: { type: string }
       example: 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+    TagSlug:
+      name: slug
+      in: path
+      required: true
+      description: The tag's canonical slug; a value that is not a slug is 404.
+      schema: { type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$' }
+      example: postgresql
     Version:
       name: version
       in: path
@@ -476,13 +592,13 @@ components:
             - id: n-exp
               type: section
               title: Experience
-              latex: ''
+              latex: "\\section{Experience}\n\\resumeSubHeadingListStart\n{{children}}\n\\resumeSubHeadingListEnd"
               tags: []
               children:
                 - id: n-exp-1
                   type: subsection
                   title: Analytical Engines Ltd
-                  latex: '\resumeSubheading{Analytical Engines Ltd}{London}{Intern}{Jun. 2026 -- Aug. 2026}'
+                  latex: "\\resumeSubheading{Analytical Engines Ltd}{London}{Intern}{Jun. 2026 -- Aug. 2026}\n\\resumeItemListStart\n{{children}}\n\\resumeItemListEnd"
                   tags: []
                   children:
                     - { id: n-exp-1-b1, type: subsection_text, title: Bullet, latex: '\resumeItem{Cut batch runtime by 40\% with caching.}', tags: [java], children: [] }
@@ -509,7 +625,7 @@ components:
             - id: n-exp
               type: section
               title: Experience
-              latex: ''
+              latex: '\section{Experience}'
               tags: []
               children: []
           footer: { id: n-footer, type: footer, title: Footer, latex: '', tags: [], children: [] }
@@ -571,8 +687,29 @@ components:
     ResumeNode:
       type: object
       description: |
-        One node of the tree. `latex` is the node's own LaTeX; children are ordered. Subsections do not
-        nest deeper than one level below a section. Tags are slugs from the shared vocabulary only.
+        One node of the tree. Children are ordered. Subsections do not nest deeper than one level below a
+        section. Tags are slugs from the shared vocabulary only.
+
+        How a node becomes LaTeX
+        - `latex` holds the node's own LaTeX in full: its heading or subheading macro (for example
+          `\section{Experience}` or `\resumeSubheading{..}{..}{..}{..}`), any list wrapper macros, and the place
+          where its child nodes go.
+        - That place is the single token `{{children}}`, written inside `latex`. When the server assembles the
+          document it replaces the token with the expanded LaTeX of the node's children, in `children` order, so
+          reordering children never edits any `latex`.
+        - A node with no children needs no token; a `{{children}}` token in a node without children is removed.
+          A node that has children but no token is rejected with 400 `validation_failed` (`details` names the node
+          id). No other `{{...}}` token exists; any other one is rejected the same way.
+        - More than one `{{children}}` token in one node is also rejected the same way (`details` names the node id).
+        - The token is literal and case-sensitive: `{{Children}}` is an unknown token. It is recognized anywhere in
+          `latex`, including inside a LaTeX comment or verbatim text; such occurrences count like any other.
+        - A section whose children mix text nodes and subsections expands them all, in `children` order, at the
+          single token.
+        - `title` is only the outline label; it is never written into the document.
+        - The comment markers that map compile errors back to nodes are written by the assembler around each
+          node's expanded output; they are not stored in `latex`.
+        - The locked preamble and macro definitions are a hidden part of the server's template. They are never part
+          of the tree and no API ever returns them.
       required: [id, type, title, latex, tags, children]
       properties:
         id:
@@ -582,12 +719,16 @@ components:
           maxLength: 64
         type: { $ref: '#/components/schemas/NodeType' }
         title: { type: string, maxLength: 200 }
-        latex: { type: string, maxLength: 20000 }
+        latex:
+          type: string
+          maxLength: 20000
+          description: The node's own LaTeX in full, including the single `{{children}}` token where its children go (see the schema description).
         tags:
           type: array
           items: { type: string, description: Tag slug }
         children:
           type: array
+          description: Ordered child nodes, expanded where `{{children}}` appears in `latex`.
           items: { $ref: '#/components/schemas/ResumeNode' }
     ResumeTree:
       type: object
@@ -650,7 +791,25 @@ components:
         category: { $ref: '#/components/schemas/TagCategory' }
         aliases:
           type: array
-          items: { type: string }
+          items: { type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$' }
+    AliasConflictError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          required: [conflictingSlug]
+          properties:
+            conflictingSlug:
+              type: string
+              description: The canonical slug of the tag that already holds the normalized alias as its slug or alias
+    AddAliasRequest:
+      type: object
+      required: [alias]
+      properties:
+        alias:
+          type: string
+          minLength: 1
+          maxLength: 60
+          description: Free text; normalized to a slug before it is stored. Must contain a letter or digit.
     CreateTagRequest:
       type: object
       required: [name, category]
