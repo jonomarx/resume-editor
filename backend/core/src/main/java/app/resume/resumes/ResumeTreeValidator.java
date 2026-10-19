@@ -29,10 +29,13 @@ public class ResumeTreeValidator {
         }
     }
 
-    /** Returns human-readable problems; empty means the tree is valid. */
-    public List<String> validate(JsonNode tree) {
-        List<String> problems = new ArrayList<>();
-        schema.validate(tree).forEach(m -> problems.add(m.getMessage()));
+    /**
+     * Returns the problems found (empty means the tree is valid): schema violations, duplicate ids, and the
+     * `{{children}}` token rules, each token problem naming its node id (the contract's 400 `details`).
+     */
+    public List<TreeProblem> validate(JsonNode tree) {
+        List<TreeProblem> problems = new ArrayList<>();
+        schema.validate(tree).forEach(m -> problems.add(new TreeProblem(m.getInstanceLocation().toString(), m.getMessage())));
         if (problems.isEmpty()) {
             Set<String> seen = new HashSet<>();
             collectIds(tree.get("id"), seen, problems);
@@ -40,6 +43,7 @@ public class ResumeTreeValidator {
             collectIds(tree.get("footer").get("id"), seen, problems);
             for (JsonNode s : tree.get("sections")) walk(s, seen, problems);
         }
+        if (problems.isEmpty()) problems.addAll(LatexAssembler.checkTokens(parse(tree)));
         return problems;
     }
 
@@ -47,12 +51,12 @@ public class ResumeTreeValidator {
         return mapper.convertValue(tree, ResumeTree.class);
     }
 
-    private void walk(JsonNode node, Set<String> seen, List<String> problems) {
+    private void walk(JsonNode node, Set<String> seen, List<TreeProblem> problems) {
         collectIds(node.get("id"), seen, problems);
         for (JsonNode c : node.get("children")) walk(c, seen, problems);
     }
 
-    private static void collectIds(JsonNode id, Set<String> seen, List<String> problems) {
-        if (!seen.add(id.asText())) problems.add("duplicate node id: " + id.asText());
+    private static void collectIds(JsonNode id, Set<String> seen, List<TreeProblem> problems) {
+        if (!seen.add(id.asText())) problems.add(new TreeProblem(id.asText(), "duplicate node id: " + id.asText()));
     }
 }

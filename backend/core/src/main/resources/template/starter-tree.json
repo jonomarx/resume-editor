@@ -13,7 +13,7 @@
       "id": "sec-education",
       "type": "section",
       "title": "Education",
-      "latex": "",
+      "latex": "\\section{Education}\n\\resumeSubHeadingListStart\n{{children}}\n\\resumeSubHeadingListEnd",
       "tags": [],
       "children": [
         {
@@ -38,14 +38,14 @@
       "id": "sec-experience",
       "type": "section",
       "title": "Experience",
-      "latex": "",
+      "latex": "\\section{Experience}\n\\resumeSubHeadingListStart\n{{children}}\n\\resumeSubHeadingListEnd",
       "tags": [],
       "children": [
         {
           "id": "exp-1",
           "type": "subsection",
           "title": "Texas A&M University: Undergraduate Research Assistant",
-          "latex": "\\resumeSubheading\n  {Undergraduate Research Assistant}{June 2020 -- Present}\n  {Texas A\\&M University}{College Station, TX}",
+          "latex": "\\resumeSubheading\n  {Undergraduate Research Assistant}{June 2020 -- Present}\n  {Texas A\\&M University}{College Station, TX}\n\\resumeItemListStart\n{{children}}\n\\resumeItemListEnd",
           "tags": [],
           "children": [
             {
@@ -78,7 +78,7 @@
           "id": "exp-2",
           "type": "subsection",
           "title": "Southwestern University: IT Support Specialist",
-          "latex": "\\resumeSubheading\n  {Information Technology Support Specialist}{Sep. 2018 -- Present}\n  {Southwestern University}{Georgetown, TX}",
+          "latex": "\\resumeSubheading\n  {Information Technology Support Specialist}{Sep. 2018 -- Present}\n  {Southwestern University}{Georgetown, TX}\n\\resumeItemListStart\n{{children}}\n\\resumeItemListEnd",
           "tags": [],
           "children": [
             {
@@ -111,7 +111,7 @@
           "id": "exp-3",
           "type": "subsection",
           "title": "Southwestern University: AI Research Assistant",
-          "latex": "\\resumeSubheading\n  {Artificial Intelligence Research Assistant}{May 2019 -- July 2019}\n  {Southwestern University}{Georgetown, TX}",
+          "latex": "\\resumeSubheading\n  {Artificial Intelligence Research Assistant}{May 2019 -- July 2019}\n  {Southwestern University}{Georgetown, TX}\n\\resumeItemListStart\n{{children}}\n\\resumeItemListEnd",
           "tags": [],
           "children": [
             {
@@ -170,14 +170,14 @@
       "id": "sec-projects",
       "type": "section",
       "title": "Projects",
-      "latex": "",
+      "latex": "\\section{Projects}\n\\resumeSubHeadingListStart\n{{children}}\n\\resumeSubHeadingListEnd",
       "tags": [],
       "children": [
         {
           "id": "proj-1",
           "type": "subsection",
           "title": "Gitlytics",
-          "latex": "\\resumeProjectHeading\n  {\\textbf{Gitlytics} $|$ \\emph{Python, Flask, React, PostgreSQL, Docker}}{June 2020 -- Present}",
+          "latex": "\\resumeProjectHeading\n  {\\textbf{Gitlytics} $|$ \\emph{Python, Flask, React, PostgreSQL, Docker}}{June 2020 -- Present}\n\\resumeItemListStart\n{{children}}\n\\resumeItemListEnd",
           "tags": [],
           "children": [
             {
@@ -218,7 +218,7 @@
           "id": "proj-2",
           "type": "subsection",
           "title": "Simple Paintball",
-          "latex": "\\resumeProjectHeading\n  {\\textbf{Simple Paintball} $|$ \\emph{Spigot API, Java, Maven, TravisCI, Git}}{May 2018 -- May 2020}",
+          "latex": "\\resumeProjectHeading\n  {\\textbf{Simple Paintball} $|$ \\emph{Spigot API, Java, Maven, TravisCI, Git}}{May 2018 -- May 2020}\n\\resumeItemListStart\n{{children}}\n\\resumeItemListEnd",
           "tags": [],
           "children": [
             {
@@ -261,7 +261,7 @@
       "id": "sec-skills",
       "type": "section",
       "title": "Skills",
-      "latex": "",
+      "latex": "\\section{Skills}\n\\resumeSubHeadingListStart\n{{children}}\n\\resumeSubHeadingListEnd",
       "tags": [],
       "children": [
         {

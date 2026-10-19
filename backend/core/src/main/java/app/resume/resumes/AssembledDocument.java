@@ -3,26 +3,30 @@ package app.resume.resumes;
 import java.util.List;
 
 /**
- * A complete LaTeX document plus where each node starts. Compile errors report a line number; {@link #nodeIdAtLine}
- * maps it back to the node whose text contains that line (null for the locked preamble).
+ * A complete LaTeX document plus the line span of every node's expansion. The assembler writes `%%NODE <id>` before and
+ * `%%END <id>` after each node's expanded output. A compile error reports a line; {@link #nodeIdAtLine} gives the
+ * innermost node containing it (null for the locked preamble and closing text).
  */
-public record AssembledDocument(String tex, List<NodeStart> nodeStarts) {
-    /** `line` is 1-based: the line of the node's `%%NODE` comment marker. */
-    public record NodeStart(String nodeId, int line) {}
+public record AssembledDocument(String tex, List<NodeSpan> spans) {
+    /** Lines are 1-based; `startLine` is the `%%NODE` marker line and `endLine` the `%%END` marker line. */
+    public record NodeSpan(String nodeId, int startLine, int endLine) {}
 
-    public static final String MARKER_PREFIX = "%%NODE ";
+    public static final String START_PREFIX = "%%NODE ";
+    public static final String END_PREFIX = "%%END ";
 
     public String nodeIdAtLine(int line) {
-        String found = null;
-        for (NodeStart s : nodeStarts) {
-            if (s.line() <= line) found = s.nodeId(); else break;
+        NodeSpan best = null;
+        for (NodeSpan s : spans) {
+            if (s.startLine() <= line && line <= s.endLine() && (best == null || s.startLine() >= best.startLine())) {
+                best = s;
+            }
         }
-        return found;
+        return best == null ? null : best.nodeId();
     }
 
-    /** The line of a node's own LaTeX within the document: the line after its marker. */
+    /** The first line of the node's own text: the line after its start marker. */
     public int firstLineOf(String nodeId) {
-        return nodeStarts.stream().filter(s -> s.nodeId().equals(nodeId)).findFirst()
-                .map(s -> s.line() + 1).orElseThrow();
+        return spans.stream().filter(s -> s.nodeId().equals(nodeId)).findFirst()
+                .map(s -> s.startLine() + 1).orElseThrow();
     }
 }
