@@ -14,6 +14,17 @@ public record AssembledDocument(String tex, List<NodeSpan> spans) {
     public static final String START_PREFIX = "%%NODE ";
     public static final String END_PREFIX = "%%END ";
 
+    /** The innermost node span containing the line, or null (locked preamble, closing text). */
+    public NodeSpan spanAtLine(int line) {
+        NodeSpan best = null;
+        for (NodeSpan s : spans) {
+            if (s.startLine() <= line && line <= s.endLine() && (best == null || s.startLine() >= best.startLine())) {
+                best = s;
+            }
+        }
+        return best;
+    }
+
     public String nodeIdAtLine(int line) {
         NodeSpan best = null;
         for (NodeSpan s : spans) {
