@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import App from './App'
 import { AuthProvider } from './auth/AuthContext'
 import { createDummyApi } from './dummy/dummyApi'
@@ -51,7 +51,7 @@ describe('login form', () => {
     await user.type(await screen.findByLabelText('Username'), 'nobody')
     await user.type(screen.getByLabelText('Password'), 'wrong-password')
     await user.click(screen.getByRole('button', { name: 'Log in' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Wrong username or password')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid username or password')
   })
 
   it('signs up a new account', async () => {
@@ -64,3 +64,29 @@ describe('login form', () => {
     expect(await screen.findByRole('heading', { name: 'Resume Editor' })).toBeInTheDocument()
   })
 })
+
+describe('route guard return path', () => {
+  it('keeps query string and hash', async () => {
+    const api = createDummyApi()
+    await api.auth.signUp({ username: 'ada', password: 'correct-horse' })
+    await api.auth.logOut()
+    render(
+      <MemoryRouter initialEntries={['/jobs?tag=java#top']}>
+        <AuthProvider api={api}>
+          <App />
+          <Where />
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+    const user = userEvent.setup()
+    await user.type(await screen.findByLabelText('Username'), 'ada')
+    await user.type(screen.getByLabelText('Password'), 'correct-horse')
+    await user.click(screen.getByRole('button', { name: 'Log in' }))
+    expect(await screen.findByTestId('where')).toHaveTextContent('/jobs?tag=java#top')
+  })
+})
+
+function Where() {
+  const l = useLocation()
+  return <span data-testid="where">{l.pathname + l.search + l.hash}</span>
+}
