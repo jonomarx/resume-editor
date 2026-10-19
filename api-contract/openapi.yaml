@@ -373,7 +373,8 @@ paths:
         An alias is any printable ASCII text (0x20 to 0x7E): "C++", "C#", ".NET" and "Node.js" are valid aliases. After
         trimming leading and trailing spaces it must be 1 to 60 characters; anything else (control characters, non-ASCII
         characters such as "café", an empty value) is rejected with 400 `validation_failed`. The alias is stored exactly
-        as typed (internal spaces and case kept) and shown that way in `Tag.aliases`.
+        as typed after trimming (leading and trailing spaces are removed when it is stored; internal spaces and case are
+        kept) and shown that way in `Tag.aliases`.
 
         Comparison uses the alias key: the trimmed alias lower-cased. Aliases are unique per user by alias key, so "C++"
         and "c++" are the same alias. An alias is a conflict when its key equals another tag's alias key or another tag's
@@ -433,6 +434,9 @@ paths:
                 conflict:
                   summary: Case-insensitive collision ("MYSQL" or "mysql" against tag mysql)
                   value: { code: alias_conflict, message: That alias already belongs to another tag, conflictingSlug: mysql }
+                aliasEqualsOtherSlug:
+                  summary: Adding the alias "C" to tag c-plus-plus (its alias key `c` equals the slug of tag c)
+                  value: { code: alias_conflict, message: That alias already belongs to another tag, conflictingSlug: c }
     delete:
       tags: [tags]
       operationId: removeTagAlias
@@ -444,6 +448,9 @@ paths:
         or a `{slug}` that is not a valid slug. The tag's slug itself is not an alias and cannot be removed here. The
         canonical slug never changes through this operation, and removing an alias never changes the tags on any
         resume node.
+
+        Encoding: a space in the `alias` value is `%20` (not `+`), and a literal `+` is `%2B`. An alias that is too
+        long or not printable ASCII can never be stored, so it simply matches nothing and returns 404.
       parameters:
         - { $ref: '#/components/parameters/XsrfToken' }
         - { $ref: '#/components/parameters/TagSlug' }
@@ -460,7 +467,16 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Tag' }
               example: { id: 10, name: C++, slug: c-plus-plus, category: language, aliases: [] }
-        '400': { $ref: '#/components/responses/ValidationError' }
+        '400':
+          description: The `alias` query parameter is missing
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                code: validation_failed
+                message: Request failed validation
+                details:
+                  - { field: alias, message: is required }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/CsrfInvalid' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -840,7 +856,7 @@ components:
           properties:
             conflictingSlug:
               type: string
-              description: The canonical slug of the tag that already holds the normalized alias as its slug or alias
+              description: The canonical slug of the tag that already holds the alias key as its slug or as one of its alias keys
     AddAliasRequest:
       type: object
       required: [alias]

@@ -244,6 +244,15 @@ test('tag aliases: the case-insensitive conflict names the other tag, 403 is doc
   assert.equal((await csrf.json()).code, 'csrf_invalid');
 });
 
+test('tag aliases: the alias C on c-plus-plus conflicts with slug c, and DELETE without alias has an alias-specific 400', async () => {
+  const conflict = await fetch(`${base}/api/tags/c-plus-plus/aliases`, { method: 'POST', headers: { ...json, prefer: 'code=409, example=aliasEqualsOtherSlug' }, body: JSON.stringify({ alias: 'C' }) });
+  assert.equal(conflict.status, 409);
+  assert.equal((await conflict.json()).conflictingSlug, 'c');
+  const bad = await fetch(`${base}/api/tags/c-plus-plus/aliases`, { method: 'DELETE', headers: json });
+  assert.equal(bad.status, 400);
+  assert.equal((await bad.json()).details[0].field, 'alias');
+});
+
 test('tag aliases: DELETE takes a percent-encoded alias query parameter', async () => {
   const res = await fetch(`${base}/api/tags/c-plus-plus/aliases?alias=${encodeURIComponent('C++')}`, { method: 'DELETE', headers: json });
   assert.equal(res.status, 200);
