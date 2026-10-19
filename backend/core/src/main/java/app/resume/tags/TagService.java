@@ -81,6 +81,21 @@ public class TagService {
         return wanted;
     }
 
+    /** Tag ids of the given canonical slugs of this user; slugs not in the vocabulary are absent from the map. */
+    public Map<String, Long> idsBySlug(long userId, java.util.Collection<String> slugs) {
+        Map<String, Long> ids = new java.util.HashMap<>();
+        java.util.Set<String> wanted = new java.util.LinkedHashSet<>(slugs);
+        for (List<String> chunk : chunks(new ArrayList<>(wanted), 500)) {
+            String marks = String.join(",", java.util.Collections.nCopies(chunk.size(), "?"));
+            List<Object> args = new ArrayList<>();
+            args.add(userId);
+            args.addAll(chunk);
+            jdbc.query("select slug, id from tag where user_id = ? and slug in (" + marks + ")",
+                    rs -> { ids.put(rs.getString(1), rs.getLong(2)); }, args.toArray());
+        }
+        return ids;
+    }
+
     private static <T> List<List<T>> chunks(List<T> all, int size) {
         List<List<T>> out = new ArrayList<>();
         for (int i = 0; i < all.size(); i += size) out.add(all.subList(i, Math.min(all.size(), i + size)));
