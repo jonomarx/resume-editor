@@ -2,6 +2,7 @@ import { Link, Route, Routes } from 'react-router-dom'
 import RequireAuth from './auth/RequireAuth'
 import { useAuth } from './auth/AuthContext'
 import LoginPage from './pages/LoginPage'
+import MasterResumePage from './pages/MasterResumePage'
 
 function Page({ title }: { title: string }) {
   return <h1>{title}</h1>
@@ -19,7 +20,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route element={<RequireAuth />}>
           <Route path="/" element={<Page title="Resume Editor" />} />
-          <Route path="/resume" element={<Page title="Master resume" />} />
+          <Route path="/resume" element={<MasterResumePage />} />
           <Route path="/jobs" element={<Page title="Jobs" />} />
           <Route path="/drafts/:id" element={<Page title="Draft" />} />
         </Route>
