@@ -1,2 +1,3 @@
-# Datasource comes from the Testcontainers @ServiceConnection; nothing else to override.
-spring: {}
+app:
+  storage:
+    data-dir: target/test-data/${random.uuid}
