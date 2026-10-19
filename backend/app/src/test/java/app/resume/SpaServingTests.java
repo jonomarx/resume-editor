@@ -60,7 +60,7 @@ class SpaServingTests {
         mvc.perform(get("/api/health"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith("application/json"));
-        mvc.perform(get("/api/does-not-exist")).andExpect(status().isNotFound());
+        mvc.perform(get("/api/does-not-exist")).andExpect(status().isUnauthorized()); // signed out: JSON 401, never index.html
         assertThat(mvc.perform(get("/api/does-not-exist")).andReturn().getResponse().getContentAsString())
                 .doesNotContain("<div id=\"root\">");
     }
