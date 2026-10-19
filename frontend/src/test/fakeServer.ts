@@ -1,17 +1,16 @@
-// DUMMY(US-006): in-memory stand-in for the auth endpoints, including the CSRF cookie and header
-// rules of the contract. It is a fake fetch, so the real HTTP client is what runs against it.
-// Delete when US-006 is ready.
+// Test-only fake of the auth endpoints, including the CSRF cookie and header rules of the contract.
+// It is a fake fetch, so the real HTTP client is what runs against it. Not bundled into the app.
 import { createHttpApi } from '../api/http'
 import type { Api, Credentials } from '../api/types'
 import { AUTH, CSRF } from '../config/constants'
 
-export interface DummyServer {
+export interface FakeServer {
   fetch: typeof fetch
   /** Test hook: invalidate the current token as if the server had rotated it. */
   rotateToken(): void
 }
 
-export function createDummyServer(): DummyServer {
+export function createFakeServer(): FakeServer {
   const accounts = new Map<string, { id: number; username: string; password: string }>()
   let nextId = 1
   let currentUserId: number | null = null
@@ -19,7 +18,7 @@ export function createDummyServer(): DummyServer {
   let counter = 0
 
   const issueToken = () => {
-    token = `dummy-token-${++counter}`
+    token = `fake-token-${++counter}`
     document.cookie = `${CSRF.cookieName}=${token}; path=/`
   }
   const reply = (status: number, body?: unknown) =>
@@ -72,8 +71,7 @@ export function createDummyServer(): DummyServer {
   }
 }
 
-export function createDummyApi(): Api {
-  return createHttpApi(createDummyServer().fetch)
+export function createFakeApi(): Api {
+  return createHttpApi(createFakeServer().fetch)
 }
 
-export const dummyApi = createDummyApi()
