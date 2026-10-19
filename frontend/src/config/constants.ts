@@ -23,7 +23,14 @@ export const AUTH = {
   usernameMinLength: 3,
   usernameMaxLength: 40,
   passwordMinLength: 8,
-  passwordMaxLength: 200,
+  usernamePattern: '^[A-Za-z0-9_.-]{3,40}$',
 } as const
 
 export const LOADING_TEXT = 'Loading...'
+
+export const CSRF = {
+  cookieName: 'XSRF-TOKEN',
+  headerName: 'X-XSRF-TOKEN',
+  tokenPath: '/api/me',
+  invalidCode: 'csrf_invalid',
+} as const

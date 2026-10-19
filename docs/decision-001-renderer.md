@@ -28,11 +28,10 @@ Tests: `renderer/tests/test.sh` (needs Docker).
 
 ## Spike: Jake's template compiles unmodified
 
-`renderer/tests/fixtures/jake.tex` is Jake Gutierrez's resume template (MIT) with its sample content,
-unchanged. It compiles in this image to a one-page PDF with `glyphtounicode` and `marvosym` available.
-No extra packages were needed beyond the list above. Note: the fixture was reproduced from the
-published template, not downloaded (the build agent has no network access to the source repo); compare it
-with the upstream copy if exact fidelity matters.
+`renderer/tests/fixtures/jake.tex` is a byte copy of `docs/reference/jake-resume-template.tex` (Jake Gutierrez's
+template, MIT, with its sample content), unmodified. It compiles in this image to a one-page PDF with
+`glyphtounicode` and `marvosym` available. No extra packages were needed beyond the list above. Keep the
+two copies identical.
 
 ## Notes and trade-offs
 

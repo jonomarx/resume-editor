@@ -13,3 +13,7 @@ spring:
       port: ${REDIS_PORT:6379}
   flyway:
     locations: classpath:db/migration
+  web:
+    resources:
+      # The SPA config in app.resume.web.SpaWebConfig owns static serving.
+      add-mappings: false

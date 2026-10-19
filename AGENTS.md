@@ -27,7 +27,7 @@ The Job List Manager only adds, culls, receives, and tags postings. It never doe
 6. **Test.** Write the tests the story needs (where applicable) and make them pass. Run the fast loop constantly. Run the Postgres profile when the story touches database-specific behavior, locking, or when you finish a feature.
 7. **Hand off.** Open a pull request into your role branch, move the card to TO-REVIEW, and comment with what changed, the test results, and anything surprising.
 8. **Review.** Small stories (`review:light`): review your own diff against the checklist in section 6 and post the result on the card. Consequential stories (`review:deep`): stop and request a review by another agent (comment "review requested"); do not approve your own deep review. Contract stories also need the owner's approval.
-9. **Finish.** After approval, merge the pull request into your role branch, move the card to DONE, and leave a short handoff note. Then go back to step 1.
+9. **Finish.** After approval, merge the pull request into your role branch, move the card to DONE, close the issue (`gh issue close <n> -c "<one-line summary>"`; GitHub only auto-closes issues for merges into the default branch, so this is never automatic), and leave a short handoff note. Then go back to step 1.
 
 If you are blocked, comment on the card with the exact reason and take another card. If a requirement is ambiguous, ask the owner on the card; do not guess on anything that changes an API, a data model, or user-visible behavior.
 
@@ -57,6 +57,7 @@ If a piece you need from another role is not ready, you write a temporary dummy 
 - **Migrations.** Flyway files with timestamp versions, never edited after merge.
 - **Tests.** Anything needing Postgres-only features, and all concurrency tests, carry `@Tag("postgres")`.
 - **Tags.** Always use the shared vocabulary; never store free-text tags.
+- **Resume template.** `docs/reference/jake-resume-template.tex` is a reference only; our real template is a derivative and will differ. Do not hard-code Jake-specific preamble, macros, or sample content; keep them in one replaceable place and mark Jake-specific assumptions with a `TEMPLATE` comment (DESIGN section 4).
 - **Git identity.** All commits are authored as `jonomarx <8230342+jonomarx@users.noreply.github.com>`. The repo-local git config (shared by every worktree) already sets this; never change it, never set a different `user.name` or `user.email`, and never use `--author` or a personal email. Before your first commit in a session, check `git config user.email`. Commit messages still end with the Co-Authored-By trailer your tooling requires.
 
 ## 6. Review checklist (author self-review and reviewing another agent)
