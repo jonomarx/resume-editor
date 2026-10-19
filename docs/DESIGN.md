@@ -92,7 +92,7 @@ Postgres holds records and pointers; resume content lives on disk behind `FileSt
 | Subsection text (tagged) | What I did on the job | `\resumeItem` bullets |
 | Footer | Anything after the last section | Text before `\end{document}` |
 
-**Template status.** Jake's template is a **reference**, not the final template. Our actual template is a derivative of it and will differ (preamble, macros, layout details). The reference copy lives at `docs/reference/jake-resume-template.tex`; use it to understand structure and macro names, but do not hard-code its exact preamble or content. Keep the preamble, macro names, and starter tree in one replaceable place so the derivative template can be swapped in later. Until the owner supplies the derivative, the reference is the stand-in; mark any code that depends on Jake-specific details with a `TEMPLATE` comment.
+**Template status.** Jake's template is a **reference**, not the final template. Our actual template is a derivative of it and will differ (preamble, macros, layout details). The reference copy lives at `docs/reference/jake-resume-template.tex`; use it to understand structure and macro names, but do not hard-code its exact preamble or content. Keep the preamble, macro names, and starter tree in one replaceable place so the derivative template can be swapped in later. US-011 creates the derivative from the reference and records the differences in `docs/decision-002-template.md`; until then the reference is the stand-in. Mark any code that depends on Jake-specific details with a `TEMPLATE` comment.
 
 Header and footer are separate top-level nodes. The document is assembled as: locked preamble from Jake's template, header, sections in order, footer, `\end{document}`. The preamble is visible only in an Advanced view. The assembler writes a comment marker per node so compile errors map back to nodes.
 
@@ -211,7 +211,7 @@ Roles: B Backend, F Frontend, J Job List Manager, I Integration, H you. **Depend
 | ID | Role | Story | Depends on | Dummy until ready |
 | --- | --- | --- | --- | --- |
 | US-010 | B | `FileStorage` plus local-disk implementation; immutable versions, atomic writes, per-resume lock, concurrency tests | US-001 | none |
-| US-011 | B | Resume tree model with tags, JSON schema, tree-to-LaTeX assembler with node markers | US-001 | none |
+| US-011 | B | Resume tree model with tags, JSON schema, tree-to-LaTeX assembler with node markers, and creation of our derivative template from the Jake reference (one replaceable resource plus a decision record) | US-001 | none |
 | US-012 | B | Renderer container (TeX Live, no network, timeout) and spike proving Jake's template compiles | none | none |
 | US-013 | B | `POST /api/render` with cache, page count, error-to-node mapping | US-006, US-011, US-012 | none |
 | US-014 | B | Master resume read and write with version check (409), versions, restore; Jake-template starter tree | US-006, US-010, US-011 | none |
