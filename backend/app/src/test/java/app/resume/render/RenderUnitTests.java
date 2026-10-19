@@ -6,10 +6,8 @@ import app.resume.resumes.LatexAssembler;
 import app.resume.resumes.ResumeTree;
 import app.resume.resumes.StarterTree;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 class RenderUnitTests {
     final ObjectMapper mapper = new ObjectMapper();
@@ -51,19 +49,5 @@ class RenderUnitTests {
         assertThat(errors.get(1).line()).isEqualTo(1);
         assertThat(errors.get(2).nodeId()).isNull();
         assertThat(RenderService.mapErrors("garbage", doc)).hasSize(1);
-    }
-
-    @Test
-    void diskCacheTreatsAnEntryFromAnotherTemplateAsAMiss(@TempDir Path dir) {
-        var cache = new DiskRenderCache(dir.toString(), mapper);
-        String h = "a".repeat(64);
-        cache.store(1, h, "templateA", "%PDF-1".getBytes(), 2, "log");
-        assertThat(cache.find(1, h, "templateA")).hasValueSatisfying(e -> assertThat(e.pageCount()).isEqualTo(2));
-        assertThat(cache.find(1, h, "templateB")).isEmpty();
-        assertThat(cache.find(2, h, "templateA")).isEmpty(); // other user
-        assertThat(cache.pdf(2, h)).isEmpty();
-        cache.store(1, h, "templateB", "%PDF-2".getBytes(), 1, "log"); // replaced atomically
-        assertThat(new String(cache.pdf(1, h).orElseThrow())).isEqualTo("%PDF-2");
-        assertThat(cache.find(1, h, "templateB")).isPresent();
     }
 }

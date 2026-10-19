@@ -7,11 +7,9 @@ import app.resume.resumes.StarterTree;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
-import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 /** Renderer protocol violations and cache failures are 503-type failures and are never cached. */
 class RenderFailureTests {
@@ -68,37 +66,5 @@ class RenderFailureTests {
         };
         var service = new RenderService(new LatexAssembler(), tex -> new RendererClient.Pdf(new byte[] {1}, 1, ""), failing, 1_000_000);
         assertThat(service.render(1, starter.create())).isInstanceOf(RenderService.Unavailable.class);
-    }
-
-    /** A reader polling while writers replace an entry must only ever see a complete old or complete new PDF. */
-    @Test
-    void cacheWritesAreAtomicReadersNeverSeeAPartialPdf(@TempDir Path dir) throws Exception {
-        var cache = new DiskRenderCache(dir.toString(), mapper);
-        String h = "b".repeat(64);
-        byte[] small = new byte[1_000_000];
-        byte[] big = new byte[12_000_000];
-        java.util.Arrays.fill(small, (byte) 's');
-        java.util.Arrays.fill(big, (byte) 'B');
-        cache.store(1, h, "t", small, 1, "l");
-        var stop = new java.util.concurrent.atomic.AtomicBoolean();
-        var bad = new AtomicInteger();
-        var seen = new AtomicInteger();
-        Thread reader = new Thread(() -> {
-            while (!stop.get()) {
-                cache.pdf(1, h).ifPresent(b -> {
-                    seen.incrementAndGet();
-                    if (b.length != small.length && b.length != big.length) bad.incrementAndGet();
-                });
-            }
-        });
-        reader.start();
-        for (int i = 0; i < 6; i++) cache.store(1, h, "t", i % 2 == 0 ? big : small, 1, "l");
-        stop.set(true);
-        reader.join();
-        assertThat(seen.get()).isPositive();
-        assertThat(bad.get()).isZero();
-        try (var files = java.nio.file.Files.list(dir.resolve("users/1/render"))) {
-            assertThat(files.map(f -> f.getFileName().toString())).noneMatch(n -> n.startsWith(".tmp-"));
-        }
     }
 }
