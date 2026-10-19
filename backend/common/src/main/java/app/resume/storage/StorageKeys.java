@@ -5,6 +5,7 @@ import java.util.regex.Pattern;
 /** Builds and validates storage keys. A key can never leave the storage root: no "..", no absolute paths. */
 public final class StorageKeys {
     private static final Pattern SEGMENT = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,127}");
+    private static final Pattern PREFIX = Pattern.compile("[A-Za-z0-9._/-]{1,600}");
     private static final int MAX_SEGMENTS = 12;
 
     private StorageKeys() {}
@@ -20,6 +21,15 @@ public final class StorageKeys {
     /** The resume's directory key, the unit the per-resume lock protects. */
     public static String resumeDirectory(long userId, long resumeId) {
         return "users/" + userId + "/resumes/" + resumeId;
+    }
+
+    /** Validates a listing prefix such as `users/7/resumes/42/`: safe characters only, no "..", not empty. */
+    public static String checkPrefix(String prefix) {
+        if (prefix == null || prefix.isEmpty() || !PREFIX.matcher(prefix).matches() || prefix.contains("..")
+                || prefix.startsWith("/") || prefix.contains("//")) {
+            throw new InvalidStorageKeyException("unsafe prefix: '" + prefix + "'");
+        }
+        return prefix;
     }
 
     /** Returns the key's segments, or throws {@link InvalidStorageKeyException}. */

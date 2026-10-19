@@ -9,16 +9,28 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
+@SpringBootTest
+@ActiveProfiles("test")
 class LocalFileStorageTests {
+    static final AtomicLong USERS = new AtomicLong(1000);
+
     @TempDir Path dir;
+    @Autowired FileRegistry registry;
     LocalFileStorage storage;
-    final String key = StorageKeys.resumeVersion(7, 42, 1);
+    long uid;
+    String key;
 
     @BeforeEach
     void setUp() {
-        storage = new LocalFileStorage(dir);
+        uid = USERS.incrementAndGet(); // the registry is shared by every test in the context: keep keys apart
+        key = StorageKeys.resumeVersion(uid, 42, 1);
+        storage = new LocalFileStorage(dir, registry);
     }
 
     static byte[] b(String s) { return s.getBytes(StandardCharsets.UTF_8); }
@@ -27,7 +39,7 @@ class LocalFileStorageTests {
     void putThenGetReturnsTheBytesAndAFileUriAtTheDesignedPath() throws Exception {
         URI uri = storage.put(key, b("{\"v\":1}"));
         assertThat(uri.getScheme()).isEqualTo("file");
-        assertThat(Path.of(uri)).isEqualTo(dir.toRealPath().resolve("users/7/resumes/42/v1.json").toAbsolutePath().normalize());
+        assertThat(Path.of(uri)).isEqualTo(dir.toRealPath().resolve("users/" + uid + "/resumes/42/v1.json").toAbsolutePath().normalize());
         assertThat(Files.readString(Path.of(uri))).isEqualTo("{\"v\":1}");
         assertThat(storage.get(key)).hasValueSatisfying(v -> assertThat(v).isEqualTo(b("{\"v\":1}")));
     }
@@ -66,7 +78,7 @@ class LocalFileStorageTests {
         storage.put(key, b("a"));
         assertThatThrownBy(() -> storage.put(key, b("b"))).isInstanceOf(KeyAlreadyExistsException.class);
         assertThat(storage.tempFilesIn(key)).isZero();
-        try (var files = Files.list(dir.resolve("users/7/resumes/42"))) {
+        try (var files = Files.list(dir.resolve("users/" + uid + "/resumes/42"))) {
             assertThat(files.map(p -> p.getFileName().toString())).containsExactly("v1.json");
         }
     }
@@ -79,6 +91,8 @@ class LocalFileStorageTests {
             assertThatThrownBy(() -> storage.get(bad)).as(bad).isInstanceOf(InvalidStorageKeyException.class);
         }
         assertThat(dir).isEmptyDirectory();
+        assertThatThrownBy(() -> storage.list("../x/", FileState.COMMITTED)).isInstanceOf(InvalidStorageKeyException.class);
+        assertThatThrownBy(() -> storage.list("", FileState.COMMITTED)).isInstanceOf(InvalidStorageKeyException.class);
     }
 
     @Test

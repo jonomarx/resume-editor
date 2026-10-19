@@ -9,30 +9,57 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 /**
- * FileStorage on local disk under DATA_DIR (FILE_STORAGE=local).
- * Write path: lock the key's directory (one writer per resume), write a temp file beside the target, fsync it, then
- * publish it with a hard link, which is atomic and fails if the target exists, so a version is never overwritten and
- * readers never see a partial file. The temp file is always removed.
+ * FileStorage on local disk under DATA_DIR (FILE_STORAGE=local), with every file registered in the {@link FileRegistry}.
+ * Write path: register the PENDING intent row (own transaction), lock the key's directory (one writer per resume),
+ * write a temp file beside the target, fsync it, then publish it with a hard link, which is atomic and fails if the
+ * target exists, so a version is never overwritten and readers never see a partial file. The temp file is removed on
+ * every normal path.
+ *
+ * <p>Requirements and limits: DATA_DIR must be on a filesystem that supports hard links (ext4, xfs, btrfs, APFS and
+ * most Docker volumes do; FAT/exFAT, some SMB/FUSE mounts and some bind mounts do not, and puts then fail with an
+ * UncheckedIOException). A crash mid-write can leave a `.tmp-*` file (never visible under a key) or, after the link
+ * but before the temp delete, a second hard link; the reconciliation worker (US-070) sweeps those. The parent directory
+ * is not fsynced after the link.
  */
 public class LocalFileStorage implements FileStorage {
     private static final String TMP_PREFIX = ".tmp-";
 
     private final Path root;
+    private final FileRegistry registry;
     private final KeyedLocks<String> dirLocks = new KeyedLocks<>();
 
-    public LocalFileStorage(Path root) {
+    public LocalFileStorage(Path root, FileRegistry registry) {
         this.root = root.toAbsolutePath().normalize();
+        this.registry = registry;
     }
 
     @Override
     public URI put(String key, byte[] bytes) {
         Path target = resolve(key);
+        FileRegistry.Registration reg = registry.register(key, target.toUri(), bytes, Files.isRegularFile(target));
+        if (reg == FileRegistry.Registration.CONFLICT) throw new KeyAlreadyExistsException(key);
+        afterRegistered(key);
         String dirKey = target.getParent().toString();
         return dirLocks.call(dirKey, () -> write(key, target, bytes));
+    }
+
+    /** Test hook: runs after the PENDING row exists and before anything is written (a crash here leaves only the row). */
+    protected void afterRegistered(String key) {}
+
+    @Override
+    public void commit(String key) {
+        StorageKeys.segments(key);
+        registry.commit(key);
+    }
+
+    @Override
+    public List<StoredFile> list(String prefix, FileState state) {
+        return registry.list(StorageKeys.checkPrefix(prefix), state);
     }
 
     private URI write(String key, Path target, byte[] bytes) {
@@ -78,13 +105,15 @@ public class LocalFileStorage implements FileStorage {
     @Override
     public boolean delete(String key) {
         Path target = resolve(key);
-        return dirLocks.call(target.getParent().toString(), () -> {
+        boolean fileRemoved = dirLocks.call(target.getParent().toString(), () -> {
             try {
                 return Files.deleteIfExists(target);
             } catch (IOException e) {
                 throw new UncheckedIOException("cannot delete " + key, e);
             }
         });
+        boolean rowRemoved = registry.remove(key); // file first, then row: never leave a file nobody knows about
+        return fileRemoved || rowRemoved;
     }
 
     @Override
