@@ -1,0 +1,50 @@
+# Java / Maven
+target/
+*.class
+*.jar
+*.war
+hs_err_pid*
+.mvn/wrapper/maven-wrapper.jar
+
+# Node / frontend / e2e
+node_modules/
+dist/
+coverage/
+.vite/
+*.tsbuildinfo
+playwright-report/
+test-results/
+.pnpm-store/
+
+# Secrets and local config (no secrets in the repo)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+application-local.yml
+application-local.properties
+
+# Runtime data and renderer output
+data/
+DATA_DIR/
+*.log
+*.aux
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# IDEs and OS
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Claude Code local files
+.claude/settings.local.json
