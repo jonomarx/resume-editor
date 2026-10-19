@@ -24,5 +24,23 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+  # LaTeX renderer (US-012). Reachable only on the internal network, which has no outbound access;
+  # the app container joins `render` to call http://renderer:8080/render.
+  renderer:
+    build: ./renderer
+    read_only: true
+    tmpfs:
+      - /work:rw,size=64m,uid=10001
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 128
+    mem_limit: 512m
+    environment:
+      RENDER_TIMEOUT_SECONDS: ${RENDER_TIMEOUT_SECONDS:-20}
+      RENDER_MAX_BYTES: ${RENDER_MAX_BYTES:-1000000}
+    networks: [render]
+networks:
+  render:
+    internal: true
 volumes:
   pgdata:
