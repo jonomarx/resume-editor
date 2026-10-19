@@ -128,3 +128,23 @@ export const PREVIEW_LABELS = {
 
 /** PDF.js draws each page at this scale (1 = 72 dpi). */
 export const PDF_PREVIEW_SCALE = 1.2
+
+export const TAG_CATEGORIES = [
+  { value: 'language', label: 'Language' },
+  { value: 'framework', label: 'Framework' },
+  { value: 'domain', label: 'Domain' },
+  { value: 'role_type', label: 'Role type' },
+] as const
+
+export const TAG_LABELS = {
+  heading: 'Tags',
+  none: 'No tags yet.',
+  addLabel: 'Add a tag',
+  categoryLabel: 'Category for a new tag',
+  create: (name: string) => `Create "${name}"`,
+  remove: (name: string) => `Remove tag ${name}`,
+  loadFailed: 'Could not load tags.',
+  createFailed: 'Could not create the tag.',
+  /** Nodes of these types carry tags (DESIGN section 4); header and footer do not. */
+  taggable: ['section', 'section_text', 'subsection', 'subsection_text'],
+} as const

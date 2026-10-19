@@ -6,6 +6,8 @@ export type ApiErrorBody = components['schemas']['Error'] & { currentVersion?: n
 export type ResumeDocument = components['schemas']['ResumeDocument']
 export type ResumeVersionSummary = components['schemas']['ResumeVersionSummary']
 export type ResumeTree = components['schemas']['ResumeTree']
+export type Tag = components['schemas']['Tag']
+export type TagCategory = components['schemas']['TagCategory']
 export type RenderResult = components['schemas']['RenderResult']
 
 /** Error thrown by any API client call; mirrors the contract's Error schema. */
@@ -50,7 +52,15 @@ export interface RenderApi {
   render(tree: ResumeTree): Promise<RenderResult>
 }
 
+/** Tag vocabulary (operationIds listTags, createTag). Aliases are not managed by the node tag editor. */
+export interface TagsApi {
+  listTags(): Promise<Tag[]>
+  /** Get or create: resolves to the existing tag (200) or the new one (201). */
+  createTag(name: string, category: TagCategory): Promise<Tag>
+}
+
 export interface Api {
+  tags: TagsApi
   auth: AuthApi
   resume: ResumeApi
   render: RenderApi

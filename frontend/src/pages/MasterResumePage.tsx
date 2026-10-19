@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api } from '../api'
 import { SAVE_LABELS } from '../config/constants'
 import NodeEditor from '../editor/NodeEditor'
+import NodeTags from '../tags/NodeTags'
 import OutlineTree from '../outline/OutlineTree'
 import RenderPanel from '../preview/RenderPanel'
 import { useRender } from '../preview/useRender'
@@ -31,7 +32,10 @@ export default function MasterResumePage({ apiClient = api }: { apiClient?: Api 
         <>
           <div style={{ display: 'flex', gap: '1rem' }}>
             <OutlineTree tree={r.tree} onChange={r.setTree} selectedId={selectedId} onSelect={setSelectedId} />
-            <NodeEditor tree={r.tree} selectedId={selectedId} onChange={r.setTree} />
+            <div>
+              <NodeEditor tree={r.tree} selectedId={selectedId} onChange={r.setTree} />
+              <NodeTags api={apiClient} tree={r.tree} selectedId={selectedId} onChange={r.setTree} />
+            </div>
             <RenderPanel tree={r.tree} {...preview} />
           </div>
           <VersionHistory
