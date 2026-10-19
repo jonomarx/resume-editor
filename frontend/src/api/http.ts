@@ -1,5 +1,5 @@
 import { CSRF } from '../config/constants'
-import { ApiError, type Api, type ApiErrorBody, type RenderResult, type ResumeDocument, type ResumeVersionSummary, type User } from './types'
+import { ApiError, type Api, type ApiErrorBody, type RenderResult, type Tag, type ResumeDocument, type ResumeVersionSummary, type User } from './types'
 
 const MUTATING = new Set(['POST', 'PUT', 'DELETE'])
 
@@ -61,6 +61,10 @@ export function createHttpApi(fetchImpl: typeof fetch = (...a) => fetch(...a)): 
   }
 
   return {
+    tags: {
+      listTags: async () => json<Tag[]>(await request('GET', '/api/tags')),
+      createTag: async (name, category) => json<Tag>(await request('POST', '/api/tags', { name, category })),
+    },
     render: {
       render: async (tree) => json<RenderResult>(await request('POST', '/api/render', { tree })),
     },

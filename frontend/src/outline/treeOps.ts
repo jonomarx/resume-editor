@@ -90,6 +90,14 @@ export function setNodeLatex(tree: ResumeTree, id: string, latex: string): Resum
   return mapAll(tree, id, (n) => ({ ...n, latex }))
 }
 
+export function addNodeTag(tree: ResumeTree, id: string, slug: string): ResumeTree {
+  return mapAll(tree, id, (n) => (n.tags.includes(slug) ? n : { ...n, tags: [...n.tags, slug] }))
+}
+
+export function removeNodeTag(tree: ResumeTree, id: string, slug: string): ResumeTree {
+  return mapAll(tree, id, (n) => ({ ...n, tags: n.tags.filter((t) => t !== slug) }))
+}
+
 /** Adds a child to `parentId` (or a new section when parentId is null). Rejects shapes the model forbids. */
 export function addNode(tree: ResumeTree, parentId: string | null, type: NodeType, newId: IdFactory = defaultId): ResumeTree {
   if (parentId === null) {

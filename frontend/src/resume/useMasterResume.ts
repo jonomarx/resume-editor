@@ -4,6 +4,11 @@ import { AUTOSAVE_DEBOUNCE_MS } from '../config/constants'
 
 export type SaveStatus = 'loading' | 'saved' | 'dirty' | 'saving' | 'conflict' | 'error'
 
+function describeError(e: unknown): string {
+  if (e instanceof ApiError && e.details?.length) return `${e.message}: ${e.details.map((d) => d.message).join('; ')}`
+  return e instanceof Error ? e.message : String(e)
+}
+
 /**
  * Loads the master resume, autosaves edits (debounced) with optimistic locking, and manages history.
  * Saves are serialized: at most one request is in flight, and edits made meanwhile trigger one more save
@@ -45,7 +50,7 @@ export function useMasterResume(api: Api) {
     try {
       adopt(await api.resume.getMaster())
     } catch (e) {
-      setErrorMessage(e instanceof Error ? e.message : String(e))
+      setErrorMessage(describeError(e))
       setStatus('error')
     }
   }, [api, adopt])
@@ -75,7 +80,7 @@ export function useMasterResume(api: Api) {
             stopped.current = true
             setStatus('conflict')
           } else {
-            setErrorMessage(e instanceof Error ? e.message : String(e))
+            setErrorMessage(describeError(e))
             setStatus('error')
           }
           return
@@ -88,7 +93,9 @@ export function useMasterResume(api: Api) {
   }, [api])
 
   const setTree = useCallback(
-    (t: ResumeTree) => {
+    (update: ResumeTree | ((prev: ResumeTree) => ResumeTree)) => {
+      // A function update is applied to the newest tree, never to a copy captured earlier (see async tag creation).
+      const t = typeof update === 'function' ? update(treeRef.current!) : update
       treeRef.current = t
       dirty.current = true
       setTreeState(t)
@@ -115,7 +122,7 @@ export function useMasterResume(api: Api) {
           stopped.current = true
           setStatus('conflict')
         } else {
-          setErrorMessage(e instanceof Error ? e.message : String(e))
+          setErrorMessage(describeError(e))
           setStatus('error')
         }
       }

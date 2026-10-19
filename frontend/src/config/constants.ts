@@ -128,3 +128,28 @@ export const PREVIEW_LABELS = {
 
 /** PDF.js draws each page at this scale (1 = 72 dpi). */
 export const PDF_PREVIEW_SCALE = 1.2
+
+export const TAG_CATEGORIES = [
+  { value: 'language', label: 'Language' },
+  { value: 'framework', label: 'Framework' },
+  { value: 'domain', label: 'Domain' },
+  { value: 'role_type', label: 'Role type' },
+] as const
+
+export const TAG_LABELS = {
+  heading: 'Tags',
+  none: 'No tags yet.',
+  addLabel: 'Add a tag',
+  categoryLabel: 'Category for a new tag',
+  create: (name: string) => `Create "${name}"`,
+  remove: (name: string) => `Remove tag ${name}`,
+  removeSymbol: 'x',
+  matchingLabel: 'Matching tags',
+  loadFailed: 'Could not load tags.',
+  createFailed: 'Could not create the tag.',
+  /** Only the two text node types carry tags for now (DESIGN section 4 and 6); other nodes get no editor. */
+  taggable: ['section_text', 'subsection_text'],
+} as const
+
+/** At most this many vocabulary suggestions are listed while typing. */
+export const TAG_SUGGESTION_LIMIT = 8
