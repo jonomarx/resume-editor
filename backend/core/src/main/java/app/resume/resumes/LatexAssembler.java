@@ -37,6 +37,9 @@ public class LatexAssembler {
         for (ResumeNode c : node.children()) collect(c, problems);
     }
 
+    /** The template this assembler uses (its fingerprint keys the render cache). */
+    public TemplateResources template() { return template; }
+
     public AssembledDocument assemble(ResumeTree tree) {
         List<TreeProblem> problems = checkTokens(tree);
         if (!problems.isEmpty()) throw new InvalidTreeException(problems);

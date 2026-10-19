@@ -24,3 +24,11 @@ server:
         name: SESSION
         http-only: true
         same-site: lax
+app:
+  renderer:
+    url: ${RENDERER_URL:http://localhost:8081}
+    timeout-seconds: 30
+  render:
+    max-bytes: 1000000
+  storage:
+    data-dir: ${DATA_DIR:./data}
