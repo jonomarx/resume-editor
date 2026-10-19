@@ -6,6 +6,7 @@ export type ApiErrorBody = components['schemas']['Error'] & { currentVersion?: n
 export type ResumeDocument = components['schemas']['ResumeDocument']
 export type ResumeVersionSummary = components['schemas']['ResumeVersionSummary']
 export type ResumeTree = components['schemas']['ResumeTree']
+export type RenderResult = components['schemas']['RenderResult']
 
 /** Error thrown by any API client call; mirrors the contract's Error schema. */
 export class ApiError extends Error {
@@ -44,7 +45,13 @@ export interface ResumeApi {
   restoreVersion(version: number, baseVersion: number): Promise<ResumeDocument>
 }
 
+/** Render operation (operationId renderResume). Takes the tree, not LaTeX; the PDF itself is fetched via result.pdfUrl. */
+export interface RenderApi {
+  render(tree: ResumeTree): Promise<RenderResult>
+}
+
 export interface Api {
   auth: AuthApi
   resume: ResumeApi
+  render: RenderApi
 }
