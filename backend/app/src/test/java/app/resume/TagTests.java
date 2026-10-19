@@ -82,47 +82,78 @@ class TagTests {
     }
 
     org.springframework.test.web.servlet.ResultActions addAlias(Cookie s, String slug, String alias) throws Exception {
+        String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(java.util.Map.of("alias", alias));
         return mvc.perform(CsrfSupport.post("/api/tags/" + slug + "/aliases").cookie(s)
-                .contentType(MediaType.APPLICATION_JSON).content("{\"alias\":\"" + alias + "\"}"));
+                .contentType(MediaType.APPLICATION_JSON).content(json));
     }
 
+    /** DELETE with the alias passed percent-encoded in the query, like a real client. */
     org.springframework.test.web.servlet.ResultActions removeAlias(Cookie s, String slug, String alias) throws Exception {
+        String encoded = java.net.URLEncoder.encode(alias, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");
         return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
-                "/api/tags/" + slug + "/aliases/" + alias).cookie(new Cookie("XSRF-TOKEN", CsrfSupport.TOKEN))
+                java.net.URI.create("/api/tags/" + slug + "/aliases?alias=" + encoded)).cookie(new Cookie("XSRF-TOKEN", CsrfSupport.TOKEN))
                 .header("X-XSRF-TOKEN", CsrfSupport.TOKEN).cookie(s));
     }
 
     @Test
-    void addAliasNormalizesAndLaterCreateResolvesToTheCanonicalTag() throws Exception {
+    void cCPlusPlusAndCSharpAreThreeTagsAndNameResolutionUsesAliasKeysFirst() throws Exception {
         Cookie s = newUser();
-        create(s, "PostgreSQL", "language").andExpect(status().isCreated());
-        addAlias(s, "postgresql", "  Post GRES! ").andExpect(status().isOk())
-                .andExpect(jsonPath("$.slug").value("postgresql")).andExpect(jsonPath("$.aliases[0]").value("post-gres"));
-        create(s, "post gres", "framework").andExpect(status().isOk()).andExpect(jsonPath("$.slug").value("postgresql"));
-        mvc.perform(get("/api/tags").param("q", "post-gres").cookie(s)).andExpect(jsonPath("$.length()").value(1));
-        assertThat(jdbc.queryForObject("select count(*) from tag where user_id = ?", Integer.class, userId(s))).isEqualTo(1);
+        create(s, "C", "language").andExpect(status().isCreated()).andExpect(jsonPath("$.slug").value("c"));
+        create(s, "C++", "language").andExpect(status().isCreated()).andExpect(jsonPath("$.slug").value("c-plus-plus"));
+        create(s, "C#", "language").andExpect(status().isCreated()).andExpect(jsonPath("$.slug").value("c-sharp"));
+        create(s, "c++", "language").andExpect(status().isOk()).andExpect(jsonPath("$.slug").value("c-plus-plus"));
+        // an alias key is checked on the raw name before the slug is computed
+        addAlias(s, "c-sharp", "C Sharp").andExpect(status().isOk()).andExpect(jsonPath("$.aliases[0]").value("C Sharp"));
+        create(s, "  c sharp ", "language").andExpect(status().isOk()).andExpect(jsonPath("$.slug").value("c-sharp"));
+        mvc.perform(get("/api/tags").cookie(s)).andExpect(jsonPath("$.length()").value(3));
     }
 
     @Test
-    void addingAnExistingAliasOrTheOwnSlugIsANoOp200() throws Exception {
+    void aSlugThatEqualsAnAliasKeyResolvesToTheAliasOwnerInsteadOfCreatingAClash() throws Exception {
+        Cookie s = newUser();
+        create(s, "Kubernetes", "domain").andExpect(status().isCreated());
+        addAlias(s, "kubernetes", "K8S").andExpect(status().isOk());
+        create(s, "k8s!", "domain").andExpect(status().isOk()).andExpect(jsonPath("$.slug").value("kubernetes")); // slug k8s = alias key k8s
+        mvc.perform(get("/api/tags").cookie(s)).andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    void aliasesKeepTheirTypedFormAndMayContainPlusHashDotSlashAndSpaces() throws Exception {
+        Cookie s = newUser();
+        create(s, "C++", "language").andExpect(status().isCreated());
+        for (String alias : new String[] {"C++", ".NET core/3", "c#-ish", " 50% done ", "~!@$^&*()"}) {
+            addAlias(s, "c-plus-plus", alias).andExpect(status().isOk());
+        }
+        mvc.perform(get("/api/tags").param("q", "c-plus").cookie(s)).andExpect(jsonPath("$[0].aliases.length()").value(5))
+                .andExpect(jsonPath("$[0].aliases", org.hamcrest.Matchers.hasItems("C++", "50% done", ".NET core/3"))); // trimmed, case kept
+        create(s, ".net CORE/3", "language").andExpect(status().isOk()).andExpect(jsonPath("$.slug").value("c-plus-plus"));
+    }
+
+    @Test
+    void addingAnExistingAliasInAnyCaseOrTheOwnSlugIsANoOp200() throws Exception {
         Cookie s = newUser();
         create(s, "Kubernetes", "domain").andExpect(status().isCreated());
         addAlias(s, "kubernetes", "k8s").andExpect(status().isOk());
-        addAlias(s, "kubernetes", "K8S").andExpect(status().isOk()).andExpect(jsonPath("$.aliases.length()").value(1));
+        addAlias(s, "kubernetes", "K8S").andExpect(status().isOk()).andExpect(jsonPath("$.aliases.length()").value(1))
+                .andExpect(jsonPath("$.aliases[0]").value("k8s")); // the first spelling stays
         addAlias(s, "kubernetes", "Kubernetes").andExpect(status().isOk()).andExpect(jsonPath("$.slug").value("kubernetes"))
                 .andExpect(jsonPath("$.aliases.length()").value(1));
     }
 
     @Test
-    void aliasConflictsWithAnotherTagsSlugOrAliasReturn409WithTheConflictingSlug() throws Exception {
+    void conflictsAreCaseInsensitiveAndCoverOtherTagsSlugsAndAliases() throws Exception {
         Cookie s = newUser();
         create(s, "MySQL", "language").andExpect(status().isCreated());
         create(s, "PostgreSQL", "language").andExpect(status().isCreated());
-        addAlias(s, "mysql", "sql-db").andExpect(status().isOk());
-        addAlias(s, "postgresql", "mysql").andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("alias_conflict"))
+        addAlias(s, "mysql", "SQL DB").andExpect(status().isOk());
+        addAlias(s, "postgresql", "MYSQL").andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("alias_conflict"))
                 .andExpect(jsonPath("$.conflictingSlug").value("mysql")).andExpect(jsonPath("$.message").isString());
-        addAlias(s, "postgresql", "SQL DB").andExpect(status().isConflict()).andExpect(jsonPath("$.conflictingSlug").value("mysql"));
+        addAlias(s, "postgresql", "sql db").andExpect(status().isConflict()).andExpect(jsonPath("$.conflictingSlug").value("mysql"));
         mvc.perform(get("/api/tags").param("q", "postgresql").cookie(s)).andExpect(jsonPath("$[0].aliases.length()").value(0));
+        // the owner's example: alias "C" on c-plus-plus equals the slug of tag c
+        create(s, "C", "language").andExpect(status().isCreated());
+        create(s, "C++", "language").andExpect(status().isCreated());
+        addAlias(s, "c-plus-plus", "C").andExpect(status().isConflict()).andExpect(jsonPath("$.conflictingSlug").value("c"));
     }
 
     @Test
@@ -133,59 +164,77 @@ class TagTests {
         create(b, "Go", "language").andExpect(status().isCreated());
         create(b, "Golang", "language").andExpect(status().isCreated());
         addAlias(a, "rust", "golang").andExpect(status().isOk()); // user B's "golang" is invisible to user A
-        addAlias(b, "go", "rust").andExpect(status().isOk());     // and user A's "rust" to B
-        addAlias(b, "go", "golang").andExpect(status().isConflict()).andExpect(jsonPath("$.conflictingSlug").value("golang"));
+        addAlias(b, "go", "RUST").andExpect(status().isOk());     // and user A's "rust" to B
+        addAlias(b, "go", "Golang").andExpect(status().isConflict()).andExpect(jsonPath("$.conflictingSlug").value("golang"));
         addAlias(a, "go", "x").andExpect(status().isNotFound());  // another user's tag is not found
     }
 
     @Test
-    void badAliasRequestsAre400() throws Exception {
+    void badAliasesAre400IncludingNonAsciiAndControlCharacters() throws Exception {
         Cookie s = newUser();
         create(s, "Python", "language").andExpect(status().isCreated());
-        addAlias(s, "python", "").andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("validation_failed"));
-        addAlias(s, "python", "!!!").andExpect(status().isBadRequest());
-        addAlias(s, "python", "a".repeat(61)).andExpect(status().isBadRequest());
-        addAlias(s, "python", "a".repeat(60)).andExpect(status().isOk()); // limit counts code points of the raw input
+        for (String bad : new String[] {"café", "", "   ", "tab\there", "line\nbreak", "\u007F", "emoji \uD83D\uDE00", "x".repeat(61), " " + "y".repeat(61)}) {
+            addAlias(s, "python", bad).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("validation_failed"))
+                    .andExpect(jsonPath("$.details[0].field").value("alias"));
+        }
+        addAlias(s, "python", "z".repeat(60)).andExpect(status().isOk());
+        addAlias(s, "python", "  " + "w".repeat(60) + "  ").andExpect(status().isOk()); // the 60 limit is after trimming
         mvc.perform(CsrfSupport.post("/api/tags/python/aliases").cookie(s).contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    void sixtyCodePointsIsTheLimitEvenForSurrogatePairs() throws Exception {
+    void deleteTakesAPercentEncodedAliasMatchedByAliasKey() throws Exception {
         Cookie s = newUser();
-        create(s, "Emoji", "domain").andExpect(status().isCreated());
-        String sixty = "\uD83D\uDE00".repeat(59) + "a"; // 60 code points, 119 chars
-        addAlias(s, "emoji", sixty).andExpect(status().isOk());
-        addAlias(s, "emoji", "\uD83D\uDE00".repeat(60) + "b").andExpect(status().isBadRequest()); // 61
+        create(s, "C++", "language").andExpect(status().isCreated());
+        addAlias(s, "c-plus-plus", "C++").andExpect(status().isOk());
+        addAlias(s, "c-plus-plus", ".NET / Core").andExpect(status().isOk());
+        removeAlias(s, "c-plus-plus", "c++").andExpect(status().isOk()).andExpect(jsonPath("$.aliases.length()").value(1))
+                .andExpect(jsonPath("$.slug").value("c-plus-plus"));
+        removeAlias(s, "c-plus-plus", ".net / core").andExpect(status().isOk()).andExpect(jsonPath("$.aliases.length()").value(0));
+        removeAlias(s, "c-plus-plus", "C++").andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("not_found"));
+        removeAlias(s, "c-plus-plus", "c-plus-plus").andExpect(status().isNotFound()); // the slug is not an alias
+        removeAlias(s, "c-plus-plus", "café").andExpect(status().isNotFound());       // non-ASCII: nothing to match
+        removeAlias(s, "c-plus-plus", "x".repeat(70)).andExpect(status().isNotFound());
+        removeAlias(s, "nope", "C++").andExpect(status().isNotFound());
+        removeAlias(s, "Not-A-Slug", "C++").andExpect(status().isNotFound());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/tags/c-plus-plus/aliases")
+                        .cookie(new Cookie("XSRF-TOKEN", CsrfSupport.TOKEN)).header("X-XSRF-TOKEN", CsrfSupport.TOKEN).cookie(s))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.details[0].field").value("alias"));
+        // the old path-segment form is gone
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/tags/c-plus-plus/aliases/cpp")
+                        .cookie(new Cookie("XSRF-TOKEN", CsrfSupport.TOKEN)).header("X-XSRF-TOKEN", CsrfSupport.TOKEN).cookie(s))
+                .andExpect(status().is4xxClientError());
     }
 
     @Test
-    void removeAliasReturnsTheUpdatedTagAndUnknownThingsAre404() throws Exception {
+    void aFreedAliasCanBeUsedByAnotherTagAndNeverChangesNodeTags() throws Exception {
         Cookie s = newUser();
         create(s, "Java", "language").andExpect(status().isCreated());
-        addAlias(s, "java", "jdk").andExpect(status().isOk());
-        removeAlias(s, "java", "jdk").andExpect(status().isOk()).andExpect(jsonPath("$.aliases.length()").value(0))
-                .andExpect(jsonPath("$.slug").value("java"));
-        removeAlias(s, "java", "jdk").andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("not_found"));
-        removeAlias(s, "java", "java").andExpect(status().isNotFound()); // the slug is not an alias
-        removeAlias(s, "nope", "jdk").andExpect(status().isNotFound());
-        removeAlias(s, "Java", "jdk").andExpect(status().isNotFound());  // not a slug
-        removeAlias(s, "java", "JDK").andExpect(status().isNotFound());  // not a normalized alias
-        addAlias(s, "nope", "x").andExpect(status().isNotFound());
-        addAlias(s, "Not-A-Slug", "x").andExpect(status().isNotFound());
         create(s, "Scala", "language").andExpect(status().isCreated());
-        addAlias(s, "scala", "jdk").andExpect(status().isOk()); // freed alias can be reused by another tag
+        addAlias(s, "java", "JDK").andExpect(status().isOk());
+        removeAlias(s, "java", "jdk").andExpect(status().isOk());
+        addAlias(s, "scala", "jdk").andExpect(status().isOk());
+        for (int i = 0; i < 25; i++) addAlias(s, "scala", "alias " + i).andExpect(status().isOk()); // no cap
+        mvc.perform(get("/api/tags").param("q", "scala").cookie(s)).andExpect(jsonPath("$[0].aliases.length()").value(26));
+        // node tags reference slugs only (US-021): alias changes touch only tag_key rows, never a tag row
+        assertThat(jdbc.queryForObject("select count(*) from tag where user_id = ?", Integer.class, userId(s))).isEqualTo(2);
     }
 
     @Test
-    void aliasChangesNeverTouchNodeTagsAndHaveNoCap() throws Exception {
+    void qMatchesNameSlugAndAliasKeyCaseInsensitivelyWithWildcardsTakenLiterally() throws Exception {
         Cookie s = newUser();
-        create(s, "Docker", "framework").andExpect(status().isCreated());
-        for (int i = 0; i < 25; i++) addAlias(s, "docker", "alias" + i).andExpect(status().isOk());
-        mvc.perform(get("/api/tags").param("q", "docker").cookie(s)).andExpect(jsonPath("$[0].aliases.length()").value(25));
-        // node tags reference slugs only; there is no resume_node_tag table yet (US-021), so nothing to change here
-        assertThat(jdbc.queryForObject("select count(*) from tag_key where is_alias = true and user_id = ?", Integer.class, userId(s)))
-                .isEqualTo(25);
+        create(s, "Node.js", "framework").andExpect(status().isCreated());
+        create(s, "Discount", "domain").andExpect(status().isCreated());
+        addAlias(s, "discount", "50% OFF").andExpect(status().isOk());
+        addAlias(s, "node-js", "Server_Side JS").andExpect(status().isOk());
+        mvc.perform(get("/api/tags").param("q", "NODE").cookie(s)).andExpect(jsonPath("$.length()").value(1)); // name and slug
+        mvc.perform(get("/api/tags").param("q", "node-j").cookie(s)).andExpect(jsonPath("$.length()").value(1)); // slug
+        mvc.perform(get("/api/tags").param("q", "server_side").cookie(s)).andExpect(jsonPath("$[0].slug").value("node-js")); // alias key
+        mvc.perform(get("/api/tags").param("q", "50% o").cookie(s)).andExpect(jsonPath("$[0].slug").value("discount"));
+        mvc.perform(get("/api/tags").param("q", "%").cookie(s)).andExpect(jsonPath("$.length()").value(1)); // not "match everything"
+        mvc.perform(get("/api/tags").param("q", "_").cookie(s)).andExpect(jsonPath("$.length()").value(1)); // only Server_Side
+        mvc.perform(get("/api/tags").param("q", "d_sc").cookie(s)).andExpect(jsonPath("$.length()").value(0)); // _ is not a wildcard
     }
 
     @Test
@@ -198,7 +247,7 @@ class TagTests {
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/tags/x/aliases").cookie(s)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"alias\":\"a\"}"))
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("csrf_invalid"));
-        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/tags/x/aliases/a").cookie(s))
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/tags/x/aliases?alias=a").cookie(s))
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("csrf_invalid"));
     }
 
