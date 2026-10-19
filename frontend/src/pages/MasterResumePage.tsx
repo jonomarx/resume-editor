@@ -1,6 +1,7 @@
 import { useState } from 'react'
 // DUMMY(US-014): swap to the real master-resume source when the endpoints are ready.
 import { createDummyMasterTree } from '../dummy/dummyMasterResume'
+import NodeEditor from '../editor/NodeEditor'
 import OutlineTree from '../outline/OutlineTree'
 
 export default function MasterResumePage() {
@@ -9,7 +10,10 @@ export default function MasterResumePage() {
   return (
     <>
       <h1>Master resume</h1>
-      <OutlineTree tree={tree} onChange={setTree} selectedId={selectedId} onSelect={setSelectedId} />
+      <div style={{ display: 'flex', gap: '1rem' }}>
+        <OutlineTree tree={tree} onChange={setTree} selectedId={selectedId} onSelect={setSelectedId} />
+        <NodeEditor tree={tree} selectedId={selectedId} onChange={setTree} />
+      </div>
     </>
   )
 }

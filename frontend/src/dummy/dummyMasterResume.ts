@@ -5,7 +5,7 @@ const node = (id: string, type: NodeType, title: string, children: ResumeNode[] 
   id,
   type,
   title,
-  latex: '',
+  latex: title === 'Built a thing' ? '\\resumeItem{Built a thing}' : '',
   tags: [],
   children,
 })
