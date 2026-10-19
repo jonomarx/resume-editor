@@ -24,3 +24,7 @@ server:
         name: SESSION
         http-only: true
         same-site: lax
+app:
+  storage:
+    type: ${FILE_STORAGE:local}
+    data-dir: ${DATA_DIR:./data}
