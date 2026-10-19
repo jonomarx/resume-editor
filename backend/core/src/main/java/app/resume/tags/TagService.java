@@ -65,6 +65,28 @@ public class TagService {
         return ids.isEmpty() ? Optional.empty() : Optional.of(load(userId, ids.get(0)));
     }
 
+    /** The given slugs that are not canonical tag slugs of this user (node tags must be vocabulary slugs, not aliases). One query. */
+    public java.util.Set<String> unknownSlugs(long userId, java.util.Collection<String> slugs) {
+        java.util.Set<String> wanted = new java.util.LinkedHashSet<>(slugs);
+        if (wanted.isEmpty()) return wanted;
+        java.util.Set<String> known = new java.util.HashSet<>();
+        for (java.util.List<String> chunk : chunks(new ArrayList<>(wanted), 500)) { // keep the IN list well under driver limits
+            String marks = String.join(",", java.util.Collections.nCopies(chunk.size(), "?"));
+            List<Object> args = new ArrayList<>();
+            args.add(userId);
+            args.addAll(chunk);
+            known.addAll(jdbc.queryForList("select slug from tag where user_id = ? and slug in (" + marks + ")", String.class, args.toArray()));
+        }
+        wanted.removeAll(known);
+        return wanted;
+    }
+
+    private static <T> List<List<T>> chunks(List<T> all, int size) {
+        List<List<T>> out = new ArrayList<>();
+        for (int i = 0; i < all.size(); i += size) out.add(all.subList(i, Math.min(all.size(), i + size)));
+        return out;
+    }
+
     public static final int MAX_ALIAS_LENGTH = 60;
 
     /** The tag with this canonical slug (not an alias), scoped to the user. */
