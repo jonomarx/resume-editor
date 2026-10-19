@@ -61,6 +61,57 @@ public class TagService {
         return ids.isEmpty() ? Optional.empty() : Optional.of(load(userId, ids.get(0)));
     }
 
+    public static final int MAX_ALIAS_CODE_POINTS = 60;
+
+    /** The tag with this canonical slug (not an alias), scoped to the user. */
+    public Tag requireBySlug(long userId, String slug) {
+        if (!TagNormalizer.isSlug(slug)) throw new TagNotFoundException();
+        List<Long> ids = jdbc.queryForList("select id from tag where user_id = ? and slug = ?", Long.class, userId, slug);
+        if (ids.isEmpty()) throw new TagNotFoundException();
+        return load(userId, ids.get(0));
+    }
+
+    /**
+     * Adds an alias (normalized, see {@link TagNormalizer}). An alias the tag already has, or equal to its own slug, is
+     * a no-op. Another tag's slug or alias (same user only) is an {@link AliasConflictException}.
+     *
+     * @throws IllegalArgumentException if the raw alias is empty, over 60 code points, or has no letter or digit
+     */
+    public Tag addAlias(long userId, String slug, String rawAlias) {
+        Tag tag = requireBySlug(userId, slug);
+        if (rawAlias == null || rawAlias.isEmpty() || rawAlias.codePointCount(0, rawAlias.length()) > MAX_ALIAS_CODE_POINTS) {
+            throw new IllegalArgumentException("alias must be 1 to 60 characters");
+        }
+        String alias = TagNormalizer.slug(rawAlias);
+        if (alias.isEmpty() || alias.length() > TagNormalizer.MAX_SLUG_LENGTH) {
+            throw new IllegalArgumentException("alias must contain a letter or digit");
+        }
+        Optional<Tag> holder = findByKey(userId, alias);
+        if (holder.isPresent()) return resolveHolder(tag, holder.get());
+        try {
+            jdbc.update("insert into tag_key (user_id, tag_id, tag_key, is_alias) values (?, ?, ?, true)",
+                    userId, tag.id(), alias);
+        } catch (DataIntegrityViolationException lostRace) { // unique (user_id, tag_key): another request took it first
+            return resolveHolder(tag, findByKey(userId, alias).orElseThrow(() -> lostRace));
+        }
+        return load(userId, tag.id());
+    }
+
+    private Tag resolveHolder(Tag requested, Tag holder) {
+        if (holder.id() == requested.id()) return holder; // already the tag's slug or alias: no-op
+        throw new AliasConflictException(holder.slug());
+    }
+
+    /** Removes an alias the tag has; 404 otherwise. The slug itself is not an alias and cannot be removed. */
+    public Tag removeAlias(long userId, String slug, String alias) {
+        Tag tag = requireBySlug(userId, slug);
+        if (!TagNormalizer.isSlug(alias)) throw new TagNotFoundException();
+        int n = jdbc.update("delete from tag_key where user_id = ? and tag_id = ? and tag_key = ? and is_alias = true",
+                userId, tag.id(), alias);
+        if (n == 0) throw new TagNotFoundException();
+        return load(userId, tag.id());
+    }
+
     private Tag load(long userId, long id) {
         return list(userId, null, null, id).get(0);
     }

@@ -56,4 +56,40 @@ class TagConcurrencyPostgresTests extends PostgresContainerSupport {
         assertThat(jdbc.queryForObject("select count(*) from tag where slug = 'rust'", Integer.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("select count(*) from tag_key where tag_key = 'rust'", Integer.class)).isEqualTo(1);
     }
+
+    @Test
+    void concurrentAliasAddsOfTheSameAliasToTwoTagsHaveOneWinner() throws Exception {
+        Cookie session = mvc.perform(CsrfSupport.post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"aliasracer\",\"password\":\"correct-horse-battery\"}"))
+                .andReturn().getResponse().getCookie("SESSION");
+        for (String name : new String[] {"Alpha", "Beta"}) {
+            mvc.perform(CsrfSupport.post("/api/tags").cookie(session).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"name\":\"" + name + "\",\"category\":\"domain\"}")).andReturn();
+        }
+        int n = 12;
+        ExecutorService pool = Executors.newFixedThreadPool(n);
+        CountDownLatch go = new CountDownLatch(1);
+        List<Future<Integer>> results = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            String slug = i % 2 == 0 ? "alpha" : "beta";
+            results.add(pool.submit(() -> {
+                go.await();
+                return mvc.perform(CsrfSupport.post("/api/tags/" + slug + "/aliases").cookie(session)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"alias\":\"shared\"}"))
+                        .andReturn().getResponse().getStatus();
+            }));
+        }
+        go.countDown();
+        int ok = 0;
+        int conflict = 0;
+        for (Future<Integer> f : results) {
+            int st = f.get();
+            if (st == 200) ok++; else if (st == 409) conflict++;
+        }
+        pool.shutdown();
+        // one tag wins the alias: its 6 requests are 200 (one insert plus no-ops); the other tag's 6 are conflicts
+        assertThat(ok).isEqualTo(n / 2);
+        assertThat(conflict).isEqualTo(n / 2);
+        assertThat(jdbc.queryForObject("select count(*) from tag_key where tag_key = 'shared'", Integer.class)).isEqualTo(1);
+    }
 }
