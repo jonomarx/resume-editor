@@ -180,3 +180,30 @@ test('unauthenticated mock request without the session cookie is rejected', asyn
   const res = await fetch(`${base}/api/me`);
   assert.equal(res.status, 401);
 });
+
+test('tag aliases: add returns the updated tag', async () => {
+  const res = await fetch(`${base}/api/tags/postgresql/aliases`, { method: 'POST', headers: json, body: JSON.stringify({ alias: 'postgres' }) });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.slug, 'postgresql');
+  assert.ok(body.aliases.includes('postgres'));
+});
+
+test('tag aliases: add rejects an empty alias, documents 409 alias_conflict and 403', async () => {
+  const bad = await fetch(`${base}/api/tags/postgresql/aliases`, { method: 'POST', headers: json, body: JSON.stringify({ alias: '' }) });
+  assert.equal(bad.status, 400);
+  const conflict = await fetch(`${base}/api/tags/postgresql/aliases`, { method: 'POST', headers: { ...json, prefer: 'code=409' }, body: JSON.stringify({ alias: 'mysql' }) });
+  assert.equal(conflict.status, 409);
+  assert.equal((await conflict.json()).code, 'alias_conflict');
+  const csrf = await fetch(`${base}/api/tags/postgresql/aliases`, { method: 'POST', headers: { ...json, prefer: 'code=403' }, body: JSON.stringify({ alias: 'pg' }) });
+  assert.equal(csrf.status, 403);
+  assert.equal((await csrf.json()).code, 'csrf_invalid');
+});
+
+test('tag aliases: remove returns the updated tag and 404 is documented', async () => {
+  const res = await fetch(`${base}/api/tags/postgresql/aliases/postgres`, { method: 'DELETE', headers: json });
+  assert.equal(res.status, 200);
+  assert.deepEqual((await res.json()).aliases, []);
+  const missing = await fetch(`${base}/api/tags/postgresql/aliases/nope`, { method: 'DELETE', headers: { ...json, prefer: 'code=404' } });
+  assert.equal(missing.status, 404);
+});

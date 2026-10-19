@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Resume Editor API
-  version: 0.2.0
+  version: 0.3.0
   description: |
     Contract v0 (US-003, fixes in US-076): auth, master resume, tags, render.
     Changed only through stories labeled `contract`.
@@ -316,6 +316,68 @@ paths:
               example: { id: 9, name: PostgreSQL, slug: postgresql, category: language, aliases: [] }
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/tags/{slug}/aliases:
+    post:
+      tags: [tags]
+      operationId: addTagAlias
+      summary: Add an alias to a tag
+      description: |
+        The alias is normalized like a tag name (lowercase, punctuation collapsed to hyphens) and stored in that
+        normalized form. Afterwards `POST /api/tags` and `GET /api/tags?q=` resolve it to this tag. Adding an alias the
+        tag already has is a no-op and still returns 200. Aliases are unique per user: an alias equal to another
+        tag's slug or another tag's alias is rejected with 409 `alias_conflict`.
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+        - { $ref: '#/components/parameters/TagSlug' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddAliasRequest' }
+            example: { alias: postgres }
+      responses:
+        '200':
+          description: The updated tag
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tag' }
+              example: { id: 9, name: PostgreSQL, slug: postgresql, category: language, aliases: [postgres] }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The alias is already another tag's slug or alias
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: alias_conflict, message: 'That alias already belongs to the tag "mysql"' }
+  /api/tags/{slug}/aliases/{alias}:
+    delete:
+      tags: [tags]
+      operationId: removeTagAlias
+      summary: Remove an alias from a tag
+      description: |
+        `{alias}` is the normalized alias as listed in the tag's `aliases`. Removing an alias the tag does not have
+        returns 404, as does an unknown tag. The tag's slug itself is not an alias and cannot be removed here.
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+        - { $ref: '#/components/parameters/TagSlug' }
+        - name: alias
+          in: path
+          required: true
+          schema: { type: string }
+          example: postgres
+      responses:
+        '200':
+          description: The updated tag
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tag' }
+              example: { id: 9, name: PostgreSQL, slug: postgresql, category: language, aliases: [] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/render:
     post:
       tags: [render]
@@ -420,6 +482,13 @@ components:
       description: The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
       schema: { type: string }
       example: 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+    TagSlug:
+      name: slug
+      in: path
+      required: true
+      description: The tag's canonical slug
+      schema: { type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$' }
+      example: postgresql
     Version:
       name: version
       in: path
@@ -651,6 +720,15 @@ components:
         aliases:
           type: array
           items: { type: string }
+    AddAliasRequest:
+      type: object
+      required: [alias]
+      properties:
+        alias:
+          type: string
+          minLength: 1
+          maxLength: 60
+          description: Free text; normalized to a slug before it is stored. Must contain a letter or digit.
     CreateTagRequest:
       type: object
       required: [name, category]
