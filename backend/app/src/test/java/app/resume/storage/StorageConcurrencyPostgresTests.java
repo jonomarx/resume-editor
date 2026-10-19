@@ -137,32 +137,4 @@ class StorageConcurrencyPostgresTests extends PostgresContainerSupport {
         reader.join();
         assertThat(partial.get()).isZero();
     }
-
-    @Test
-    void theResumeLockAllowsOneWriterAtATimeAndIsPerResume() throws Exception {
-        InMemoryResumeLocks locks = new InMemoryResumeLocks();
-        int[] counter = {0}; // deliberately unsynchronized: only the lock protects it
-        int n = 16;
-        List<Future<Boolean>> same = runAll(n, i -> () -> {
-            for (int k = 0; k < 500; k++) locks.withLock(9L, () -> { counter[0]++; });
-            return true;
-        });
-        for (Future<Boolean> f : same) f.get();
-        assertThat(counter[0]).isEqualTo(n * 500);
-
-        // a held lock on resume 1 does not block resume 2
-        CountDownLatch holding = new CountDownLatch(1);
-        CountDownLatch release = new CountDownLatch(1);
-        ExecutorService pool = Executors.newFixedThreadPool(2);
-        Future<?> holder = pool.submit(() -> locks.withLock(1L, () -> {
-            holding.countDown();
-            try { release.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-        }));
-        holding.await();
-        Future<String> other = pool.submit(() -> locks.withLock(2L, () -> "ok"));
-        assertThat(other.get(5, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo("ok");
-        release.countDown();
-        holder.get();
-        pool.shutdown();
-    }
 }

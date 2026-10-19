@@ -13,4 +13,8 @@ public final class CsrfSupport {
     public static MockHttpServletRequestBuilder post(String url) {
         return MockMvcRequestBuilders.post(url).cookie(new Cookie("XSRF-TOKEN", TOKEN)).header("X-XSRF-TOKEN", TOKEN);
     }
+
+    public static MockHttpServletRequestBuilder put(String url) {
+        return MockMvcRequestBuilders.put(url).cookie(new Cookie("XSRF-TOKEN", TOKEN)).header("X-XSRF-TOKEN", TOKEN);
+    }
 }
