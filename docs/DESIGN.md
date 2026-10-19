@@ -120,7 +120,7 @@ Header and footer are separate top-level nodes. The document is assembled as: lo
 
 ## 6. Tags and matching (backend part 1)
 
-**Tags.** Master resume nodes can be tagged (many per node). Tags come from one shared, user-extensible vocabulary: canonical name, slug, category (language, framework, domain, role type), aliases. Free text is never stored as a tag; typing a new one creates a vocabulary entry first. The Job List Manager tags postings from the same list and may *propose* new entries, which wait for your approval. A story generates your starter list from your master resume for you to approve.
+**Tags.** Master resume nodes can be tagged (many per node). Tags come from one shared, user-extensible vocabulary: canonical name, slug, category (language, framework, domain, role type), aliases. Aliases (for example "reactjs" for React) are managed through the API: add and remove an alias on a tag, unique per user and never colliding with another tag's slug or alias. The v0 contract has no alias endpoint, so US-020 raises a `contract` story for it first. Free text is never stored as a tag; typing a new one creates a vocabulary entry first. The Job List Manager tags postings from the same list and may *propose* new entries, which wait for your approval. A story generates your starter list from your master resume for you to approve.
 
 **Matching** is done by the web controller on each request, not by the Job List Manager. Order of build:
 
@@ -219,7 +219,7 @@ Roles: B Backend, F Frontend, J Job List Manager, I Integration, H you. **Depend
 | US-016 | F | Node LaTeX editor (CodeMirror) with snippet buttons | US-015 | none |
 | US-017 | F | PDF preview, debounced render (`RENDER_DEBOUNCE_MS`), "Render now" button, error panel, page counter | US-016, US-003 | Render endpoint (US-013) |
 | US-018 | F | Autosave, 409 conflict handling, version history UI | US-016, US-003 | Master resume endpoints (US-014) |
-| US-020 | B | Tag vocabulary: table, normalization, aliases, list and create endpoints | US-006, US-003 | none |
+| US-020 | B | Tag vocabulary: table, normalization, aliases (add and remove, via a contract story for the endpoints), list and create endpoints | US-006, US-003 | none |
 | US-021 | B | Tags on resume nodes: save, read, derived `resume_node_tag` index | US-014, US-020 | none |
 | US-022 | F | Tag editor on nodes | US-016, US-003 | Tag endpoints (US-020, US-021) |
 | US-023 | F | Placeholder content when a node is created | US-015 | none |
