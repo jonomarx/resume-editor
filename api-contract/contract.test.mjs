@@ -180,3 +180,21 @@ test('unauthenticated mock request without the session cookie is rejected', asyn
   const res = await fetch(`${base}/api/me`);
   assert.equal(res.status, 401);
 });
+
+test('save 400: children token examples name the node', async () => {
+  const tree = { id: 'r', header: { id: 'h', type: 'header', title: 'H', latex: '', tags: [], children: [] }, sections: [], footer: { id: 'f', type: 'footer', title: 'F', latex: '', tags: [], children: [] } };
+  for (const [name, text] of [['missingChildrenToken', '{{children}}'], ['unknownToken', 'unknown token']]) {
+    const res = await fetch(`${base}/api/resumes/master`, { method: 'PUT', headers: { ...json, prefer: `code=400, example=${name}` }, body: JSON.stringify({ baseVersion: 1, tree }) });
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.equal(body.code, 'validation_failed');
+    assert.ok(body.details[0].field.startsWith('n-exp'));
+    assert.ok(body.details[0].message.includes(text));
+  }
+});
+
+test('examples: every node with children carries the {{children}} token', async () => {
+  const doc = await (await fetch(`${base}/api/resumes/master`, { headers: json })).json();
+  const check = (n) => { if (n.children.length) assert.ok(n.latex.includes('{{children}}'), n.id); n.children.forEach(check); };
+  [doc.tree.header, ...doc.tree.sections, doc.tree.footer].forEach(check);
+});
