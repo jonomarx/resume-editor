@@ -27,7 +27,7 @@ The Job List Manager only adds, culls, receives, and tags postings. It never doe
 6. **Test.** Write the tests the story needs (where applicable) and make them pass. Run the fast loop constantly. Run the Postgres profile when the story touches database-specific behavior, locking, or when you finish a feature.
 7. **Hand off.** Open a pull request into your role branch, move the card to TO-REVIEW, and comment with what changed, the test results, and anything surprising.
 8. **Review.** Small stories (`review:light`): review your own diff against the checklist in section 6 and post the result on the card. Consequential stories (`review:deep`): stop and request a review by another agent (comment "review requested"); do not approve your own deep review. Contract stories also need the owner's approval.
-9. **Finish.** After approval, merge the pull request into your role branch, move the card to DONE, and leave a short handoff note. Then go back to step 1.
+9. **Finish.** After approval, merge the pull request into your role branch, move the card to DONE, close the issue (`gh issue close <n> -c "<one-line summary>"`; GitHub only auto-closes issues for merges into the default branch, so this is never automatic), and leave a short handoff note. Then go back to step 1.
 
 If you are blocked, comment on the card with the exact reason and take another card. If a requirement is ambiguous, ask the owner on the card; do not guess on anything that changes an API, a data model, or user-visible behavior.
 
