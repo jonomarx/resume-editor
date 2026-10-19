@@ -1,34 +1,78 @@
-import { afterEach, vi } from 'vitest'
-import { httpApi } from './http'
-import { ApiError } from './types'
+import { afterEach, beforeEach, vi } from 'vitest'
+import { createDummyServer } from '../dummy/dummyApi'
+import { createHttpApi, readCsrfCookie } from './http'
 
+const creds = { username: 'ada', password: 'correct-horse' }
+
+beforeEach(() => {
+  document.cookie = 'XSRF-TOKEN=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
+})
 afterEach(() => vi.unstubAllGlobals())
 
-function stubFetch(status: number, body?: unknown) {
-  const fn = vi.fn(async () => new Response(body === undefined ? null : JSON.stringify(body), { status }))
-  vi.stubGlobal('fetch', fn)
-  return fn
+function spied() {
+  const server = createDummyServer()
+  const calls: { method: string; path: string; header: string | null }[] = []
+  const f = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
+    calls.push({ method: init.method ?? 'GET', path: String(input), header: new Headers(init.headers).get('X-XSRF-TOKEN') })
+    return server.fetch(input, init)
+  }) as unknown as typeof fetch
+  return { server, calls, api: createHttpApi(f) }
 }
 
-describe('httpApi.auth', () => {
-  it('posts credentials to the login path', async () => {
-    const fn = stubFetch(200, { id: 1, username: 'ada' })
-    const u = await httpApi.auth.logIn({ username: 'ada', password: 'correct-horse' })
-    expect(u.username).toBe('ada')
-    expect(fn).toHaveBeenCalledWith('/api/auth/login', expect.objectContaining({ method: 'POST' }))
+describe('csrf handling', () => {
+  it('fetches a token via GET /api/me before the first mutating call, and sends the header only on mutations', async () => {
+    const { api, calls } = spied()
+    await api.auth.signUp(creds)
+    expect(calls[0]).toMatchObject({ method: 'GET', path: '/api/me', header: null })
+    expect(calls[1]).toMatchObject({ method: 'POST', path: '/api/auth/signup' })
+    expect(calls[1].header).toBe('dummy-token-1')
+    await api.auth.getMe()
+    expect(calls.at(-1)).toMatchObject({ method: 'GET', header: null })
   })
 
-  it('maps error bodies to ApiError', async () => {
-    stubFetch(409, { code: 'username_taken', message: 'That username is taken' })
-    await expect(httpApi.auth.signUp({ username: 'ada', password: 'correct-horse' })).rejects.toMatchObject({
-      status: 409,
-      code: 'username_taken',
-    })
-    expect(new ApiError(1, { code: 'x', message: 'y' })).toBeInstanceOf(Error)
+  it('re-reads the cookie after login replaces it', async () => {
+    const { api, calls } = spied()
+    await api.auth.signUp(creds)
+    await api.auth.logOut()
+    expect(calls.at(-1)!.header).toBe(readCsrfCookie())
+    await api.auth.logIn(creds)
+    await api.auth.logOut()
+    expect(calls.at(-1)!.header).toBe(readCsrfCookie())
   })
 
-  it('getMe returns null on 401', async () => {
-    stubFetch(401, { code: 'unauthorized', message: 'no' })
-    expect(await httpApi.auth.getMe()).toBeNull()
+  it('retries once after csrf_invalid with a refreshed token', async () => {
+    const { api, calls, server } = spied()
+    await api.auth.signUp(creds)
+    server.rotateToken()
+    await api.auth.logOut()
+    const posts = calls.filter((c) => c.path === '/api/auth/logout')
+    expect(posts).toHaveLength(2)
+  })
+
+  it('surfaces csrf_invalid when the retry also fails', async () => {
+    const f = vi.fn(async (_i: RequestInfo | URL, init: RequestInit = {}) =>
+      init.method === 'GET'
+        ? new Response(null, { status: 401 })
+        : new Response(JSON.stringify({ code: 'csrf_invalid', message: 'bad' }), { status: 403 }),
+    ) as unknown as typeof fetch
+    await expect(createHttpApi(f).auth.logIn(creds)).rejects.toMatchObject({ status: 403, code: 'csrf_invalid' })
+    expect(vi.mocked(f).mock.calls.filter(([, i]) => i?.method === 'POST')).toHaveLength(2)
+  })
+
+  it('does not use web storage', async () => {
+    const set = vi.spyOn(Storage.prototype, 'setItem')
+    const { api } = spied()
+    await api.auth.signUp(creds)
+    expect(set).not.toHaveBeenCalled()
+  })
+
+  it('maps error bodies and 409 to ApiError', async () => {
+    const { api } = spied()
+    await api.auth.signUp(creds)
+    await expect(api.auth.signUp({ ...creds, username: 'ADA' })).rejects.toMatchObject({ status: 409, code: 'username_taken' })
+  })
+
+  it('getMe returns null when signed out', async () => {
+    expect(await spied().api.auth.getMe()).toBeNull()
   })
 })

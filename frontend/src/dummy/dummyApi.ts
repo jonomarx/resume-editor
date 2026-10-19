@@ -1,46 +1,79 @@
-// DUMMY(US-006): in-memory stand-in for the auth endpoints. Delete when US-006 is ready.
-import { AUTH } from '../config/constants'
-import { ApiError, type Api, type Credentials, type User } from '../api/types'
+// DUMMY(US-006): in-memory stand-in for the auth endpoints, including the CSRF cookie and header
+// rules of the contract. It is a fake fetch, so the real HTTP client is what runs against it.
+// Delete when US-006 is ready.
+import { createHttpApi } from '../api/http'
+import type { Api, Credentials } from '../api/types'
+import { AUTH, CSRF } from '../config/constants'
 
-export function createDummyApi(): Api {
-  const accounts = new Map<string, { id: number; password: string }>()
+export interface DummyServer {
+  fetch: typeof fetch
+  /** Test hook: invalidate the current token as if the server had rotated it. */
+  rotateToken(): void
+}
+
+export function createDummyServer(): DummyServer {
+  const accounts = new Map<string, { id: number; username: string; password: string }>()
   let nextId = 1
-  let current: User | null = null
+  let currentUserId: number | null = null
+  let token = ''
+  let counter = 0
 
-  function validate(c: Credentials) {
-    if (c.username.length < AUTH.usernameMinLength || c.username.length > AUTH.usernameMaxLength || c.password.length < AUTH.passwordMinLength) {
-      throw new ApiError(400, { code: 'validation_failed', message: 'Username or password is invalid' })
+  const issueToken = () => {
+    token = `dummy-token-${++counter}`
+    document.cookie = `${CSRF.cookieName}=${token}; path=/`
+  }
+  const reply = (status: number, body?: unknown) =>
+    new Response(body === undefined ? null : JSON.stringify(body), { status })
+  const err = (status: number, code: string, message: string) => reply(status, { code, message })
+
+  async function handle(path: string, init: RequestInit): Promise<Response> {
+    const method = init.method ?? 'GET'
+    const headers = new Headers(init.headers)
+    if (method === 'GET' && path === CSRF.tokenPath) {
+      issueToken()
+      const u = [...accounts.values()].find((a) => a.id === currentUserId)
+      return u ? reply(200, { id: u.id, username: u.username }) : err(401, 'unauthorized', 'Sign in required')
     }
+    if (method !== 'GET' && headers.get(CSRF.headerName) !== token) {
+      return err(403, CSRF.invalidCode, 'Missing or invalid CSRF token')
+    }
+    const body = init.body ? (JSON.parse(init.body as string) as Credentials) : undefined
+    if (path === '/api/auth/logout') {
+      currentUserId = null
+      return reply(204)
+    }
+    if (!body || !new RegExp(AUTH.usernamePattern).test(body.username) || body.password.length < AUTH.passwordMinLength) {
+      return err(400, 'validation_failed', 'Username or password is invalid')
+    }
+    const key = body.username.toLowerCase()
+    if (path === '/api/auth/signup') {
+      if (accounts.has(key)) return err(409, 'username_taken', 'That username is taken')
+      const a = { id: nextId++, username: body.username, password: body.password }
+      accounts.set(key, a)
+      currentUserId = a.id
+      issueToken()
+      return reply(201, { id: a.id, username: a.username })
+    }
+    if (path === '/api/auth/login') {
+      const a = accounts.get(key)
+      if (!a || a.password !== body.password) return err(401, 'bad_credentials', 'Invalid username or password')
+      currentUserId = a.id
+      issueToken()
+      return reply(200, { id: a.id, username: a.username })
+    }
+    return err(404, 'not_found', 'Not found')
   }
 
   return {
-    auth: {
-      async signUp(c) {
-        validate(c)
-        if (accounts.has(c.username)) {
-          throw new ApiError(409, { code: 'username_taken', message: 'That username is taken' })
-        }
-        const id = nextId++
-        accounts.set(c.username, { id, password: c.password })
-        current = { id, username: c.username }
-        return current
-      },
-      async logIn(c) {
-        const a = accounts.get(c.username)
-        if (!a || a.password !== c.password) {
-          throw new ApiError(401, { code: 'bad_credentials', message: 'Invalid username or password' })
-        }
-        current = { id: a.id, username: c.username }
-        return current
-      },
-      async logOut() {
-        current = null
-      },
-      async getMe() {
-        return current
-      },
+    fetch: ((input: RequestInfo | URL, init: RequestInit = {}) => handle(String(input), init)) as typeof fetch,
+    rotateToken: () => {
+      token = `rotated-${++counter}`
     },
   }
+}
+
+export function createDummyApi(): Api {
+  return createHttpApi(createDummyServer().fetch)
 }
 
 export const dummyApi = createDummyApi()

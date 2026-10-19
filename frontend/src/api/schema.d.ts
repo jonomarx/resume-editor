@@ -88,6 +88,13 @@ export interface paths {
          * Save a new version of the master resume
          * @description Succeeds only if `baseVersion` equals the current version; the new version is `baseVersion + 1`.
          *     A stale `baseVersion` returns 409 with the current version so the UI can offer a reload.
+         *
+         *     A save whose tree is identical to the current version (same `contentHash`) does not create a version: it
+         *     returns the current document unchanged with 200.
+         *
+         *     Tags on nodes must be slugs in the tag vocabulary. A tree containing any unknown slug is rejected with 400,
+         *     code `validation_failed`, and `details` has one entry per offending slug (`field` is the slug's node id
+         *     path, `message` names the slug).
          */
         put: operations["saveMasterResume"];
         post?: never;
@@ -144,6 +151,7 @@ export interface paths {
          * Make an old version the newest version
          * @description Copies the old content into a new version (history is never rewritten).
          *     Uses the same optimistic check as a save.
+         *     A missing or invalid `baseVersion` returns 400.
          */
         post: operations["restoreMasterVersion"];
         delete?: never;
@@ -204,7 +212,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The PDF of a successful render */
+        /**
+         * The PDF of a successful render
+         * @description `contentHash` is the full SHA-256 (64 hex characters) from a render result. The server checks that the PDF
+         *     belongs to the signed-in user; any other hash, including someone else's, returns 404 (never 403).
+         */
         get: operations["getRenderedPdf"];
         put?: never;
         post?: never;
@@ -234,8 +246,16 @@ export interface components {
             currentVersion: number;
         };
         Credentials: {
+            /**
+             * @description 3 to 40 characters: letters, digits, underscore, dot, hyphen. Unique case-insensitively
+             *     ("Ada" and "ada" collide); a collision returns 409 `username_taken`.
+             */
             username: string;
-            /** Format: password */
+            /**
+             * Format: password
+             * @description At least 8 characters. Only the first 72 bytes (UTF-8, never cutting a character in half) are used;
+             *     anything beyond is ignored, identically at sign-up and login. There is no maximum length.
+             */
             password: string;
         };
         User: {
@@ -269,6 +289,10 @@ export interface components {
             /** Format: int64 */
             id: number;
             version: number;
+            /**
+             * @description SHA-256 (64 hex characters) of the canonical tree. `RenderResult.contentHash` uses the same method,
+             *     so the same tree always yields the same hash in both places.
+             */
             contentHash: string;
             /** Format: date-time */
             updatedAt: string;
@@ -285,6 +309,7 @@ export interface components {
         };
         ResumeVersionSummary: {
             version: number;
+            /** @description SHA-256 of the canonical tree (64 hex characters) */
             contentHash: string;
             /** Format: date-time */
             createdAt: string;
@@ -315,6 +340,10 @@ export interface components {
         };
         RenderResult: {
             success: boolean;
+            /**
+             * @description SHA-256 (64 hex characters) of the canonical tree. `RenderResult.contentHash` uses the same method,
+             *     so the same tree always yields the same hash in both places.
+             */
             contentHash: string;
             /** @description True when served from the render cache */
             cached: boolean;
@@ -326,6 +355,21 @@ export interface components {
         };
     };
     responses: {
+        /** @description Missing or wrong `X-XSRF-TOKEN` header */
+        CsrfInvalid: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "code": "csrf_invalid",
+                 *       "message": "Missing or invalid CSRF token"
+                 *     }
+                 */
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description Not signed in */
         Unauthorized: {
             headers: {
@@ -395,6 +439,11 @@ export interface components {
         };
     };
     parameters: {
+        /**
+         * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+         * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+         */
+        XsrfToken: string;
         /** @example 2 */
         Version: number;
     };
@@ -407,7 +456,13 @@ export interface operations {
     signUp: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /**
+                 * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+                 * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+                 */
+                "X-XSRF-TOKEN": components["parameters"]["XsrfToken"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -441,6 +496,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["ValidationError"];
+            403: components["responses"]["CsrfInvalid"];
             /** @description Username already taken */
             409: {
                 headers: {
@@ -461,7 +517,13 @@ export interface operations {
     logIn: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /**
+                 * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+                 * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+                 */
+                "X-XSRF-TOKEN": components["parameters"]["XsrfToken"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -510,12 +572,19 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            403: components["responses"]["CsrfInvalid"];
         };
     };
     logOut: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /**
+                 * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+                 * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+                 */
+                "X-XSRF-TOKEN": components["parameters"]["XsrfToken"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -529,6 +598,7 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["CsrfInvalid"];
         };
     };
     getMe: {
@@ -543,6 +613,8 @@ export interface operations {
             /** @description Current user */
             200: {
                 headers: {
+                    /** @description Refreshes the `XSRF-TOKEN` cookie (readable by JavaScript) */
+                    "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -555,7 +627,23 @@ export interface operations {
                     "application/json": components["schemas"]["User"];
                 };
             };
-            401: components["responses"]["Unauthorized"];
+            /** @description Not signed in (the response still sets the `XSRF-TOKEN` cookie) */
+            401: {
+                headers: {
+                    /** @description Sets the `XSRF-TOKEN` cookie (readable by JavaScript) */
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "unauthorized",
+                     *       "message": "Sign in required"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     getMasterResume: {
@@ -582,7 +670,13 @@ export interface operations {
     saveMasterResume: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /**
+                 * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+                 * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+                 */
+                "X-XSRF-TOKEN": components["parameters"]["XsrfToken"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -601,8 +695,29 @@ export interface operations {
                     "application/json": components["schemas"]["ResumeDocument"];
                 };
             };
-            400: components["responses"]["ValidationError"];
+            /** @description Request failed validation, including tags that are not in the vocabulary */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "validation_failed",
+                     *       "message": "Request failed validation",
+                     *       "details": [
+                     *         {
+                     *           "field": "n-exp-1-b1",
+                     *           "message": "unknown tag slug \"javscript\""
+                     *         }
+                     *       ]
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["CsrfInvalid"];
             409: components["responses"]["VersionConflict"];
         };
     };
@@ -625,12 +740,12 @@ export interface operations {
                      * @example [
                      *       {
                      *         "version": 3,
-                     *         "contentHash": "9f2c1d",
+                     *         "contentHash": "e99551fa57d7a6c2858733580847871fae001b49e0f54e59dc8e15ebae6b5203",
                      *         "createdAt": "2026-10-18T20:15:00Z"
                      *       },
                      *       {
                      *         "version": 2,
-                     *         "contentHash": "41ab07",
+                     *         "contentHash": "b10af658e08210683091e16185d3c41ddcae75ca55322e125094137dd668097e",
                      *         "createdAt": "2026-10-18T19:02:00Z"
                      *       }
                      *     ]
@@ -669,7 +784,13 @@ export interface operations {
     restoreMasterVersion: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /**
+                 * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+                 * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+                 */
+                "X-XSRF-TOKEN": components["parameters"]["XsrfToken"];
+            };
             path: {
                 /** @example 2 */
                 version: components["parameters"]["Version"];
@@ -696,7 +817,9 @@ export interface operations {
                     "application/json": components["schemas"]["ResumeDocument"];
                 };
             };
+            400: components["responses"]["ValidationError"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["CsrfInvalid"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["VersionConflict"];
         };
@@ -752,7 +875,13 @@ export interface operations {
     createTag: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /**
+                 * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+                 * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+                 */
+                "X-XSRF-TOKEN": components["parameters"]["XsrfToken"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -808,12 +937,19 @@ export interface operations {
             };
             400: components["responses"]["ValidationError"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["CsrfInvalid"];
         };
     };
     renderResume: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /**
+                 * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+                 * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+                 */
+                "X-XSRF-TOKEN": components["parameters"]["XsrfToken"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -834,6 +970,7 @@ export interface operations {
             };
             400: components["responses"]["ValidationError"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["CsrfInvalid"];
             /** @description Document too large */
             413: {
                 headers: {
@@ -886,7 +1023,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @example 9f2c1d7a */
+                /** @example b706a01cf5720a0f5e9044150a32728b0773bfd2a065bfa7704fb9ae91038f82 */
                 contentHash: string;
             };
             cookie?: never;

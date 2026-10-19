@@ -36,11 +36,11 @@ export default function LoginPage() {
       <h1>{mode === 'login' ? 'Log in' : 'Sign up'}</h1>
       <label>
         Username
-        <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required minLength={AUTH.usernameMinLength} maxLength={AUTH.usernameMaxLength} />
+        <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required pattern={AUTH.usernamePattern} />
       </label>
       <label>
         Password
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required minLength={AUTH.passwordMinLength} maxLength={AUTH.passwordMaxLength} />
+        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required minLength={AUTH.passwordMinLength} />
       </label>
       {error && <p role="alert">{error}</p>}
       <button type="submit" disabled={busy}>{mode === 'login' ? 'Log in' : 'Create account'}</button>
