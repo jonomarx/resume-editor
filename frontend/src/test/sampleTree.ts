@@ -1,4 +1,4 @@
-// DUMMY(US-014): hard-coded master resume standing in for GET /api/resumes/master. Delete when US-014 is ready.
+// Test fixture: a small master resume that follows the {{children}} rules.
 import type { ResumeNode, ResumeTree, NodeType } from '../outline/types'
 
 // Latex follows the {{children}} contract: a parent carries wrapper macros and the token only while it has children.
@@ -26,9 +26,9 @@ const node = (id: string, type: NodeType, title: string, children: ResumeNode[] 
   children,
 })
 
-export function createDummyMasterTree(): ResumeTree {
+export function createSampleTree(): ResumeTree {
   return {
-    id: 'dummy-master',
+    id: 'sample-master',
     header: node('h', 'header', 'Your Name'),
     sections: [
       node('s-edu', 'section', 'Education', [node('e1', 'section_text', 'University Name, B.S. Computer Science')]),

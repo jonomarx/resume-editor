@@ -178,11 +178,69 @@ export interface paths {
         put?: never;
         /**
          * Get or create a vocabulary entry
-         * @description Names are normalized to a slug (lowercase, trimmed, punctuation collapsed). If the slug or an alias
-         *     already exists, the existing tag is returned with 200; otherwise a new tag is created with 201.
+         * @description Slug normalization, in this order: trim, Unicode NFKC, lowercase, replace every `+` with `-plus-` and every `#`
+         *     with `-sharp-`, collapse every run of characters outside `[a-z0-9]` into one hyphen, strip leading and trailing
+         *     hyphens. So "C" is `c`, "C++" is `c-plus-plus`, "C#" is `c-sharp`, "Node.js" is `node-js`. Non-ASCII letters are
+         *     not transliterated: they are separators ("café" gives `caf`). A name with no letter or digit and no `+` or `#`
+         *     is rejected with 400 `validation_failed`.
+         *
+         *     Resolution order: (1) the trimmed, lower-cased name is compared with every alias key of the user (an alias key
+         *     is the trimmed, lower-cased alias); (2) the computed slug is compared with the user's tag slugs and with their
+         *     alias keys. The first match is returned with 200 (its category and name are kept); if nothing matches a new tag
+         *     is created with 201. Example: posting "C++" returns the tag that has the alias "C++" if there is one, otherwise
+         *     creates `c-plus-plus`.
          */
         post: operations["createTag"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tags/{slug}/aliases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add an alias to a tag
+         * @description An alias is any printable ASCII text (0x20 to 0x7E): "C++", "C#", ".NET" and "Node.js" are valid aliases. After
+         *     trimming leading and trailing spaces it must be 1 to 60 characters; anything else (control characters, non-ASCII
+         *     characters such as "café", an empty value) is rejected with 400 `validation_failed`. The alias is stored exactly
+         *     as typed after trimming (leading and trailing spaces are removed when it is stored; internal spaces and case are
+         *     kept) and shown that way in `Tag.aliases`.
+         *
+         *     Comparison uses the alias key: the trimmed alias lower-cased. Aliases are unique per user by alias key, so "C++"
+         *     and "c++" are the same alias. An alias is a conflict when its key equals another tag's alias key or another tag's
+         *     slug; that is rejected with 409 `alias_conflict`. Clients must not parse the free-text `message`; use
+         *     `conflictingSlug`.
+         *
+         *     Adding an alias whose key equals one the tag already has, or equals the tag's own slug, is a no-op: 200 with the
+         *     unchanged canonical Tag. The canonical slug never changes through these operations. There is no cap on the
+         *     number of aliases per tag.
+         *
+         *     Afterwards `POST /api/tags` and `GET /api/tags?q=` resolve the alias to this tag (200, existing).
+         *
+         *     Adding or removing an alias never changes the tags on any resume node (nodes reference tags by slug).
+         */
+        post: operations["addTagAlias"];
+        /**
+         * Remove an alias from a tag
+         * @description The alias goes in the `alias` query parameter, percent-encoded (aliases can contain `/`, `.`, `%`, `#` and
+         *     spaces, which do not belong in a path segment: "C++" is `?alias=C%2B%2B`). It is matched by alias key, so the
+         *     case of the value does not matter. Removing an alias the tag does not have returns 404, as does an unknown tag
+         *     or a `{slug}` that is not a valid slug. The tag's slug itself is not an alias and cannot be removed here. The
+         *     canonical slug never changes through this operation, and removing an alias never changes the tags on any
+         *     resume node.
+         *
+         *     Encoding: a space in the `alias` value is `%20` (not `+`), and a literal `+` is `%2B`. An alias that is too
+         *     long or not printable ASCII can never be stored, so it simply matches nothing and returns 404.
+         */
+        delete: operations["removeTagAlias"];
         options?: never;
         head?: never;
         patch?: never;
@@ -351,7 +409,19 @@ export interface components {
             name: string;
             slug: string;
             category: components["schemas"]["TagCategory"];
+            /** @description Aliases as typed (printable ASCII, any case); unique per user by lower-cased trimmed key. */
             aliases: string[];
+        };
+        AliasConflictError: components["schemas"]["Error"] & {
+            /** @description The canonical slug of the tag that already holds the alias key as its slug or as one of its alias keys */
+            conflictingSlug: string;
+        };
+        AddAliasRequest: {
+            /**
+             * @description Printable ASCII (space to tilde). After trimming leading and trailing spaces it must be 1 to 60 characters
+             *     (a length rule the schema cannot express); stored as typed.
+             */
+            alias: string;
         };
         CreateTagRequest: {
             name: string;
@@ -473,6 +543,11 @@ export interface components {
          * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
          */
         XsrfToken: string;
+        /**
+         * @description The tag's canonical slug; a value that is not a slug is 404.
+         * @example postgresql
+         */
+        TagSlug: string;
         /** @example 2 */
         Version: number;
     };
@@ -845,7 +920,7 @@ export interface operations {
         parameters: {
             query?: {
                 category?: components["schemas"]["TagCategory"];
-                /** @description Case-insensitive match on name or alias */
+                /** @description Case-insensitive substring match on name, slug or alias key (the lower-cased trimmed alias) */
                 q?: string;
             };
             header?: never;
@@ -868,8 +943,8 @@ export interface operations {
                      *         "slug": "java",
                      *         "category": "language",
                      *         "aliases": [
-                     *           "java17",
-                     *           "jdk"
+                     *           "Java 17",
+                     *           "JDK"
                      *         ]
                      *       },
                      *       {
@@ -878,7 +953,17 @@ export interface operations {
                      *         "slug": "react",
                      *         "category": "framework",
                      *         "aliases": [
-                     *           "reactjs"
+                     *           "React.js"
+                     *         ]
+                     *       },
+                     *       {
+                     *         "id": 10,
+                     *         "name": "C++",
+                     *         "slug": "c-plus-plus",
+                     *         "category": "language",
+                     *         "aliases": [
+                     *           "CPP",
+                     *           "C++"
                      *         ]
                      *       }
                      *     ]
@@ -904,33 +989,16 @@ export interface operations {
         };
         requestBody: {
             content: {
-                /**
-                 * @example {
-                 *       "name": "PostgreSQL",
-                 *       "category": "language"
-                 *     }
-                 */
                 "application/json": components["schemas"]["CreateTagRequest"];
             };
         };
         responses: {
-            /** @description Already existed */
+            /** @description Already existed (the name matched an alias key, a slug or a slug equal to an alias key) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    /**
-                     * @example {
-                     *       "id": 9,
-                     *       "name": "PostgreSQL",
-                     *       "slug": "postgresql",
-                     *       "category": "language",
-                     *       "aliases": [
-                     *         "postgres"
-                     *       ]
-                     *     }
-                     */
                     "application/json": components["schemas"]["Tag"];
                 };
             };
@@ -940,11 +1008,109 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    "application/json": components["schemas"]["Tag"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["CsrfInvalid"];
+        };
+    };
+    addTagAlias: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+                 * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+                 */
+                "X-XSRF-TOKEN": components["parameters"]["XsrfToken"];
+            };
+            path: {
+                /**
+                 * @description The tag's canonical slug; a value that is not a slug is 404.
+                 * @example postgresql
+                 */
+                slug: components["parameters"]["TagSlug"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddAliasRequest"];
+            };
+        };
+        responses: {
+            /** @description The updated tag */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tag"];
+                };
+            };
+            /** @description The alias is empty, longer than 60 characters, or not printable ASCII */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["CsrfInvalid"];
+            404: components["responses"]["NotFound"];
+            /** @description The alias key equals another tag's alias key or slug */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AliasConflictError"];
+                };
+            };
+        };
+    };
+    removeTagAlias: {
+        parameters: {
+            query: {
+                /**
+                 * @description The alias to remove, percent-encoded; matched by alias key (trimmed, lower-cased).
+                 * @example C++
+                 */
+                alias: string;
+            };
+            header: {
+                /**
+                 * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+                 * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+                 */
+                "X-XSRF-TOKEN": components["parameters"]["XsrfToken"];
+            };
+            path: {
+                /**
+                 * @description The tag's canonical slug; a value that is not a slug is 404.
+                 * @example postgresql
+                 */
+                slug: components["parameters"]["TagSlug"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The updated tag */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
                     /**
                      * @example {
-                     *       "id": 9,
-                     *       "name": "PostgreSQL",
-                     *       "slug": "postgresql",
+                     *       "id": 10,
+                     *       "name": "C++",
+                     *       "slug": "c-plus-plus",
                      *       "category": "language",
                      *       "aliases": []
                      *     }
@@ -952,9 +1118,30 @@ export interface operations {
                     "application/json": components["schemas"]["Tag"];
                 };
             };
-            400: components["responses"]["ValidationError"];
+            /** @description The `alias` query parameter is missing */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "validation_failed",
+                     *       "message": "Request failed validation",
+                     *       "details": [
+                     *         {
+                     *           "field": "alias",
+                     *           "message": "is required"
+                     *         }
+                     *       ]
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["CsrfInvalid"];
+            404: components["responses"]["NotFound"];
         };
     };
     renderResume: {

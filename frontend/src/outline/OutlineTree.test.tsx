@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
-import { createDummyMasterTree } from '../dummy/dummyMasterResume'
+import { createSampleTree } from '../test/sampleTree'
 import { PLACEHOLDERS } from '../config/constants'
 import OutlineTree from './OutlineTree'
 import { addNode, deleteNode, moveNode } from './treeOps'
@@ -13,7 +13,7 @@ const newId = () => `new-${++n}`
 const changes: ResumeTree[] = []
 const latest = () => changes[changes.length - 1]
 function Harness() {
-  const [tree, setTree] = useState(createDummyMasterTree)
+  const [tree, setTree] = useState(createSampleTree)
   const onChange = (t: ResumeTree) => {
     changes.push(t)
     setTree(t)
@@ -84,14 +84,14 @@ describe('OutlineTree component', () => {
 
 describe('treeOps', () => {
   it('rejects shapes that break the one-level subsection limit', () => {
-    const t = createDummyMasterTree()
+    const t = createSampleTree()
     expect(() => addNode(t, 'x1', 'subsection')).toThrow()
     expect(() => addNode(t, 's-exp', 'subsection_text')).toThrow()
     expect(() => addNode(t, null, 'subsection')).toThrow()
   })
 
   it('refuses to delete or move header and footer, and does not mutate input', () => {
-    const t = createDummyMasterTree()
+    const t = createSampleTree()
     const copy = structuredClone(t)
     expect(() => deleteNode(t, 'h')).toThrow()
     expect(moveNode(t, 'f', -1)).toBe(t)
@@ -100,7 +100,7 @@ describe('treeOps', () => {
   })
 
   it('moves a subsection within its section only', () => {
-    const t = moveNode(createDummyMasterTree(), 'x1', 1)
+    const t = moveNode(createSampleTree(), 'x1', 1)
     expect(t.sections[1].children.map((c) => c.id)).toEqual(['x2', 'x1'])
     expect(moveNode(t, 'x1', 1)).toBe(t)
   })

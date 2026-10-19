@@ -2,18 +2,27 @@ import type { components } from './schema'
 
 export type User = components['schemas']['User']
 export type Credentials = components['schemas']['Credentials']
-export type ApiErrorBody = components['schemas']['Error']
+export type ApiErrorBody = components['schemas']['Error'] & { currentVersion?: number }
+export type ResumeDocument = components['schemas']['ResumeDocument']
+export type ResumeVersionSummary = components['schemas']['ResumeVersionSummary']
+export type ResumeTree = components['schemas']['ResumeTree']
 
 /** Error thrown by any API client call; mirrors the contract's Error schema. */
 export class ApiError extends Error {
   readonly status: number
   readonly code: string
+  /** Present on 409 version_conflict: the version now stored. */
+  readonly currentVersion?: number
+  /** Per-field problems on 400 validation_failed. */
+  readonly details?: ApiErrorBody['details']
 
   constructor(status: number, body: ApiErrorBody) {
     super(body.message)
     this.name = 'ApiError'
     this.status = status
     this.code = body.code
+    this.currentVersion = body.currentVersion
+    this.details = body.details
   }
 }
 
@@ -26,6 +35,16 @@ export interface AuthApi {
   getMe(): Promise<User | null>
 }
 
+/** Master resume operations (operationIds getMasterResume, saveMasterResume, listMasterVersions, restoreMasterVersion). */
+export interface ResumeApi {
+  getMaster(): Promise<ResumeDocument>
+  /** 409 rejects with an ApiError carrying currentVersion. */
+  saveMaster(baseVersion: number, tree: ResumeTree): Promise<ResumeDocument>
+  listVersions(): Promise<ResumeVersionSummary[]>
+  restoreVersion(version: number, baseVersion: number): Promise<ResumeDocument>
+}
+
 export interface Api {
   auth: AuthApi
+  resume: ResumeApi
 }

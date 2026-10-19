@@ -1,5 +1,5 @@
 import { CSRF } from '../config/constants'
-import { ApiError, type Api, type ApiErrorBody, type User } from './types'
+import { ApiError, type Api, type ApiErrorBody, type ResumeDocument, type ResumeVersionSummary, type User } from './types'
 
 const MUTATING = new Set(['POST', 'PUT', 'DELETE'])
 
@@ -61,6 +61,14 @@ export function createHttpApi(fetchImpl: typeof fetch = (...a) => fetch(...a)): 
   }
 
   return {
+    resume: {
+      getMaster: async () => json<ResumeDocument>(await request('GET', '/api/resumes/master')),
+      saveMaster: async (baseVersion, tree) =>
+        json<ResumeDocument>(await request('PUT', '/api/resumes/master', { baseVersion, tree })),
+      listVersions: async () => json<ResumeVersionSummary[]>(await request('GET', '/api/resumes/master/versions')),
+      restoreVersion: async (version, baseVersion) =>
+        json<ResumeDocument>(await request('POST', `/api/resumes/master/versions/${version}/restore`, { baseVersion })),
+    },
     auth: {
       signUp: async (c) => json<User>(await request('POST', '/api/auth/signup', c)),
       logIn: async (c) => json<User>(await request('POST', '/api/auth/login', c)),

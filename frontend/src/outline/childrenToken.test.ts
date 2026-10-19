@@ -1,4 +1,4 @@
-import { createDummyMasterTree } from '../dummy/dummyMasterResume'
+import { createSampleTree } from '../test/sampleTree'
 import { addNode, childrenTokenProblems, deleteNode, findNode, moveNode, setNodeLatex } from './treeOps'
 import type { ResumeNode, ResumeTree } from './types'
 
@@ -15,8 +15,8 @@ const SECTION_BLOCK = '\n\\resumeSubHeadingListStart\n{{children}}\n\\resumeSubH
 const SUB_BLOCK = '\n\\resumeItemListStart\n{{children}}\n\\resumeItemListEnd'
 
 describe('children token and list wrappers', () => {
-  it('dummy master tree is consistent: token only on nodes with children', () => {
-    const t = createDummyMasterTree()
+  it('sample master tree is consistent: token only on nodes with children', () => {
+    const t = createSampleTree()
     const walk = (n: ResumeNode) => {
       expect(childrenTokenProblems(n)).toEqual([])
       expect(n.latex.includes('{{children}}')).toBe(n.children.length > 0)
@@ -26,7 +26,7 @@ describe('children token and list wrappers', () => {
   })
 
   it('a new section gains wrapper and token with its first child only', () => {
-    const t1 = addNode(createDummyMasterTree(), null, 'section', () => 'sec')
+    const t1 = addNode(createSampleTree(), null, 'section', () => 'sec')
     expect(latexOf(t1, 'sec')).toBe('\\section{New Section}')
     const t2 = addNode(t1, 'sec', 'section_text', id)
     expect(latexOf(t2, 'sec')).toBe('\\section{New Section}' + SECTION_BLOCK)
@@ -35,7 +35,7 @@ describe('children token and list wrappers', () => {
   })
 
   it('a new subsection gains the item wrapper with its first bullet only', () => {
-    const t1 = addNode(createDummyMasterTree(), 's-exp', 'subsection', () => 'sub')
+    const t1 = addNode(createSampleTree(), 's-exp', 'subsection', () => 'sub')
     const heading = latexOf(t1, 'sub')
     expect(heading).toMatch(/^\\resumeSubheading\{Company Name\}.*\}$/)
     expect(heading).not.toContain('{{children}}')
@@ -46,13 +46,13 @@ describe('children token and list wrappers', () => {
   })
 
   it('keeps what the user wrote: an existing token is not duplicated', () => {
-    let t = addNode(createDummyMasterTree(), null, 'section', () => 'sec')
+    let t = addNode(createSampleTree(), null, 'section', () => 'sec')
     t = setNodeLatex(t, 'sec', '\\section{Mine}\n{{children}}')
     expect(latexOf(addNode(t, 'sec', 'section_text', id), 'sec')).toBe('\\section{Mine}\n{{children}}')
   })
 
   it('deleting the last child removes untouched wrapper and token, but not while other children remain', () => {
-    let t = addNode(createDummyMasterTree(), null, 'section', () => 'sec')
+    let t = addNode(createSampleTree(), null, 'section', () => 'sec')
     t = addNode(addNode(t, 'sec', 'section_text', () => 'a'), 'sec', 'section_text', () => 'b')
     t = deleteNode(t, 'a')
     expect(latexOf(t, 'sec')).toBe('\\section{New Section}' + SECTION_BLOCK)
@@ -61,7 +61,7 @@ describe('children token and list wrappers', () => {
   })
 
   it('deleting the last child keeps edited latex and warns about the empty wrapper', () => {
-    let t = addNode(createDummyMasterTree(), null, 'section', () => 'sec')
+    let t = addNode(createSampleTree(), null, 'section', () => 'sec')
     t = addNode(t, 'sec', 'section_text', () => 'a')
     t = setNodeLatex(t, 'sec', latexOf(t, 'sec') + '\n% my note')
     t = deleteNode(t, 'a')
@@ -71,19 +71,19 @@ describe('children token and list wrappers', () => {
   })
 
   it('reordering never edits any latex', () => {
-    const t = createDummyMasterTree()
+    const t = createSampleTree()
     const moved = moveNode(moveNode(moveNode(t, 'x1', 1), 'x1b1', 1), 's-edu', 1)
     expect(allLatex(moved)).toEqual(allLatex(t))
     expect(moved).not.toEqual(t)
   })
 
   it('a parent with children but no token still warns', () => {
-    const t = setNodeLatex(createDummyMasterTree(), 'x1', '\\resumeSubheading{a}{b}{c}{d}')
+    const t = setNodeLatex(createSampleTree(), 'x1', '\\resumeSubheading{a}{b}{c}{d}')
     expect(childrenTokenProblems(findNode(t, 'x1')!.node)).toHaveLength(1)
   })
 
   it('reports duplicate and unknown tokens (case-sensitive)', () => {
-    const parent = (latex: string): ResumeNode => ({ id: 'p', type: 'section', title: '', latex, tags: [], children: [findNode(createDummyMasterTree(), 'e1')!.node] })
+    const parent = (latex: string): ResumeNode => ({ id: 'p', type: 'section', title: '', latex, tags: [], children: [findNode(createSampleTree(), 'e1')!.node] })
     expect(childrenTokenProblems(parent('{{children}}{{children}}'))).toHaveLength(1)
     expect(childrenTokenProblems(parent('{{children}}{{Children}}'))).toHaveLength(1)
   })
