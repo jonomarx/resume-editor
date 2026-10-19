@@ -35,7 +35,7 @@ public class HttpRendererClient implements RendererClient {
         try {
             HttpResponse<byte[]> res = http.send(request, HttpResponse.BodyHandlers.ofByteArray());
             return switch (res.statusCode()) {
-                case 200 -> new Pdf(res.body(), res.headers().firstValue("X-Page-Count").map(Integer::valueOf).orElse(null), "");
+                case 200 -> pdfOutcome(res);
                 case 422 -> new CompileError(logOf(res.body()));
                 case 413 -> new TooLarge();
                 case 504 -> new Unavailable("renderer timed out");
@@ -46,6 +46,18 @@ public class HttpRendererClient implements RendererClient {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return new Unavailable("interrupted");
+        }
+    }
+
+    /** A 200 without a usable X-Page-Count is a broken renderer, not a one-page document. */
+    private static Outcome pdfOutcome(HttpResponse<byte[]> res) {
+        String header = res.headers().firstValue("X-Page-Count").orElse(null);
+        try {
+            int pages = Integer.parseInt(header == null ? "" : header.trim());
+            if (pages < 1) return new Unavailable("renderer sent an invalid page count");
+            return new Pdf(res.body(), pages, "");
+        } catch (NumberFormatException e) {
+            return new Unavailable("renderer sent a missing or non-numeric page count");
         }
     }
 

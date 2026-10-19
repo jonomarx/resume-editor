@@ -67,8 +67,13 @@ public class RenderService {
             if (hit.isPresent()) return new Rendered(hash, true, hit.get().pageCount(), hit.get().log());
             RendererClient.Outcome outcome = renderer.render(doc.tex());
             if (outcome instanceof RendererClient.Pdf pdf) {
-                int pages = pdf.pageCount() == null ? 1 : pdf.pageCount();
-                cache.store(userId, hash, fingerprint, pdf.bytes(), pages, pdf.log());
+                int pages = pdf.pageCount() == null ? 0 : pdf.pageCount();
+                if (pages < 1) return new Unavailable(); // no trustworthy page count: a renderer failure, never cached
+                try {
+                    cache.store(userId, hash, fingerprint, pdf.bytes(), pages, pdf.log());
+                } catch (RuntimeException cacheFailure) { // for example an IOException writing the cache
+                    return new Unavailable();
+                }
                 return new Rendered(hash, false, pages, pdf.log());
             }
             if (outcome instanceof RendererClient.CompileError err) {
