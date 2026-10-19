@@ -34,3 +34,15 @@ export const CSRF = {
   tokenPath: '/api/me',
   invalidCode: 'csrf_invalid',
 } as const
+
+export const OUTLINE_LABELS = {
+  untitled: '(untitled)',
+  add: {
+    header: 'Add header',
+    footer: 'Add footer',
+    section: 'Add section',
+    section_text: 'Add text line',
+    subsection: 'Add subsection',
+    subsection_text: 'Add bullet',
+  },
+} as const

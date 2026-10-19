@@ -7,7 +7,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.nio.charset.StandardCharsets;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,6 +26,29 @@ import org.springframework.test.web.servlet.MockMvc;
 class SpaServingTests {
     @Autowired
     MockMvc mvc;
+
+    /** Name of the hashed JS file the real Vite build references, e.g. /assets/index-CdHJH-nP.js. */
+    static String assetPath;
+
+    /**
+     * These tests serve the real frontend build (frontend/dist, copied onto the test classpath by the app pom).
+     * Without a build they are skipped locally; CI builds the frontend first and sets REQUIRE_FRONTEND_BUILD=true,
+     * which turns a missing build into a failure.
+     */
+    @BeforeAll
+    static void requireFrontendBuild() throws Exception {
+        ClassPathResource index = new ClassPathResource("static/index.html");
+        if (!index.exists()) {
+            if ("true".equals(System.getenv("REQUIRE_FRONTEND_BUILD"))) {
+                throw new AssertionError("frontend/dist is missing: run `pnpm build` in frontend/ first");
+            }
+            Assumptions.abort("frontend/dist not built; run `pnpm build` in frontend/ to enable SpaServingTests");
+        }
+        String html = new String(index.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        Matcher m = Pattern.compile("/assets/[^\"']+\\.js").matcher(html);
+        assertThat(m.find()).as("index.html references a hashed /assets/*.js file").isTrue();
+        assetPath = m.group();
+    }
 
     @Test
     void rootAndClientRoutesServeIndexHtml() throws Exception {
@@ -48,7 +77,7 @@ class SpaServingTests {
 
     @Test
     void hashedAssetsAreCachedLongAndImmutable() throws Exception {
-        mvc.perform(get("/assets/app-abc123.js"))
+        mvc.perform(get(assetPath))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.allOf(
                         org.hamcrest.Matchers.containsString("max-age=31536000"),
