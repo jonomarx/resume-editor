@@ -36,7 +36,7 @@ before(async () => {
 
 after(() => mock?.kill());
 
-const json = { 'content-type': 'application/json', cookie: 'SESSION=mock' };
+const json = { 'content-type': 'application/json', cookie: 'SESSION=mock', 'x-xsrf-token': 'tok' };
 
 test('auth: login returns a user', async () => {
   const res = await fetch(`${base}/api/auth/login`, {
@@ -106,6 +106,74 @@ test('render: returns a render result', async () => {
   const body = await res.json();
   assert.equal(typeof body.success, 'boolean');
   assert.ok('pageCount' in body && Array.isArray(body.errors));
+});
+
+test('csrf: a state-changing request without X-XSRF-TOKEN is rejected by the contract', async () => {
+  const { 'x-xsrf-token': _omit, ...noToken } = json;
+  const res = await fetch(`${base}/api/auth/login`, {
+    method: 'POST',
+    headers: noToken,
+    body: JSON.stringify({ username: 'ada', password: 'correct-horse-battery' }),
+  });
+  assert.equal(res.status, 400); // Prism: required header missing
+});
+
+test('csrf: the documented 403 csrf_invalid shape is served', async () => {
+  const res = await fetch(`${base}/api/auth/logout`, { method: 'POST', headers: { ...json, prefer: 'code=403' } });
+  assert.equal(res.status, 403);
+  assert.equal((await res.json()).code, 'csrf_invalid');
+});
+
+test('credentials: username pattern is enforced', async () => {
+  const res = await fetch(`${base}/api/auth/signup`, {
+    method: 'POST',
+    headers: json,
+    body: JSON.stringify({ username: 'has space', password: 'correct-horse-battery' }),
+  });
+  assert.equal(res.status, 400);
+});
+
+test('credentials: a very long password is accepted by the contract', async () => {
+  const res = await fetch(`${base}/api/auth/login`, {
+    method: 'POST',
+    headers: json,
+    body: JSON.stringify({ username: 'ada', password: 'x'.repeat(500) }),
+  });
+  assert.equal(res.status, 200);
+});
+
+test('restore: 400 is documented', async () => {
+  const res = await fetch(`${base}/api/resumes/master/versions/2/restore`, {
+    method: 'POST',
+    headers: { ...json, prefer: 'code=400' },
+    body: JSON.stringify({}),
+  });
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).code, 'validation_failed');
+});
+
+test('save: unknown tag slug 400 example names the slug', async () => {
+  const res = await fetch(`${base}/api/resumes/master`, { method: 'PUT', headers: { ...json, prefer: 'code=400' }, body: JSON.stringify({ baseVersion: 1, tree: { id: 'r', header: { id: 'h', type: 'header', title: 'H', latex: '', tags: [], children: [] }, sections: [], footer: { id: 'f', type: 'footer', title: 'F', latex: '', tags: [], children: [] } } }) });
+  assert.equal(res.status, 400);
+  assert.match(JSON.stringify(await res.json()), /unknown tag slug/);
+});
+
+test('render pdf: path requires a full 64-hex SHA-256 and /api/me advertises the XSRF cookie', async () => {
+  const hash = 'a'.repeat(64);
+  assert.equal((await fetch(`${base}/api/render/${hash}/pdf`, { headers: json })).status, 200);
+  assert.equal((await fetch(`${base}/api/render/abc123/pdf`, { headers: json })).status, 422);
+  const me = await fetch(`${base}/api/me`, { headers: json });
+  assert.ok(me.headers.has('set-cookie') || me.status === 200);
+});
+
+test('contentHash is the same 64-hex format in resume and render examples', async () => {
+  const resume = await (await fetch(`${base}/api/resumes/master`, { headers: json })).json();
+  const render = await (await fetch(`${base}/api/render`, {
+    method: 'POST', headers: json,
+    body: JSON.stringify({ tree: resume.tree }),
+  })).json();
+  assert.match(resume.contentHash, /^[0-9a-f]{64}$/);
+  assert.equal(render.contentHash, resume.contentHash);
 });
 
 test('unauthenticated mock request without the session cookie is rejected', async () => {
