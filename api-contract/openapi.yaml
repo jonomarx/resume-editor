@@ -352,10 +352,13 @@ paths:
       operationId: addTagAlias
       summary: Add an alias to a tag
       description: |
-        Normalization (applied to the raw `alias` and stored in this form): trim, lowercase, Unicode NFKC, collapse
-        every run of characters outside `[a-z0-9]` into one hyphen, strip leading and trailing hyphens. The 60-character
-        limit applies to the raw input. An alias with no letter or digit after normalizing is rejected with 400
-        `validation_failed`.
+        Normalization (applied to the raw `alias` and stored in this form), in this order: trim, Unicode NFKC, lowercase
+        (NFKC first, because lowercasing first can leave uppercase letters after NFKC, for example U+216B becomes
+        "XII"), collapse every run of characters outside `[a-z0-9]` into one hyphen, strip leading and trailing hyphens.
+        Non-ASCII letters are not transliterated: they are separators like any other character outside `[a-z0-9]`
+        (for example "café" normalizes to "caf"). The normalized output therefore always matches the slug pattern
+        `^[a-z0-9]+(-[a-z0-9]+)*$`. The 60-character limit counts Unicode code points of the raw input. An alias with no
+        letter or digit after normalizing is rejected with 400 `validation_failed`.
 
         Afterwards `POST /api/tags` and `GET /api/tags?q=` resolve the alias to this tag (200, existing).
 
