@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, vi } from 'vitest'
-import { createDummyServer } from '../dummy/dummyApi'
+import { createFakeServer } from '../test/fakeServer'
 import { createHttpApi, readCsrfCookie } from './http'
 
 const creds = { username: 'ada', password: 'correct-horse' }
@@ -10,7 +10,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 function spied() {
-  const server = createDummyServer()
+  const server = createFakeServer()
   const calls: { method: string; path: string; header: string | null }[] = []
   const f = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
     calls.push({ method: init.method ?? 'GET', path: String(input), header: new Headers(init.headers).get('X-XSRF-TOKEN') })
@@ -25,7 +25,7 @@ describe('csrf handling', () => {
     await api.auth.signUp(creds)
     expect(calls[0]).toMatchObject({ method: 'GET', path: '/api/me', header: null })
     expect(calls[1]).toMatchObject({ method: 'POST', path: '/api/auth/signup' })
-    expect(calls[1].header).toBe('dummy-token-1')
+    expect(calls[1].header).toBe('fake-token-1')
     await api.auth.getMe()
     expect(calls.at(-1)).toMatchObject({ method: 'GET', header: null })
   })
