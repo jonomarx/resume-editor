@@ -183,7 +183,7 @@ test('unauthenticated mock request without the session cookie is rejected', asyn
 
 test('save 400: children token examples name the node', async () => {
   const tree = { id: 'r', header: { id: 'h', type: 'header', title: 'H', latex: '', tags: [], children: [] }, sections: [], footer: { id: 'f', type: 'footer', title: 'F', latex: '', tags: [], children: [] } };
-  for (const [name, text] of [['missingChildrenToken', '{{children}}'], ['unknownToken', 'unknown token']]) {
+  for (const [name, text] of [['missingChildrenToken', '{{children}}'], ['unknownToken', 'unknown token'], ['duplicateChildrenToken', 'more than one']]) {
     const res = await fetch(`${base}/api/resumes/master`, { method: 'PUT', headers: { ...json, prefer: `code=400, example=${name}` }, body: JSON.stringify({ baseVersion: 1, tree }) });
     assert.equal(res.status, 400);
     const body = await res.json();

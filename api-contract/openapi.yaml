@@ -206,6 +206,13 @@ paths:
                     message: Request failed validation
                     details:
                       - { field: n-exp-1, message: 'node has children but its latex has no {{children}} token' }
+                duplicateChildrenToken:
+                  summary: More than one {{children}} token in one node
+                  value:
+                    code: validation_failed
+                    message: Request failed validation
+                    details:
+                      - { field: n-exp, message: 'node latex has more than one {{children}} token' }
                 unknownToken:
                   summary: A {{...}} token other than {{children}}
                   value:
@@ -258,6 +265,9 @@ paths:
         Copies the old content into a new version (history is never rewritten).
         Uses the same optimistic check as a save.
         A missing or invalid `baseVersion` returns 400.
+        If the stored tree of that version violates today's node rules (for example the `{{children}}` rules of the
+        `ResumeNode` schema), restore is rejected with the same 400 `validation_failed` as a save. No such stored data
+        exists yet.
       parameters:
         - { $ref: '#/components/parameters/XsrfToken' }
         - { $ref: '#/components/parameters/Version' }
@@ -604,6 +614,11 @@ components:
         - A node with no children needs no token; a `{{children}}` token in a node without children is removed.
           A node that has children but no token is rejected with 400 `validation_failed` (`details` names the node
           id). No other `{{...}}` token exists; any other one is rejected the same way.
+        - More than one `{{children}}` token in one node is also rejected the same way (`details` names the node id).
+        - The token is literal and case-sensitive: `{{Children}}` is an unknown token. It is recognized anywhere in
+          `latex`, including inside a LaTeX comment or verbatim text; such occurrences count like any other.
+        - A section whose children mix text nodes and subsections expands them all, in `children` order, at the
+          single token.
         - `title` is only the outline label; it is never written into the document.
         - The comment markers that map compile errors back to nodes are written by the assembler around each
           node's expanded output; they are not stored in `latex`.
