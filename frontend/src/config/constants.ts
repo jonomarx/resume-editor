@@ -5,6 +5,9 @@ export const CHILDREN_TOKEN = '{{children}}'
 
 export const RENDER_DEBOUNCE_MS = 10000
 
+/** Quiet time after the last edit before the master resume is saved. */
+export const AUTOSAVE_DEBOUNCE_MS = 2000
+
 export const PLACEHOLDERS = {
   section: {
     title: 'New Section',
@@ -95,4 +98,19 @@ export const TOKEN_WARNINGS = {
   duplicate: `This node's LaTeX has more than one ${CHILDREN_TOKEN} token. Keep exactly one.`,
   emptyWrapper: `This node has no children but its LaTeX still has a ${CHILDREN_TOKEN} token inside list macros; an empty list does not compile. Remove the list macros and the token, or add a child.`,
   unknown: (token: string) => `Unknown token ${token}: the only token is ${CHILDREN_TOKEN} (it is case-sensitive).`,
+} as const
+
+export const SAVE_LABELS = {
+  loading: 'Loading your resume...',
+  saved: 'All changes saved',
+  dirty: 'Unsaved changes',
+  saving: 'Saving...',
+  conflict: 'This resume was changed somewhere else (another tab or device). Your last edits were not saved.',
+  reload: 'Reload latest version',
+  error: 'Saving failed.',
+  retry: 'Retry save',
+  history: 'Version history',
+  restore: 'Restore',
+  historyEmpty: 'No versions yet.',
+  restoreBlocked: 'Wait for saving to finish before restoring.',
 } as const

@@ -3,11 +3,13 @@
 import { createHttpApi } from '../api/http'
 import type { Api, Credentials } from '../api/types'
 import { AUTH, CSRF } from '../config/constants'
+import { createFakeResume, type FakeResume } from './fakeResume'
 
 export interface FakeServer {
   fetch: typeof fetch
   /** Test hook: invalidate the current token as if the server had rotated it. */
   rotateToken(): void
+  resume: FakeResume
 }
 
 export function createFakeServer(): FakeServer {
@@ -16,6 +18,7 @@ export function createFakeServer(): FakeServer {
   let currentUserId: number | null = null
   let token = ''
   let counter = 0
+  const resume = createFakeResume()
 
   const issueToken = () => {
     token = `fake-token-${++counter}`
@@ -36,7 +39,10 @@ export function createFakeServer(): FakeServer {
     if (method !== 'GET' && headers.get(CSRF.headerName) !== token) {
       return err(403, CSRF.invalidCode, 'Missing or invalid CSRF token')
     }
-    const body = init.body ? (JSON.parse(init.body as string) as Credentials) : undefined
+    const parsed = init.body ? JSON.parse(init.body as string) : undefined
+    const resumeReply = resume.handle(method, path, parsed)
+    if (resumeReply) return resumeReply
+    const body = parsed as Credentials | undefined
     if (path === '/api/auth/logout') {
       currentUserId = null
       return reply(204)
@@ -65,6 +71,7 @@ export function createFakeServer(): FakeServer {
 
   return {
     fetch: ((input: RequestInfo | URL, init: RequestInit = {}) => handle(String(input), init)) as typeof fetch,
+    resume,
     rotateToken: () => {
       token = `rotated-${++counter}`
     },

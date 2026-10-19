@@ -2,7 +2,7 @@ import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { EditorView } from '@codemirror/view'
 import { useState } from 'react'
-import { createDummyMasterTree } from '../dummy/dummyMasterResume'
+import { createSampleTree } from '../test/sampleTree'
 import { LATEX_SNIPPETS } from '../config/constants'
 import { findNode } from '../outline/treeOps'
 import type { ResumeTree } from '../outline/types'
@@ -12,7 +12,7 @@ import { expandSnippet } from './snippets'
 const changes: ResumeTree[] = []
 const tree = () => changes[changes.length - 1]
 function Harness({ initial }: { initial: string | null }) {
-  const [t, setT] = useState(createDummyMasterTree)
+  const [t, setT] = useState(createSampleTree)
   const onChange = (n: ResumeTree) => {
     changes.push(n)
     setT(n)
