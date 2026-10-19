@@ -16,6 +16,9 @@ import java.util.function.Supplier;
  * <p>The lock holds across processes on Postgres (an advisory transaction lock keyed by the resume id, released at
  * commit or rollback) and in-process everywhere (so H2 tests are serialized too). The row's optimistic version stays
  * the application-level guard (409). Do not nest calls for two different resumes: opposite orders can deadlock.
+ * Calling it while a transaction is already active fails fast with an IllegalStateException (joining that transaction
+ * would release the lock before the commit), so call it from non-transactional code such as a controller or service
+ * method without {@code @Transactional}.
  * {@code work} must not start its own thread for database access; it runs on the caller's thread and connection.
  */
 public interface ResumeLocks {

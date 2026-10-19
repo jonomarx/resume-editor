@@ -95,4 +95,19 @@ class ResumeLocksTests {
         holder.get();
         pool.shutdown();
     }
+
+    @Autowired org.springframework.transaction.PlatformTransactionManager txManager;
+
+    @Test
+    void callingItInsideAnActiveTransactionFailsFastAndLeavesTheLockFree() throws Exception {
+        var tx = new org.springframework.transaction.support.TransactionTemplate(txManager);
+        assertThatThrownBy(() -> tx.executeWithoutResult(s -> locks.withResumeLock(21L, () -> jdbc.update("update lock_probe set v = 7 where id = 1"))))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("active transaction").hasMessageContaining("cover the commit");
+        assertThat(read()).isZero(); // the work never ran
+        // the lock was not taken, so another thread (and this one) can acquire it at once
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        assertThat(pool.submit(() -> locks.withResumeLock(21L, () -> "free")).get(5, TimeUnit.SECONDS)).isEqualTo("free");
+        pool.shutdown();
+        assertThat(locks.withResumeLock(21L, () -> "free again")).isEqualTo("free again");
+    }
 }

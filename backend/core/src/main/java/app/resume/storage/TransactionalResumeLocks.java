@@ -7,6 +7,7 @@ import javax.sql.DataSource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -40,6 +41,11 @@ public class TransactionalResumeLocks implements ResumeLocks {
 
     @Override
     public <T> T withResumeLock(long resumeId, Supplier<T> work) {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            // Joining the caller's transaction would let the lock be released before that transaction commits, which defeats it.
+            throw new IllegalStateException("withResumeLock must not be called inside an active transaction: the lock has to"
+                    + " cover the commit, so it starts its own transaction. Call it from non-transactional code.");
+        }
         return locks.call(resumeId, () -> tx.execute(status -> {
             if (postgres) jdbc.query("select pg_advisory_xact_lock(?)", rs -> {}, ADVISORY_NAMESPACE | resumeId);
             return work.get();

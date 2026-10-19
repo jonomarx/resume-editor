@@ -69,9 +69,13 @@ public class TagController {
         }
     }
 
-    @DeleteMapping("/{slug}/aliases/{alias}")
+    @DeleteMapping("/{slug}/aliases")
     ResponseEntity<?> removeAlias(@AuthenticationPrincipal AppUserPrincipal user, @PathVariable String slug,
-            @PathVariable String alias) {
+            @RequestParam(required = false) String alias) {
+        if (alias == null) {
+            return ResponseEntity.badRequest().body(new ApiError("validation_failed", "Request failed validation",
+                    List.of(new ApiError.FieldProblem("alias", "is required"))));
+        }
         try {
             return ResponseEntity.ok(tags.removeAlias(user.getId(), slug, alias));
         } catch (TagNotFoundException e) {

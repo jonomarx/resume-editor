@@ -207,7 +207,8 @@ public class ResumeService {
     /**
      * Puts the version's file. A key left behind by a crashed or rolled-back earlier attempt (PENDING, unreferenced, maybe
      * with other bytes) is never reused: the next free suffix is taken (`v3.json`, `v3-r1.json`, ...), and the row records
-     * the key that was actually written.
+     * the key that was actually written. Known limit: after 20 consecutive orphans for the same version number the save
+     * fails with an IllegalStateException until the reconciliation worker (US-070) sweeps the PENDING files.
      */
     private Written putVersionFile(long userId, long resumeId, long version, ResumeTree tree) {
         byte[] bytes;
