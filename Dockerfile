@@ -1,7 +1,8 @@
 # Multi-stage build: Vite frontend -> Spring Boot jar (frontend served from static/) -> slim runtime.
 
-FROM node:22-slim AS frontend
-RUN corepack enable
+FROM node:24-slim AS frontend
+# Node 25+ no longer bundles corepack, so: install the pinned pnpm explicitly (keep in sync with PNPM_VERSION in ci.yml).
+RUN npm install -g pnpm@12.14.0
 WORKDIR /build
 COPY api-contract ./api-contract
 COPY frontend ./frontend

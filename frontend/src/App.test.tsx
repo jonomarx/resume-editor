@@ -3,10 +3,10 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import App from './App'
 import { AuthProvider } from './auth/AuthContext'
-import { createDummyApi } from './dummy/dummyApi'
+import { createFakeApi } from './test/fakeServer'
 import type { Api } from './api/types'
 
-function renderAt(path: string, api: Api = createDummyApi()) {
+function renderAt(path: string, api: Api = createFakeApi()) {
   render(
     <MemoryRouter initialEntries={[path]}>
       <AuthProvider api={api}>
@@ -25,7 +25,7 @@ describe('route guard', () => {
   })
 
   it('lets a signed-in user through', async () => {
-    const api = createDummyApi()
+    const api = createFakeApi()
     await api.auth.signUp({ username: 'ada', password: 'correct-horse' })
     renderAt('/jobs', api)
     expect(await screen.findByRole('heading', { name: 'Jobs' })).toBeInTheDocument()
@@ -34,7 +34,7 @@ describe('route guard', () => {
 
 describe('login form', () => {
   it('logs in and returns to the page the guard intercepted', async () => {
-    const api = createDummyApi()
+    const api = createFakeApi()
     await api.auth.signUp({ username: 'ada', password: 'correct-horse' })
     await api.auth.logOut()
     renderAt('/jobs', api)
@@ -67,7 +67,7 @@ describe('login form', () => {
 
 describe('route guard return path', () => {
   it('keeps query string and hash', async () => {
-    const api = createDummyApi()
+    const api = createFakeApi()
     await api.auth.signUp({ username: 'ada', password: 'correct-horse' })
     await api.auth.logOut()
     render(
