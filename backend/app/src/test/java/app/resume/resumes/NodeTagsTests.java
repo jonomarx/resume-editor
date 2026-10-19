@@ -173,4 +173,72 @@ class NodeTagsTests {
         assertThat(index.nodesWithTag(userOf(b), master(b).get("id").asLong(), "java")).containsExactly("edu-1", "exp-1-b1");
         assertThat(index.nodesWithTag(userOf(a), master(b).get("id").asLong(), "java")).isEmpty(); // not A's resume
     }
+
+    /** Sets tags on any node found by id anywhere in the tree. */
+    void tagNode(ObjectNode root, String id, List<String> tags) {
+        java.util.ArrayDeque<JsonNode> todo = new java.util.ArrayDeque<>();
+        todo.add(root.get("header"));
+        todo.add(root.get("footer"));
+        root.get("sections").forEach(todo::add);
+        while (!todo.isEmpty()) {
+            JsonNode n = todo.poll();
+            if (n.get("id").asText().equals(id)) { setTags((ObjectNode) n, tags); return; }
+            n.get("children").forEach(todo::add);
+        }
+        throw new IllegalArgumentException(id);
+    }
+
+    @Test
+    void onlyTextNodesAreIndexedHeadingsHeaderAndFooterAreNot() throws Exception {
+        Cookie s = newUser();
+        tag(s, "Java");
+        JsonNode v1 = master(s);
+        ObjectNode tree = v1.get("tree").deepCopy();
+        tagNode(tree, "header", List.of("java"));          // header
+        tagNode(tree, "footer", List.of("java"));          // footer
+        tagNode(tree, "sec-education", List.of("java"));   // section heading
+        tagNode(tree, "exp-1", List.of("java"));           // subsection heading
+        tagNode(tree, "edu-1", List.of("java"));           // section text: indexed
+        tagNode(tree, "exp-1-b1", List.of("java"));        // subsection text: indexed
+        put(s, 1, tree).andExpect(status().isOk());
+        assertThat(entries(s)).containsExactly(new NodeTagIndex.Entry("edu-1", "java"), new NodeTagIndex.Entry("exp-1-b1", "java"));
+        assertThat(index.nodesWithTag(userOf(s), master(s).get("id").asLong(), "java")).containsExactly("edu-1", "exp-1-b1");
+        // the stored tree keeps the tags the client sent
+        JsonNode stored = master(s).get("tree");
+        assertThat(stored.get("header").get("tags")).hasSize(1);
+        assertThat(stored.get("sections").get(0).get("tags")).hasSize(1);
+        assertThat(stored.get("sections").get(1).get("children").get(0).get("tags")).hasSize(1);
+        // restore and an identical save behave as before
+        put(s, 2, tree).andExpect(status().isOk()).andExpect(jsonPath("$.version").value(2));
+        assertThat(entries(s)).hasSize(2);
+        mvc.perform(CsrfSupport.post("/api/resumes/master/versions/1/restore").cookie(s).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"baseVersion\":2}")).andExpect(status().isOk()).andExpect(jsonPath("$.version").value(3));
+        assertThat(entries(s)).isEmpty();
+        mvc.perform(CsrfSupport.post("/api/resumes/master/versions/2/restore").cookie(s).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"baseVersion\":3}")).andExpect(status().isOk());
+        assertThat(entries(s)).containsExactly(new NodeTagIndex.Entry("edu-1", "java"), new NodeTagIndex.Entry("exp-1-b1", "java"));
+    }
+
+    @Test
+    void anUnknownSlugOnAHeadingIsStillA400AndRowsFromAnEarlierVersionGoAway() throws Exception {
+        Cookie s = newUser();
+        tag(s, "Java");
+        JsonNode v1 = master(s);
+        ObjectNode good = v1.get("tree").deepCopy();
+        tagNode(good, "exp-1-b1", List.of("java"));
+        put(s, 1, good).andExpect(status().isOk());
+        ObjectNode bad = good.deepCopy();
+        tagNode(bad, "sec-experience", List.of("nope"));
+        put(s, 2, bad).andExpect(status().isBadRequest()).andExpect(jsonPath("$.details[0].field").value("sec-experience"))
+                .andExpect(jsonPath("$.details[0].message").value("unknown tag slug \"nope\""));
+        ObjectNode bad2 = good.deepCopy();
+        tagNode(bad2, "footer", List.of("Java"));
+        put(s, 2, bad2).andExpect(status().isBadRequest()).andExpect(jsonPath("$.details[0].field").value("footer"));
+        assertThat(entries(s)).containsExactly(new NodeTagIndex.Entry("exp-1-b1", "java"));
+        // moving a tag from a text node to a heading removes its row on the next rebuild
+        ObjectNode moved = v1.get("tree").deepCopy();
+        tagNode(moved, "exp-1", List.of("java"));
+        put(s, 2, moved).andExpect(status().isOk());
+        assertThat(entries(s)).isEmpty();
+    }
 }
