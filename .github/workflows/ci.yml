@@ -13,6 +13,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # frontend/package.json has no packageManager field, so pin pnpm here (US-078).
+  PNPM_VERSION: '12.14.0'
+
 jobs:
   backend-h2:
     name: Backend tests (H2)
@@ -51,16 +55,32 @@ jobs:
       - if: steps.has.outputs.present == 'true'
         uses: pnpm/action-setup@v4
         with:
-          package_json_file: frontend/package.json
+          version: ${{ env.PNPM_VERSION }}
       - if: steps.has.outputs.present == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
       - if: steps.has.outputs.present == 'true'
         working-directory: frontend
-        run: pnpm install --frozen-lockfile && pnpm test && pnpm build
+        run: pnpm install --frozen-lockfile && pnpm lint && pnpm test && pnpm build
+
+  api-contract:
+    name: API contract lint and mock tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: api-contract/pnpm-lock.yaml
+      - working-directory: api-contract
+        run: pnpm install --frozen-lockfile && pnpm test
 
   scripts:
     name: Script tests

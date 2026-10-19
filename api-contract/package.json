@@ -1,6 +1,10 @@
 {
   "name": "api-contract",
   "private": true,
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": ">=24"
+  },
   "description": "OpenAPI contract tooling: lint and mock server",
   "scripts": {
     "lint": "redocly lint openapi.yaml",
