@@ -16,6 +16,10 @@
     "gen:api": "openapi-typescript ../api-contract/openapi.yaml -o src/api/schema.d.ts"
   },
   "dependencies": {
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.14",
+    "codemirror": "^6.0.2",
+    "pdfjs-dist": "^6.4.299",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-router-dom": "^7.18.4"
