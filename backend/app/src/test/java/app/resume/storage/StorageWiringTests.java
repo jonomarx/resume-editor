@@ -17,6 +17,6 @@ class StorageWiringTests {
     @Test
     void localImplementationIsSelectedByDefault() {
         assertThat(storage).isInstanceOf(LocalFileStorage.class);
-        assertThat(locks).isInstanceOf(InMemoryResumeLocks.class);
+        assertThat(locks).isInstanceOf(TransactionalResumeLocks.class);
     }
 }

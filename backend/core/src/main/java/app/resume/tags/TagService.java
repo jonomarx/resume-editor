@@ -61,6 +61,16 @@ public class TagService {
         return ids.isEmpty() ? Optional.empty() : Optional.of(load(userId, ids.get(0)));
     }
 
+    /** The given slugs that are not canonical tag slugs of this user (node tags must be vocabulary slugs, not aliases). */
+    public java.util.Set<String> unknownSlugs(long userId, java.util.Collection<String> slugs) {
+        java.util.Set<String> unknown = new java.util.LinkedHashSet<>();
+        for (String slug : new java.util.LinkedHashSet<>(slugs)) {
+            Integer n = jdbc.queryForObject("select count(*) from tag where user_id = ? and slug = ?", Integer.class, userId, slug);
+            if (n == null || n == 0) unknown.add(slug);
+        }
+        return unknown;
+    }
+
     public static final int MAX_ALIAS_CODE_POINTS = 60;
 
     /** The tag with this canonical slug (not an alias), scoped to the user. */
