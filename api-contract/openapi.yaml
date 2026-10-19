@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Resume Editor API
-  version: 0.3.0
+  version: 0.4.0
   description: |
     Contract v0 (US-003, fixes in US-076): auth, master resume, tags, render.
     Changed only through stories labeled `contract`.
@@ -301,7 +301,7 @@ paths:
           schema: { $ref: '#/components/schemas/TagCategory' }
         - name: q
           in: query
-          description: Case-insensitive match on name or alias
+          description: Case-insensitive substring match on name, slug or alias key (the lower-cased trimmed alias)
           schema: { type: string }
       responses:
         '200':
@@ -312,16 +312,26 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/Tag' }
               example:
-                - { id: 7, name: Java, slug: java, category: language, aliases: [java17, jdk] }
-                - { id: 8, name: React, slug: react, category: framework, aliases: [reactjs] }
+                - { id: 7, name: Java, slug: java, category: language, aliases: [Java 17, JDK] }
+                - { id: 8, name: React, slug: react, category: framework, aliases: [React.js] }
+                - { id: 10, name: C++, slug: c-plus-plus, category: language, aliases: [CPP, 'C++'] }
         '401': { $ref: '#/components/responses/Unauthorized' }
     post:
       tags: [tags]
       operationId: createTag
       summary: Get or create a vocabulary entry
       description: |
-        Names are normalized to a slug (lowercase, trimmed, punctuation collapsed). If the slug or an alias
-        already exists, the existing tag is returned with 200; otherwise a new tag is created with 201.
+        Slug normalization, in this order: trim, Unicode NFKC, lowercase, replace every `+` with `-plus-` and every `#`
+        with `-sharp-`, collapse every run of characters outside `[a-z0-9]` into one hyphen, strip leading and trailing
+        hyphens. So "C" is `c`, "C++" is `c-plus-plus`, "C#" is `c-sharp`, "Node.js" is `node-js`. Non-ASCII letters are
+        not transliterated: they are separators ("café" gives `caf`). A name with no letter or digit and no `+` or `#`
+        is rejected with 400 `validation_failed`.
+
+        Resolution order: (1) the trimmed, lower-cased name is compared with every alias key of the user (an alias key
+        is the trimmed, lower-cased alias); (2) the computed slug is compared with the user's tag slugs and with their
+        alias keys. The first match is returned with 200 (its category and name are kept); if nothing matches a new tag
+        is created with 201. Example: posting "C++" returns the tag that has the alias "C++" if there is one, otherwise
+        creates `c-plus-plus`.
       parameters:
         - { $ref: '#/components/parameters/XsrfToken' }
       requestBody:
@@ -329,21 +339,29 @@ paths:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/CreateTagRequest' }
-            example: { name: PostgreSQL, category: language }
+            examples:
+              postgres: { value: { name: PostgreSQL, category: language } }
+              cpp: { value: { name: 'C++', category: language } }
+              csharp: { value: { name: 'C#', category: language } }
       responses:
         '403': { $ref: '#/components/responses/CsrfInvalid' }
         '200':
-          description: Already existed
+          description: Already existed (the name matched an alias key, a slug or a slug equal to an alias key)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Tag' }
-              example: { id: 9, name: PostgreSQL, slug: postgresql, category: language, aliases: [postgres] }
+              examples:
+                postgres: { value: { id: 9, name: PostgreSQL, slug: postgresql, category: language, aliases: [Postgres] } }
+                cpp: { value: { id: 10, name: C++, slug: c-plus-plus, category: language, aliases: ['C++', CPP] } }
         '201':
           description: Created
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Tag' }
-              example: { id: 9, name: PostgreSQL, slug: postgresql, category: language, aliases: [] }
+              examples:
+                postgres: { value: { id: 9, name: PostgreSQL, slug: postgresql, category: language, aliases: [] } }
+                cpp: { value: { id: 10, name: C++, slug: c-plus-plus, category: language, aliases: [] } }
+                csharp: { value: { id: 11, name: C#, slug: c-sharp, category: language, aliases: [] } }
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthorized' }
   /api/tags/{slug}/aliases:
@@ -352,22 +370,21 @@ paths:
       operationId: addTagAlias
       summary: Add an alias to a tag
       description: |
-        Normalization (applied to the raw `alias` and stored in this form), in this order: trim, Unicode NFKC, lowercase
-        (NFKC first, because lowercasing first can leave uppercase letters after NFKC, for example U+216B becomes
-        "XII"), collapse every run of characters outside `[a-z0-9]` into one hyphen, strip leading and trailing hyphens.
-        Non-ASCII letters are not transliterated: they are separators like any other character outside `[a-z0-9]`
-        (for example "café" normalizes to "caf"). The normalized output therefore always matches the slug pattern
-        `^[a-z0-9]+(-[a-z0-9]+)*$`. The 60-character limit counts Unicode code points of the raw input. An alias with no
-        letter or digit after normalizing is rejected with 400 `validation_failed`.
+        An alias is any printable ASCII text (0x20 to 0x7E): "C++", "C#", ".NET" and "Node.js" are valid aliases. After
+        trimming leading and trailing spaces it must be 1 to 60 characters; anything else (control characters, non-ASCII
+        characters such as "café", an empty value) is rejected with 400 `validation_failed`. The alias is stored exactly
+        as typed (internal spaces and case kept) and shown that way in `Tag.aliases`.
 
-        Afterwards `POST /api/tags` and `GET /api/tags?q=` resolve the alias to this tag (200, existing).
+        Comparison uses the alias key: the trimmed alias lower-cased. Aliases are unique per user by alias key, so "C++"
+        and "c++" are the same alias. An alias is a conflict when its key equals another tag's alias key or another tag's
+        slug; that is rejected with 409 `alias_conflict`. Clients must not parse the free-text `message`; use
+        `conflictingSlug`.
 
-        Adding an alias that the tag already has, or one equal to the tag's own slug, is a no-op: 200 with the
+        Adding an alias whose key equals one the tag already has, or equals the tag's own slug, is a no-op: 200 with the
         unchanged canonical Tag. The canonical slug never changes through these operations. There is no cap on the
         number of aliases per tag.
 
-        Aliases are unique per user: an alias equal to another tag's slug or another tag's alias is rejected with 409
-        `alias_conflict`. Clients must not parse the free-text `message`; use `conflictingSlug`.
+        Afterwards `POST /api/tags` and `GET /api/tags?q=` resolve the alias to this tag (200, existing).
 
         Adding or removing an alias never changes the tags on any resume node (nodes reference tags by slug).
       parameters:
@@ -378,50 +395,72 @@ paths:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/AddAliasRequest' }
-            example: { alias: postgres }
+            examples:
+              plain: { value: { alias: Postgres } }
+              cpp: { value: { alias: 'C++' } }
+              dotnet: { value: { alias: .NET } }
       responses:
         '200':
           description: The updated tag
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Tag' }
-              example: { id: 9, name: PostgreSQL, slug: postgresql, category: language, aliases: [postgres] }
-        '400': { $ref: '#/components/responses/ValidationError' }
+              examples:
+                plain: { value: { id: 9, name: PostgreSQL, slug: postgresql, category: language, aliases: [Postgres] } }
+                cpp: { value: { id: 10, name: C++, slug: c-plus-plus, category: language, aliases: ['C++'] } }
+        '400':
+          description: The alias is empty, longer than 60 characters, or not printable ASCII
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                nonAscii:
+                  summary: Non-ASCII character
+                  value:
+                    code: validation_failed
+                    message: Request failed validation
+                    details:
+                      - { field: alias, message: must be printable ASCII (space to tilde) }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/CsrfInvalid' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: The alias is already another tag's slug or alias
+          description: The alias key equals another tag's alias key or slug
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AliasConflictError' }
-              example: { code: alias_conflict, message: That alias already belongs to another tag, conflictingSlug: mysql }
-  /api/tags/{slug}/aliases/{alias}:
+              examples:
+                conflict:
+                  summary: Case-insensitive collision ("MYSQL" or "mysql" against tag mysql)
+                  value: { code: alias_conflict, message: That alias already belongs to another tag, conflictingSlug: mysql }
     delete:
       tags: [tags]
       operationId: removeTagAlias
       summary: Remove an alias from a tag
       description: |
-        `{alias}` is the normalized alias as listed in the tag's `aliases`. Removing an alias the tag does not have
-        returns 404, as does an unknown tag, and so does a `{slug}` or `{alias}` that is not a valid slug. The tag's
-        slug itself is not an alias and cannot be removed here. The canonical slug never changes through this
-        operation, and removing an alias never changes the tags on any resume node.
+        The alias goes in the `alias` query parameter, percent-encoded (aliases can contain `/`, `.`, `%`, `#` and
+        spaces, which do not belong in a path segment: "C++" is `?alias=C%2B%2B`). It is matched by alias key, so the
+        case of the value does not matter. Removing an alias the tag does not have returns 404, as does an unknown tag
+        or a `{slug}` that is not a valid slug. The tag's slug itself is not an alias and cannot be removed here. The
+        canonical slug never changes through this operation, and removing an alias never changes the tags on any
+        resume node.
       parameters:
         - { $ref: '#/components/parameters/XsrfToken' }
         - { $ref: '#/components/parameters/TagSlug' }
         - name: alias
-          in: path
+          in: query
           required: true
-          description: A normalized alias (a slug); anything else is 404.
-          schema: { type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$' }
-          example: postgres
+          description: The alias to remove, percent-encoded; matched by alias key (trimmed, lower-cased).
+          schema: { type: string }
+          example: C++
       responses:
         '200':
           description: The updated tag
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Tag' }
-              example: { id: 9, name: PostgreSQL, slug: postgresql, category: language, aliases: [] }
+              example: { id: 10, name: C++, slug: c-plus-plus, category: language, aliases: [] }
+        '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/CsrfInvalid' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -791,7 +830,8 @@ components:
         category: { $ref: '#/components/schemas/TagCategory' }
         aliases:
           type: array
-          items: { type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$' }
+          items: { type: string }
+          description: Aliases as typed (printable ASCII, any case); unique per user by lower-cased trimmed key.
     AliasConflictError:
       allOf:
         - $ref: '#/components/schemas/Error'
@@ -807,9 +847,10 @@ components:
       properties:
         alias:
           type: string
-          minLength: 1
-          maxLength: 60
-          description: Free text; normalized to a slug before it is stored. Must contain a letter or digit.
+          pattern: '^[ -~]+$'
+          description: |
+            Printable ASCII (space to tilde). After trimming leading and trailing spaces it must be 1 to 60 characters
+            (a length rule the schema cannot express); stored as typed.
     CreateTagRequest:
       type: object
       required: [name, category]
