@@ -1,0 +1,692 @@
+openapi: 3.0.3
+info:
+  title: Resume Editor API
+  version: 0.2.0
+  description: |
+    Contract v0 (US-003, fixes in US-076): auth, master resume, tags, render.
+    Changed only through stories labeled `contract`.
+
+    Conventions
+    - All paths are under `/api`. JSON bodies use camelCase.
+    - Authentication is a session cookie (`SESSION`, HttpOnly, SameSite=Lax) set by login or sign-up.
+    - Every error response uses the `Error` schema.
+    - Resume saves use optimistic locking: send the `baseVersion` you loaded; a stale save returns 409.
+
+    CSRF protection
+    - The server sets a JavaScript-readable `XSRF-TOKEN` cookie. `GET /api/me` always sets it, including its 401
+      response, so a signed-out client can obtain a token before sign-up or login.
+    - Every state-changing request (POST, PUT, DELETE, including sign-up, login and logout) must send the cookie's
+      value in an `X-XSRF-TOKEN` header. A missing or wrong token returns 403 with code `csrf_invalid`.
+    - The token may be replaced when a session starts; clients re-read the cookie before each request.
+servers:
+  - url: http://localhost:8080
+    description: Local Spring Boot (the Vite dev server proxies /api to it)
+tags:
+  - name: auth
+    description: Sign-up, login, logout, current user
+  - name: resume
+    description: Master resume read, write, versions, restore
+  - name: tags
+    description: Shared tag vocabulary
+  - name: render
+    description: LaTeX to PDF
+security:
+  - sessionCookie: []
+paths:
+  /api/auth/signup:
+    post:
+      tags: [auth]
+      operationId: signUp
+      summary: Create an account and start a session
+      security: []
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Credentials' }
+            example: { username: ada, password: correct-horse-battery }
+      responses:
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '201':
+          description: Account created and signed in
+          headers:
+            Set-Cookie:
+              description: Session cookie
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+              example: { id: 1, username: ada }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '409':
+          description: Username already taken
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: username_taken, message: That username is taken }
+  /api/auth/login:
+    post:
+      tags: [auth]
+      operationId: logIn
+      summary: Start a session
+      security: []
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Credentials' }
+            example: { username: ada, password: correct-horse-battery }
+      responses:
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '200':
+          description: Signed in
+          headers:
+            Set-Cookie:
+              description: Session cookie
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+              example: { id: 1, username: ada }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401':
+          description: Wrong username or password
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: bad_credentials, message: Invalid username or password }
+  /api/auth/logout:
+    post:
+      tags: [auth]
+      operationId: logOut
+      summary: End the session
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+      responses:
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '204': { description: Signed out }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/me:
+    get:
+      tags: [auth]
+      operationId: getMe
+      summary: The signed-in user
+      responses:
+        '200':
+          description: Current user
+          headers:
+            Set-Cookie:
+              description: Refreshes the `XSRF-TOKEN` cookie (readable by JavaScript)
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+              example: { id: 1, username: ada }
+        '401':
+          description: Not signed in (the response still sets the `XSRF-TOKEN` cookie)
+          headers:
+            Set-Cookie:
+              description: Sets the `XSRF-TOKEN` cookie (readable by JavaScript)
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: unauthorized, message: Sign in required }
+  /api/resumes/master:
+    get:
+      tags: [resume]
+      operationId: getMasterResume
+      summary: Read the latest version of the master resume
+      description: The first read creates the master from the Jake-template starter tree.
+      responses:
+        '200':
+          description: Latest version
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResumeDocument' }
+              examples:
+                current: { $ref: '#/components/examples/ResumeDocument' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      tags: [resume]
+      operationId: saveMasterResume
+      summary: Save a new version of the master resume
+      description: |
+        Succeeds only if `baseVersion` equals the current version; the new version is `baseVersion + 1`.
+        A stale `baseVersion` returns 409 with the current version so the UI can offer a reload.
+
+        A save whose tree is identical to the current version (same `contentHash`) does not create a version: it
+        returns the current document unchanged with 200.
+
+        Tags on nodes must be slugs in the tag vocabulary. A tree containing any unknown slug is rejected with 400,
+        code `validation_failed`, and `details` has one entry per offending slug (`field` is the slug's node id
+        path, `message` names the slug).
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SaveResumeRequest' }
+            examples:
+              save: { $ref: '#/components/examples/SaveRequest' }
+      responses:
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResumeDocument' }
+              examples:
+                current: { $ref: '#/components/examples/ResumeDocument' }
+        '400':
+          description: Request failed validation, including tags that are not in the vocabulary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                code: validation_failed
+                message: Request failed validation
+                details:
+                  - { field: n-exp-1-b1, message: unknown tag slug "javscript" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/VersionConflict' }
+  /api/resumes/master/versions:
+    get:
+      tags: [resume]
+      operationId: listMasterVersions
+      summary: Version history, newest first
+      responses:
+        '200':
+          description: Versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ResumeVersionSummary' }
+              example:
+                - { version: 3, contentHash: e99551fa57d7a6c2858733580847871fae001b49e0f54e59dc8e15ebae6b5203, createdAt: '2026-10-18T20:15:00Z' }
+                - { version: 2, contentHash: b10af658e08210683091e16185d3c41ddcae75ca55322e125094137dd668097e, createdAt: '2026-10-18T19:02:00Z' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/resumes/master/versions/{version}:
+    get:
+      tags: [resume]
+      operationId: getMasterVersion
+      summary: Read one historical version
+      parameters:
+        - { $ref: '#/components/parameters/Version' }
+      responses:
+        '200':
+          description: That version
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResumeDocument' }
+              examples:
+                current: { $ref: '#/components/examples/ResumeDocument' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/resumes/master/versions/{version}/restore:
+    post:
+      tags: [resume]
+      operationId: restoreMasterVersion
+      summary: Make an old version the newest version
+      description: |
+        Copies the old content into a new version (history is never rewritten).
+        Uses the same optimistic check as a save.
+        A missing or invalid `baseVersion` returns 400.
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+        - { $ref: '#/components/parameters/Version' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RestoreRequest' }
+            example: { baseVersion: 3 }
+      responses:
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '200':
+          description: Restored as a new version
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResumeDocument' }
+              examples:
+                current: { $ref: '#/components/examples/ResumeDocument' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/VersionConflict' }
+  /api/tags:
+    get:
+      tags: [tags]
+      operationId: listTags
+      summary: The tag vocabulary
+      parameters:
+        - name: category
+          in: query
+          schema: { $ref: '#/components/schemas/TagCategory' }
+        - name: q
+          in: query
+          description: Case-insensitive match on name or alias
+          schema: { type: string }
+      responses:
+        '200':
+          description: Tags
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Tag' }
+              example:
+                - { id: 7, name: Java, slug: java, category: language, aliases: [java17, jdk] }
+                - { id: 8, name: React, slug: react, category: framework, aliases: [reactjs] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [tags]
+      operationId: createTag
+      summary: Get or create a vocabulary entry
+      description: |
+        Names are normalized to a slug (lowercase, trimmed, punctuation collapsed). If the slug or an alias
+        already exists, the existing tag is returned with 200; otherwise a new tag is created with 201.
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateTagRequest' }
+            example: { name: PostgreSQL, category: language }
+      responses:
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '200':
+          description: Already existed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tag' }
+              example: { id: 9, name: PostgreSQL, slug: postgresql, category: language, aliases: [postgres] }
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tag' }
+              example: { id: 9, name: PostgreSQL, slug: postgresql, category: language, aliases: [] }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/render:
+    post:
+      tags: [render]
+      operationId: renderResume
+      summary: Compile a resume tree to PDF
+      description: |
+        The server assembles the tree into a LaTeX document (locked preamble, header, sections, footer),
+        compiles it in the sandboxed renderer, and caches the result by content hash. The same tree always
+        returns the same `contentHash`. A LaTeX compile failure is a normal 200 response with `success: false`
+        and errors mapped to node ids; fetch the PDF of a successful render from `pdfUrl`.
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RenderRequest' }
+            examples:
+              render: { $ref: '#/components/examples/RenderRequest' }
+      responses:
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '200':
+          description: Render finished (check `success`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RenderResult' }
+              examples:
+                ok:
+                  summary: Compiled
+                  value:
+                    success: true
+                    contentHash: b706a01cf5720a0f5e9044150a32728b0773bfd2a065bfa7704fb9ae91038f82
+                    cached: false
+                    pageCount: 1
+                    pdfUrl: /api/render/b706a01cf5720a0f5e9044150a32728b0773bfd2a065bfa7704fb9ae91038f82/pdf
+                    log: This is pdfTeX, Version 3.141592653
+                    errors: []
+                failed:
+                  summary: Compile error in a node
+                  value:
+                    success: false
+                    contentHash: b6630edd4acc65e3c44874f48d0f80e3fe629905b7aad7ca669f149162451d63
+                    cached: false
+                    pageCount: null
+                    pdfUrl: null
+                    log: '! Undefined control sequence.'
+                    errors:
+                      - { nodeId: n-exp-1, line: 2, message: Undefined control sequence }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '413':
+          description: Document too large
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: too_large, message: Resume is too large to render }
+        '429':
+          description: Too many render requests
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: rate_limited, message: Slow down and try again shortly }
+        '503':
+          description: Renderer unavailable or timed out
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: renderer_unavailable, message: The renderer did not respond in time }
+  /api/render/{contentHash}/pdf:
+    get:
+      tags: [render]
+      operationId: getRenderedPdf
+      summary: The PDF of a successful render
+      description: |
+        `contentHash` is the full SHA-256 (64 hex characters) from a render result. The server checks that the PDF
+        belongs to the signed-in user; any other hash, including someone else's, returns 404 (never 403).
+      parameters:
+        - name: contentHash
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[0-9a-f]{64}$' }
+          example: b706a01cf5720a0f5e9044150a32728b0773bfd2a065bfa7704fb9ae91038f82
+      responses:
+        '200':
+          description: PDF bytes (immutable, cacheable)
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: SESSION
+  parameters:
+    XsrfToken:
+      name: X-XSRF-TOKEN
+      in: header
+      required: true
+      description: The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+      schema: { type: string }
+      example: 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+    Version:
+      name: version
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+      example: 2
+  responses:
+    CsrfInvalid:
+      description: Missing or wrong `X-XSRF-TOKEN` header
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { code: csrf_invalid, message: Missing or invalid CSRF token }
+    Unauthorized:
+      description: Not signed in
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { code: unauthorized, message: Sign in required }
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { code: not_found, message: Not found }
+    ValidationError:
+      description: Request failed validation
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            code: validation_failed
+            message: Request failed validation
+            details:
+              - { field: username, message: must be 3 to 40 characters }
+    VersionConflict:
+      description: Stale `baseVersion`; someone else saved first. Reload and retry.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/VersionConflictError' }
+          example:
+            code: version_conflict
+            message: The resume changed since you loaded it
+            currentVersion: 4
+  examples:
+    SaveRequest:
+      summary: Save after editing version 3
+      value:
+        baseVersion: 3
+        tree:
+          id: root
+          header: { id: n-header, type: header, title: Header, latex: '\begin{center} \textbf{\Huge Ada Lovelace} \end{center}', tags: [], children: [] }
+          sections:
+            - id: n-exp
+              type: section
+              title: Experience
+              latex: ''
+              tags: []
+              children:
+                - id: n-exp-1
+                  type: subsection
+                  title: Analytical Engines Ltd
+                  latex: '\resumeSubheading{Analytical Engines Ltd}{London}{Intern}{Jun. 2026 -- Aug. 2026}'
+                  tags: []
+                  children:
+                    - { id: n-exp-1-b1, type: subsection_text, title: Bullet, latex: '\resumeItem{Cut batch runtime by 40\% with caching.}', tags: [java], children: [] }
+          footer: { id: n-footer, type: footer, title: Footer, latex: '', tags: [], children: [] }
+    RenderRequest:
+      summary: Render the current tree
+      value:
+        tree:
+          id: root
+          header: { id: n-header, type: header, title: Header, latex: '\begin{center} \textbf{\Huge Ada Lovelace} \end{center}', tags: [], children: [] }
+          sections: []
+          footer: { id: n-footer, type: footer, title: Footer, latex: '', tags: [], children: [] }
+    ResumeDocument:
+      summary: A saved master resume
+      value:
+        id: 12
+        version: 4
+        contentHash: b706a01cf5720a0f5e9044150a32728b0773bfd2a065bfa7704fb9ae91038f82
+        updatedAt: '2026-10-18T20:15:00Z'
+        tree:
+          id: root
+          header: { id: n-header, type: header, title: Header, latex: '\begin{center} \textbf{\Huge Ada Lovelace} \end{center}', tags: [], children: [] }
+          sections:
+            - id: n-exp
+              type: section
+              title: Experience
+              latex: ''
+              tags: []
+              children: []
+          footer: { id: n-footer, type: footer, title: Footer, latex: '', tags: [], children: [] }
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable code (snake_case)
+        message:
+          type: string
+          description: Human-readable text, safe to show
+        details:
+          type: array
+          description: Per-field problems, present on validation_failed
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field: { type: string }
+              message: { type: string }
+    VersionConflictError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          required: [currentVersion]
+          properties:
+            currentVersion:
+              type: integer
+              description: The version now stored; reload it before saving again
+    Credentials:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          pattern: '^[A-Za-z0-9_.-]{3,40}$'
+          description: |
+            3 to 40 characters: letters, digits, underscore, dot, hyphen. Unique case-insensitively
+            ("Ada" and "ada" collide); a collision returns 409 `username_taken`.
+        password:
+          type: string
+          minLength: 8
+          format: password
+          description: |
+            At least 8 characters. Only the first 72 bytes (UTF-8, never cutting a character in half) are used;
+            anything beyond is ignored, identically at sign-up and login. There is no maximum length.
+    User:
+      type: object
+      required: [id, username]
+      properties:
+        id: { type: integer, format: int64 }
+        username: { type: string }
+    NodeType:
+      type: string
+      enum: [header, section, section_text, subsection, subsection_text, footer]
+    ResumeNode:
+      type: object
+      description: |
+        One node of the tree. `latex` is the node's own LaTeX; children are ordered. Subsections do not
+        nest deeper than one level below a section. Tags are slugs from the shared vocabulary only.
+      required: [id, type, title, latex, tags, children]
+      properties:
+        id:
+          type: string
+          description: Stable client-generated id, unique within the tree; used in render error mapping
+          minLength: 1
+          maxLength: 64
+        type: { $ref: '#/components/schemas/NodeType' }
+        title: { type: string, maxLength: 200 }
+        latex: { type: string, maxLength: 20000 }
+        tags:
+          type: array
+          items: { type: string, description: Tag slug }
+        children:
+          type: array
+          items: { $ref: '#/components/schemas/ResumeNode' }
+    ResumeTree:
+      type: object
+      description: Header and footer are separate top-level nodes; sections are ordered.
+      required: [id, header, sections, footer]
+      properties:
+        id: { type: string }
+        header: { $ref: '#/components/schemas/ResumeNode' }
+        sections:
+          type: array
+          items: { $ref: '#/components/schemas/ResumeNode' }
+        footer: { $ref: '#/components/schemas/ResumeNode' }
+    ResumeDocument:
+      type: object
+      required: [id, version, contentHash, updatedAt, tree]
+      properties:
+        id: { type: integer, format: int64 }
+        version: { type: integer, minimum: 1 }
+        contentHash:
+          type: string
+          description: &hashdesc |
+            SHA-256 (64 hex characters) of the canonical tree. `RenderResult.contentHash` uses the same method,
+            so the same tree always yields the same hash in both places.
+        updatedAt: { type: string, format: date-time }
+        tree: { $ref: '#/components/schemas/ResumeTree' }
+    SaveResumeRequest:
+      type: object
+      required: [baseVersion, tree]
+      properties:
+        baseVersion:
+          type: integer
+          minimum: 1
+          description: The version this edit was based on
+        tree: { $ref: '#/components/schemas/ResumeTree' }
+    RestoreRequest:
+      type: object
+      required: [baseVersion]
+      properties:
+        baseVersion:
+          type: integer
+          minimum: 1
+          description: The current version the caller last saw
+    ResumeVersionSummary:
+      type: object
+      required: [version, contentHash, createdAt]
+      properties:
+        version: { type: integer, minimum: 1 }
+        contentHash: { type: string, description: 'SHA-256 of the canonical tree (64 hex characters)' }
+        createdAt: { type: string, format: date-time }
+    TagCategory:
+      type: string
+      enum: [language, framework, domain, role_type]
+    Tag:
+      type: object
+      required: [id, name, slug, category, aliases]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        slug: { type: string }
+        category: { $ref: '#/components/schemas/TagCategory' }
+        aliases:
+          type: array
+          items: { type: string }
+    CreateTagRequest:
+      type: object
+      required: [name, category]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 60 }
+        category: { $ref: '#/components/schemas/TagCategory' }
+    RenderRequest:
+      type: object
+      required: [tree]
+      properties:
+        tree: { $ref: '#/components/schemas/ResumeTree' }
+    RenderError:
+      type: object
+      required: [message]
+      properties:
+        nodeId:
+          type: string
+          nullable: true
+          description: Node whose LaTeX caused the error, or null if it is in the preamble
+        line:
+          type: integer
+          nullable: true
+          description: Line within the node's LaTeX
+        message: { type: string }
+    RenderResult:
+      type: object
+      required: [success, contentHash, cached, pageCount, pdfUrl, log, errors]
+      properties:
+        success: { type: boolean }
+        contentHash:
+          type: string
+          description: *hashdesc
+        cached: { type: boolean, description: True when served from the render cache }
+        pageCount: { type: integer, nullable: true }
+        pdfUrl: { type: string, nullable: true }
+        log: { type: string, description: Compile log (may be truncated) }
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/RenderError' }
