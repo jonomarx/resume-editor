@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import type { Tag, TagCategory } from '../api/types'
-import { TAG_CATEGORIES, TAG_LABELS } from '../config/constants'
+import { TAG_CATEGORIES, TAG_LABELS, TAG_SUGGESTION_LIMIT } from '../config/constants'
 
 interface Props {
   /** Slugs on the node. */
   selected: string[]
   vocabulary: Tag[]
-  onChange(slugs: string[]): void
+  onAdd(slug: string): void
+  onRemove(slug: string): void
   /** Get-or-create in the vocabulary; resolves to the entry to use. */
   onCreate(name: string, category: TagCategory): Promise<Tag>
 }
@@ -14,17 +15,17 @@ interface Props {
 const matches = (t: Tag, q: string) =>
   t.name.toLowerCase().includes(q) || t.slug.includes(q) || t.aliases.some((a) => a.toLowerCase().includes(q))
 
-export default function TagEditor({ selected, vocabulary, onChange, onCreate }: Props) {
+export default function TagEditor({ selected, vocabulary, onAdd, onRemove, onCreate }: Props) {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<TagCategory>(TAG_CATEGORIES[0].value)
   const [error, setError] = useState<string | null>(null)
   const q = query.trim().toLowerCase()
   const nameOf = (slug: string) => vocabulary.find((t) => t.slug === slug)?.name ?? slug
-  const candidates = q ? vocabulary.filter((t) => !selected.includes(t.slug) && matches(t, q)) : []
+  const candidates = q ? vocabulary.filter((t) => !selected.includes(t.slug) && matches(t, q)).slice(0, TAG_SUGGESTION_LIMIT) : []
   const exact = vocabulary.some((t) => t.name.toLowerCase() === q || t.slug === q)
 
   const add = (slug: string) => {
-    if (!selected.includes(slug)) onChange([...selected, slug])
+    onAdd(slug)
     setQuery('')
   }
 
@@ -45,10 +46,10 @@ export default function TagEditor({ selected, vocabulary, onChange, onCreate }: 
       ) : (
         <ul>
           {selected.map((slug) => (
-            <li key={slug}>
+            <li key={slug} style={{ overflowWrap: 'anywhere' }}>
               {nameOf(slug)}{' '}
-              <button type="button" aria-label={TAG_LABELS.remove(nameOf(slug))} onClick={() => onChange(selected.filter((s) => s !== slug))}>
-                x
+              <button type="button" aria-label={TAG_LABELS.remove(nameOf(slug))} onClick={() => onRemove(slug)}>
+                {TAG_LABELS.removeSymbol}
               </button>
             </li>
           ))}
@@ -59,9 +60,9 @@ export default function TagEditor({ selected, vocabulary, onChange, onCreate }: 
         <input value={query} onChange={(e) => setQuery(e.target.value)} />
       </label>
       {candidates.length > 0 && (
-        <ul aria-label="Matching tags">
+        <ul aria-label={TAG_LABELS.matchingLabel}>
           {candidates.map((t) => (
-            <li key={t.slug}>
+            <li key={t.slug} style={{ overflowWrap: 'anywhere' }}>
               <button type="button" onClick={() => add(t.slug)}>{t.name}</button>
             </li>
           ))}

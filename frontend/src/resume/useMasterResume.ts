@@ -93,7 +93,9 @@ export function useMasterResume(api: Api) {
   }, [api])
 
   const setTree = useCallback(
-    (t: ResumeTree) => {
+    (update: ResumeTree | ((prev: ResumeTree) => ResumeTree)) => {
+      // A function update is applied to the newest tree, never to a copy captured earlier (see async tag creation).
+      const t = typeof update === 'function' ? update(treeRef.current!) : update
       treeRef.current = t
       dirty.current = true
       setTreeState(t)

@@ -90,9 +90,12 @@ export function setNodeLatex(tree: ResumeTree, id: string, latex: string): Resum
   return mapAll(tree, id, (n) => ({ ...n, latex }))
 }
 
-/** Replaces a node's tags with `tags` (slugs), dropping duplicates and keeping order. */
-export function setNodeTags(tree: ResumeTree, id: string, tags: string[]): ResumeTree {
-  return mapAll(tree, id, (n) => ({ ...n, tags: [...new Set(tags)] }))
+export function addNodeTag(tree: ResumeTree, id: string, slug: string): ResumeTree {
+  return mapAll(tree, id, (n) => (n.tags.includes(slug) ? n : { ...n, tags: [...n.tags, slug] }))
+}
+
+export function removeNodeTag(tree: ResumeTree, id: string, slug: string): ResumeTree {
+  return mapAll(tree, id, (n) => ({ ...n, tags: n.tags.filter((t) => t !== slug) }))
 }
 
 /** Adds a child to `parentId` (or a new section when parentId is null). Rejects shapes the model forbids. */

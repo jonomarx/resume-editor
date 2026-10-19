@@ -143,8 +143,13 @@ export const TAG_LABELS = {
   categoryLabel: 'Category for a new tag',
   create: (name: string) => `Create "${name}"`,
   remove: (name: string) => `Remove tag ${name}`,
+  removeSymbol: 'x',
+  matchingLabel: 'Matching tags',
   loadFailed: 'Could not load tags.',
   createFailed: 'Could not create the tag.',
-  /** Nodes of these types carry tags (DESIGN section 4); header and footer do not. */
-  taggable: ['section', 'section_text', 'subsection', 'subsection_text'],
+  /** Only the two text node types carry tags for now (DESIGN section 4 and 6); other nodes get no editor. */
+  taggable: ['section_text', 'subsection_text'],
 } as const
+
+/** At most this many vocabulary suggestions are listed while typing. */
+export const TAG_SUGGESTION_LIMIT = 8

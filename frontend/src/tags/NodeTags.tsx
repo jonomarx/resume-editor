@@ -1,6 +1,6 @@
 import type { Api } from '../api/types'
 import { TAG_LABELS } from '../config/constants'
-import { findNode, setNodeTags } from '../outline/treeOps'
+import { addNodeTag, findNode, removeNodeTag } from '../outline/treeOps'
 import type { ResumeTree } from '../outline/types'
 import TagEditor from './TagEditor'
 import { useTags } from './useTags'
@@ -9,7 +9,8 @@ interface Props {
   api: Api
   tree: ResumeTree
   selectedId: string | null
-  onChange(tree: ResumeTree): void
+  /** Accepts an updater so changes are applied to the newest tree, even after an async create. */
+  onChange(update: (tree: ResumeTree) => ResumeTree): void
 }
 
 /** Tag editor for the selected node (header and footer carry no tags). */
@@ -21,7 +22,7 @@ export default function NodeTags({ api, tree, selectedId, onChange }: Props) {
   return (
     <>
       {error && <p role="alert">{error}</p>}
-      <TagEditor key={node.id} selected={node.tags} vocabulary={tags} onChange={(slugs) => onChange(setNodeTags(tree, node.id, slugs))} onCreate={create} />
+      <TagEditor key={node.id} selected={node.tags} vocabulary={tags} onAdd={(slug) => onChange((t) => addNodeTag(t, node.id, slug))} onRemove={(slug) => onChange((t) => removeNodeTag(t, node.id, slug))} onCreate={create} />
     </>
   )
 }
