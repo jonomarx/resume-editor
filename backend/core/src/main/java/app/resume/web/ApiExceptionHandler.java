@@ -20,6 +20,12 @@ public class ApiExceptionHandler {
                 .body(new ApiError("validation_failed", "Request failed validation", details));
     }
 
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ApiError> badParameter(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiError("validation_failed",
+                "Request failed validation", List.of(new ApiError.FieldProblem(e.getName(), "has an invalid value"))));
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ResponseEntity<ApiError> unreadable(HttpMessageNotReadableException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
