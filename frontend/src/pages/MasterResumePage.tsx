@@ -3,12 +3,15 @@ import { api } from '../api'
 import { SAVE_LABELS } from '../config/constants'
 import NodeEditor from '../editor/NodeEditor'
 import OutlineTree from '../outline/OutlineTree'
+import RenderPanel from '../preview/RenderPanel'
+import { useRender } from '../preview/useRender'
 import { useMasterResume } from '../resume/useMasterResume'
 import VersionHistory from '../resume/VersionHistory'
 import type { Api } from '../api/types'
 
 export default function MasterResumePage({ apiClient = api }: { apiClient?: Api }) {
   const r = useMasterResume(apiClient)
+  const preview = useRender(apiClient, r.tree)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   return (
     <>
@@ -29,6 +32,7 @@ export default function MasterResumePage({ apiClient = api }: { apiClient?: Api 
           <div style={{ display: 'flex', gap: '1rem' }}>
             <OutlineTree tree={r.tree} onChange={r.setTree} selectedId={selectedId} onSelect={setSelectedId} />
             <NodeEditor tree={r.tree} selectedId={selectedId} onChange={r.setTree} />
+            <RenderPanel tree={r.tree} {...preview} />
           </div>
           <VersionHistory
             versions={r.versions}

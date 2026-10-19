@@ -6,6 +6,8 @@ import { AUTOSAVE_DEBOUNCE_MS } from '../config/constants'
 import { createFakeServer, type FakeServer } from '../test/fakeServer'
 import MasterResumePage from './MasterResumePage'
 
+vi.mock('../preview/PdfViewer', () => ({ default: ({ url }: { url: string }) => <div data-testid="pdf" data-url={url} /> }))
+
 let server: FakeServer
 let user: ReturnType<typeof userEvent.setup>
 

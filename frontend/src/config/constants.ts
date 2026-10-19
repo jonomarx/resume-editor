@@ -114,3 +114,17 @@ export const SAVE_LABELS = {
   historyEmpty: 'No versions yet.',
   restoreBlocked: 'Wait for saving to finish before restoring.',
 } as const
+
+export const PREVIEW_LABELS = {
+  renderNow: 'Render now',
+  rendering: 'Rendering...',
+  pages: (n: number) => `${n} ${n === 1 ? 'page' : 'pages'}`,
+  errorsTitle: 'Could not render',
+  logSummary: 'Compile log',
+  noPreview: 'No preview yet.',
+  preamble: 'the template',
+  failed: 'Rendering failed.',
+} as const
+
+/** PDF.js draws each page at this scale (1 = 72 dpi). */
+export const PDF_PREVIEW_SCALE = 1.2

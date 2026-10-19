@@ -43,7 +43,7 @@ describe('placeholder content for new nodes', () => {
 })
 
 describe('no inline placeholder strings', () => {
-  const sources = import.meta.glob<string>(['../**/*.{ts,tsx}', '!../**/*.test.*', '!../dummy/**', '!../api/schema.d.ts', '!../config/constants.ts'], {
+  const sources = import.meta.glob<string>(['../**/*.{ts,tsx}', '!../**/*.test.*', '!../test/**', '!../api/schema.d.ts', '!../config/constants.ts'], {
     query: '?raw',
     import: 'default',
     eager: true,

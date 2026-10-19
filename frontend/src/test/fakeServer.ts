@@ -3,6 +3,7 @@
 import { createHttpApi } from '../api/http'
 import type { Api, Credentials } from '../api/types'
 import { AUTH, CSRF } from '../config/constants'
+import { createFakeRender, type FakeRender } from './fakeRender'
 import { createFakeResume, type FakeResume } from './fakeResume'
 
 export interface FakeServer {
@@ -10,6 +11,7 @@ export interface FakeServer {
   /** Test hook: invalidate the current token as if the server had rotated it. */
   rotateToken(): void
   resume: FakeResume
+  render: FakeRender
 }
 
 export function createFakeServer(): FakeServer {
@@ -19,6 +21,7 @@ export function createFakeServer(): FakeServer {
   let token = ''
   let counter = 0
   const resume = createFakeResume()
+  const render = createFakeRender()
 
   const issueToken = () => {
     token = `fake-token-${++counter}`
@@ -42,6 +45,8 @@ export function createFakeServer(): FakeServer {
     const parsed = init.body ? JSON.parse(init.body as string) : undefined
     const resumeReply = resume.handle(method, path, parsed)
     if (resumeReply) return resumeReply
+    const renderReply = render.handle(method, path, parsed)
+    if (renderReply) return renderReply
     const body = parsed as Credentials | undefined
     if (path === '/api/auth/logout') {
       currentUserId = null
@@ -72,6 +77,7 @@ export function createFakeServer(): FakeServer {
   return {
     fetch: ((input: RequestInfo | URL, init: RequestInit = {}) => handle(String(input), init)) as typeof fetch,
     resume,
+    render,
     rotateToken: () => {
       token = `rotated-${++counter}`
     },
