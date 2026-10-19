@@ -32,6 +32,19 @@ public final class TemplateResources {
     /** Classpath location of the starter tree that ships with this template. */
     public String starterTreeResource() { return base + "starter-tree.json"; }
 
+    /** Identifies this template's locked text; a render cached under another fingerprint is stale. Not an API field. */
+    public String fingerprint() {
+        try {
+            java.security.MessageDigest d = java.security.MessageDigest.getInstance("SHA-256");
+            d.update(preamble.getBytes(StandardCharsets.UTF_8));
+            d.update((byte) 0);
+            d.update(documentEnd.getBytes(StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(d.digest()).substring(0, 16);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     String preamble() { return preamble; }
     String documentEnd() { return documentEnd; }
 
