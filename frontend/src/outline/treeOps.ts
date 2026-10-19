@@ -67,6 +67,10 @@ export function renameNode(tree: ResumeTree, id: string, title: string): ResumeT
   return mapAll(tree, id, (n) => ({ ...n, title }))
 }
 
+export function setNodeLatex(tree: ResumeTree, id: string, latex: string): ResumeTree {
+  return mapAll(tree, id, (n) => ({ ...n, latex }))
+}
+
 /** Adds a child to `parentId` (or a new section when parentId is null). Rejects shapes the model forbids. */
 export function addNode(tree: ResumeTree, parentId: string | null, type: NodeType, newId: IdFactory = defaultId): ResumeTree {
   if (parentId === null) {

@@ -46,3 +46,19 @@ export const OUTLINE_LABELS = {
     subsection_text: 'Add bullet',
   },
 } as const
+
+// TEMPLATE: these snippets use Jake's macro names. Replace them when the derivative template (US-011)
+// changes the macros. `$0` marks where the cursor lands after insertion.
+export const LATEX_SNIPPETS = [
+  { label: 'Bold', text: '\\textbf{$0}' },
+  { label: 'Italic', text: '\\textit{$0}' },
+  { label: 'Link', text: '\\href{https://$0}{link text}' },
+  { label: 'Bullet', text: '\\resumeItem{$0}' },
+  { label: 'Bullet list', text: '\\resumeItemListStart\n  \\resumeItem{$0}\n\\resumeItemListEnd' },
+  { label: 'Subheading', text: '\\resumeSubheading\n  {$0}{City, ST}\n  {Job Title}{Mon. YYYY -- Mon. YYYY}' },
+] as const
+
+export const EDITOR_LABELS = {
+  empty: 'Select a node in the outline to edit its LaTeX.',
+  editorAria: 'LaTeX editor',
+} as const
