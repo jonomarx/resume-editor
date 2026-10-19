@@ -37,21 +37,39 @@ describe('NodeEditor', () => {
     render(<Harness initial="x1b1" />)
     expect(view().state.doc.toString()).toBe('\\resumeItem{Built a thing}')
     await userEvent.click(screen.getByText('pick other'))
-    expect(view().state.doc.toString()).toBe('')
+    expect(view().state.doc.toString()).toBe('\\resumeItem{Shipped another thing}')
   })
 
   it('writes edits into the tree node, only that node', () => {
     render(<Harness initial="x1b1" />)
     act(() => view().dispatch({ changes: { from: 0, to: view().state.doc.length, insert: 'new text' } }))
     expect(findNode(tree(), 'x1b1')!.node.latex).toBe('new text')
-    expect(findNode(tree(), 'x1b2')!.node.latex).toBe('')
+    expect(findNode(tree(), 'x1b2')!.node.latex).toBe('\\resumeItem{Shipped another thing}')
   })
 
   it('inserts a snippet at the cursor and places the cursor at the marker', async () => {
     render(<Harness initial="x1b2" />)
+    act(() => view().dispatch({ changes: { from: 0, to: view().state.doc.length, insert: '' } }))
     await userEvent.click(screen.getByRole('button', { name: 'Bold' }))
     expect(findNode(tree(), 'x1b2')!.node.latex).toBe('\\textbf{}')
     expect(view().state.selection.main.head).toBe('\\textbf{'.length)
+  })
+})
+
+describe('children token warning', () => {
+  it('warns when a node with children has no token, and not otherwise', () => {
+    const { unmount } = render(<Harness initial="x1" />)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    act(() => view().dispatch({ changes: { from: 0, to: view().state.doc.length, insert: '\\resumeSubheading{a}{b}{c}{d}' } }))
+    expect(screen.getByRole('alert')).toHaveTextContent('no {{children}} token')
+    unmount()
+  })
+
+  it('the Children snippet restores the token', async () => {
+    render(<Harness initial="x1" />)
+    act(() => view().dispatch({ changes: { from: 0, to: view().state.doc.length, insert: 'x' } }))
+    await userEvent.click(screen.getByRole('button', { name: 'Children' }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
 

@@ -1,4 +1,4 @@
-import { PLACEHOLDER_LATEX, PLACEHOLDERS } from '../config/constants'
+import { CHILDREN_TOKEN, PLACEHOLDER_LATEX, PLACEHOLDERS, TOKEN_WARNINGS } from '../config/constants'
 import type { NodeType, ResumeNode, ResumeTree } from './types'
 
 /**
@@ -25,6 +25,22 @@ export const isFixed = (n: ResumeNode) => n.type === 'header' || n.type === 'foo
 
 export type IdFactory = () => string
 export const defaultId: IdFactory = () => crypto.randomUUID()
+
+export function ensureChildrenToken(latex: string): string {
+  return latex.includes(CHILDREN_TOKEN) ? latex : `${latex}${latex === '' || latex.endsWith('\n') ? '' : '\n'}${CHILDREN_TOKEN}`
+}
+
+/** Problems the server would reject with 400 for this node's latex (api-contract ResumeNode). */
+export function childrenTokenProblems(node: ResumeNode): string[] {
+  const out: string[] = []
+  const count = node.latex.split(CHILDREN_TOKEN).length - 1
+  if (node.children.length > 0 && count === 0) out.push(TOKEN_WARNINGS.missing)
+  if (count > 1) out.push(TOKEN_WARNINGS.duplicate)
+  for (const m of node.latex.matchAll(/\{\{[^{}]*\}\}/g)) {
+    if (m[0] !== CHILDREN_TOKEN) out.push(TOKEN_WARNINGS.unknown(m[0]))
+  }
+  return out
+}
 
 export function createNode(type: NodeType, newId: IdFactory = defaultId): ResumeNode {
   const titles: Partial<Record<NodeType, string>> = {
@@ -89,7 +105,12 @@ export function addNode(tree: ResumeTree, parentId: string | null, type: NodeTyp
     throw new Error(`Cannot add ${type} under ${found.node.type}`)
   }
   const child = createNode(type, newId)
-  return mapAll(tree, parentId, (n) => ({ ...n, children: [...n.children, child] }))
+  // A parent needs the children token once it has children: insert it if missing. Existing latex is never otherwise touched.
+  return mapAll(tree, parentId, (n) => ({
+    ...n,
+    latex: n.latex.includes(CHILDREN_TOKEN) ? n.latex : ensureChildrenToken(n.latex),
+    children: [...n.children, child],
+  }))
 }
 
 function filterTree(nodes: ResumeNode[], id: string): ResumeNode[] {

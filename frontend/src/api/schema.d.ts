@@ -95,6 +95,9 @@ export interface paths {
          *     Tags on nodes must be slugs in the tag vocabulary. A tree containing any unknown slug is rejected with 400,
          *     code `validation_failed`, and `details` has one entry per offending slug (`field` is the slug's node id
          *     path, `message` names the slug).
+         *
+         *     Node LaTeX follows the `{{children}}` rules in the `ResumeNode` schema: a node with children but no token,
+         *     or any other `{{...}}` token, is rejected with 400 `validation_failed` and `details` naming the node id.
          */
         put: operations["saveMasterResume"];
         post?: never;
@@ -152,6 +155,9 @@ export interface paths {
          * @description Copies the old content into a new version (history is never rewritten).
          *     Uses the same optimistic check as a save.
          *     A missing or invalid `baseVersion` returns 400.
+         *     If the stored tree of that version violates today's node rules (for example the `{{children}}` rules of the
+         *     `ResumeNode` schema), restore is rejected with the same 400 `validation_failed` as a save. No such stored data
+         *     exists yet.
          */
         post: operations["restoreMasterVersion"];
         delete?: never;
@@ -266,16 +272,39 @@ export interface components {
         /** @enum {string} */
         NodeType: "header" | "section" | "section_text" | "subsection" | "subsection_text" | "footer";
         /**
-         * @description One node of the tree. `latex` is the node's own LaTeX; children are ordered. Subsections do not
-         *     nest deeper than one level below a section. Tags are slugs from the shared vocabulary only.
+         * @description One node of the tree. Children are ordered. Subsections do not nest deeper than one level below a
+         *     section. Tags are slugs from the shared vocabulary only.
+         *
+         *     How a node becomes LaTeX
+         *     - `latex` holds the node's own LaTeX in full: its heading or subheading macro (for example
+         *       `\section{Experience}` or `\resumeSubheading{..}{..}{..}{..}`), any list wrapper macros, and the place
+         *       where its child nodes go.
+         *     - That place is the single token `{{children}}`, written inside `latex`. When the server assembles the
+         *       document it replaces the token with the expanded LaTeX of the node's children, in `children` order, so
+         *       reordering children never edits any `latex`.
+         *     - A node with no children needs no token; a `{{children}}` token in a node without children is removed.
+         *       A node that has children but no token is rejected with 400 `validation_failed` (`details` names the node
+         *       id). No other `{{...}}` token exists; any other one is rejected the same way.
+         *     - More than one `{{children}}` token in one node is also rejected the same way (`details` names the node id).
+         *     - The token is literal and case-sensitive: `{{Children}}` is an unknown token. It is recognized anywhere in
+         *       `latex`, including inside a LaTeX comment or verbatim text; such occurrences count like any other.
+         *     - A section whose children mix text nodes and subsections expands them all, in `children` order, at the
+         *       single token.
+         *     - `title` is only the outline label; it is never written into the document.
+         *     - The comment markers that map compile errors back to nodes are written by the assembler around each
+         *       node's expanded output; they are not stored in `latex`.
+         *     - The locked preamble and macro definitions are a hidden part of the server's template. They are never part
+         *       of the tree and no API ever returns them.
          */
         ResumeNode: {
             /** @description Stable client-generated id, unique within the tree; used in render error mapping */
             id: string;
             type: components["schemas"]["NodeType"];
             title: string;
+            /** @description The node's own LaTeX in full, including the single `{{children}}` token where its children go (see the schema description). */
             latex: string;
             tags: string[];
+            /** @description Ordered child nodes, expanded where `{{children}}` appears in `latex`. */
             children: components["schemas"]["ResumeNode"][];
         };
         /** @description Header and footer are separate top-level nodes; sections are ordered. */
@@ -701,18 +730,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    /**
-                     * @example {
-                     *       "code": "validation_failed",
-                     *       "message": "Request failed validation",
-                     *       "details": [
-                     *         {
-                     *           "field": "n-exp-1-b1",
-                     *           "message": "unknown tag slug \"javscript\""
-                     *         }
-                     *       ]
-                     *     }
-                     */
                     "application/json": components["schemas"]["Error"];
                 };
             };
