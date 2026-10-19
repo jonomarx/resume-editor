@@ -197,6 +197,7 @@ test('examples: every node with children carries the {{children}} token', async 
   const doc = await (await fetch(`${base}/api/resumes/master`, { headers: json })).json();
   const check = (n) => { if (n.children.length) assert.ok(n.latex.includes('{{children}}'), n.id); n.children.forEach(check); };
   [doc.tree.header, ...doc.tree.sections, doc.tree.footer].forEach(check);
+});
 
 test('tag aliases: add returns the updated tag', async () => {
   const res = await fetch(`${base}/api/tags/postgresql/aliases`, { method: 'POST', headers: json, body: JSON.stringify({ alias: 'postgres' }) });
@@ -211,7 +212,9 @@ test('tag aliases: add rejects an empty alias, documents 409 alias_conflict and 
   assert.equal(bad.status, 400);
   const conflict = await fetch(`${base}/api/tags/postgresql/aliases`, { method: 'POST', headers: { ...json, prefer: 'code=409' }, body: JSON.stringify({ alias: 'mysql' }) });
   assert.equal(conflict.status, 409);
-  assert.equal((await conflict.json()).code, 'alias_conflict');
+  const conflictBody = await conflict.json();
+  assert.equal(conflictBody.code, 'alias_conflict');
+  assert.equal(conflictBody.conflictingSlug, 'mysql');
   const csrf = await fetch(`${base}/api/tags/postgresql/aliases`, { method: 'POST', headers: { ...json, prefer: 'code=403' }, body: JSON.stringify({ alias: 'pg' }) });
   assert.equal(csrf.status, 403);
   assert.equal((await csrf.json()).code, 'csrf_invalid');

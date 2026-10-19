@@ -352,10 +352,21 @@ paths:
       operationId: addTagAlias
       summary: Add an alias to a tag
       description: |
-        The alias is normalized like a tag name (lowercase, punctuation collapsed to hyphens) and stored in that
-        normalized form. Afterwards `POST /api/tags` and `GET /api/tags?q=` resolve it to this tag. Adding an alias the
-        tag already has is a no-op and still returns 200. Aliases are unique per user: an alias equal to another
-        tag's slug or another tag's alias is rejected with 409 `alias_conflict`.
+        Normalization (applied to the raw `alias` and stored in this form): trim, lowercase, Unicode NFKC, collapse
+        every run of characters outside `[a-z0-9]` into one hyphen, strip leading and trailing hyphens. The 60-character
+        limit applies to the raw input. An alias with no letter or digit after normalizing is rejected with 400
+        `validation_failed`.
+
+        Afterwards `POST /api/tags` and `GET /api/tags?q=` resolve the alias to this tag (200, existing).
+
+        Adding an alias that the tag already has, or one equal to the tag's own slug, is a no-op: 200 with the
+        unchanged canonical Tag. The canonical slug never changes through these operations. There is no cap on the
+        number of aliases per tag.
+
+        Aliases are unique per user: an alias equal to another tag's slug or another tag's alias is rejected with 409
+        `alias_conflict`. Clients must not parse the free-text `message`; use `conflictingSlug`.
+
+        Adding or removing an alias never changes the tags on any resume node (nodes reference tags by slug).
       parameters:
         - { $ref: '#/components/parameters/XsrfToken' }
         - { $ref: '#/components/parameters/TagSlug' }
@@ -380,8 +391,8 @@ paths:
           description: The alias is already another tag's slug or alias
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-              example: { code: alias_conflict, message: 'That alias already belongs to the tag "mysql"' }
+              schema: { $ref: '#/components/schemas/AliasConflictError' }
+              example: { code: alias_conflict, message: That alias already belongs to another tag, conflictingSlug: mysql }
   /api/tags/{slug}/aliases/{alias}:
     delete:
       tags: [tags]
@@ -389,14 +400,17 @@ paths:
       summary: Remove an alias from a tag
       description: |
         `{alias}` is the normalized alias as listed in the tag's `aliases`. Removing an alias the tag does not have
-        returns 404, as does an unknown tag. The tag's slug itself is not an alias and cannot be removed here.
+        returns 404, as does an unknown tag, and so does a `{slug}` or `{alias}` that is not a valid slug. The tag's
+        slug itself is not an alias and cannot be removed here. The canonical slug never changes through this
+        operation, and removing an alias never changes the tags on any resume node.
       parameters:
         - { $ref: '#/components/parameters/XsrfToken' }
         - { $ref: '#/components/parameters/TagSlug' }
         - name: alias
           in: path
           required: true
-          schema: { type: string }
+          description: A normalized alias (a slug); anything else is 404.
+          schema: { type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$' }
           example: postgres
       responses:
         '200':
@@ -516,7 +530,7 @@ components:
       name: slug
       in: path
       required: true
-      description: The tag's canonical slug
+      description: The tag's canonical slug; a value that is not a slug is 404.
       schema: { type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$' }
       example: postgresql
     Version:
@@ -774,7 +788,16 @@ components:
         category: { $ref: '#/components/schemas/TagCategory' }
         aliases:
           type: array
-          items: { type: string }
+          items: { type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$' }
+    AliasConflictError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          required: [conflictingSlug]
+          properties:
+            conflictingSlug:
+              type: string
+              description: The canonical slug of the tag that already holds the normalized alias as its slug or alias
     AddAliasRequest:
       type: object
       required: [alias]
