@@ -1,4 +1,4 @@
-import { PLACEHOLDERS } from '../config/constants'
+import { PLACEHOLDER_LATEX, PLACEHOLDERS } from '../config/constants'
 import type { NodeType, ResumeNode, ResumeTree } from './types'
 
 /**
@@ -33,7 +33,13 @@ export function createNode(type: NodeType, newId: IdFactory = defaultId): Resume
     subsection: PLACEHOLDERS.subsection.organization,
     subsection_text: PLACEHOLDERS.bullet,
   }
-  return { id: newId(), type, title: titles[type] ?? '', latex: '', tags: [], children: [] }
+  const latex: Partial<Record<NodeType, string>> = {
+    section: PLACEHOLDER_LATEX.section(PLACEHOLDERS),
+    section_text: PLACEHOLDER_LATEX.sectionText(PLACEHOLDERS),
+    subsection: PLACEHOLDER_LATEX.subsection(PLACEHOLDERS),
+    subsection_text: PLACEHOLDER_LATEX.bullet(PLACEHOLDERS),
+  }
+  return { id: newId(), type, title: titles[type] ?? '', latex: latex[type] ?? '', tags: [], children: [] }
 }
 
 /** Finds a node anywhere in the tree, with its parent (null for top-level nodes). */

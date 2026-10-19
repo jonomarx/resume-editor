@@ -62,3 +62,13 @@ export const EDITOR_LABELS = {
   empty: 'Select a node in the outline to edit its LaTeX.',
   editorAria: 'LaTeX editor',
 } as const
+
+// TEMPLATE: LaTeX for a new node, using Jake's macro names. Each string is a function of the placeholder
+// text above, so the visible words live only in PLACEHOLDERS. Replace with the derivative template's macros.
+export const PLACEHOLDER_LATEX = {
+  section: (p: typeof PLACEHOLDERS) => `\\section{${p.section.title}}`,
+  sectionText: (p: typeof PLACEHOLDERS) => `\\resumeSubheading{${p.sectionText.text}}{}{}{}`,
+  subsection: (p: typeof PLACEHOLDERS) =>
+    `\\resumeSubheading{${p.subsection.organization}}{${p.subsection.location}}{${p.subsection.role}}{${p.subsection.dates}}`,
+  bullet: (p: typeof PLACEHOLDERS) => `\\resumeItem{${p.bullet}}`,
+} as const
