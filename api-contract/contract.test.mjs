@@ -199,31 +199,69 @@ test('examples: every node with children carries the {{children}} token', async 
   [doc.tree.header, ...doc.tree.sections, doc.tree.footer].forEach(check);
 });
 
-test('tag aliases: add returns the updated tag', async () => {
-  const res = await fetch(`${base}/api/tags/postgresql/aliases`, { method: 'POST', headers: json, body: JSON.stringify({ alias: 'postgres' }) });
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.equal(body.slug, 'postgresql');
-  assert.ok(body.aliases.includes('postgres'));
+test('tags: C++ and C# get distinct slugs in the documented examples', async () => {
+  const post = (name, example, status) => fetch(`${base}/api/tags`, { method: 'POST', headers: { ...json, prefer: `code=${status}, example=${example}` }, body: JSON.stringify({ name, category: 'language' }) });
+  const cpp = await post('C++', 'cpp', 201);
+  assert.equal(cpp.status, 201);
+  assert.equal((await cpp.json()).slug, 'c-plus-plus');
+  const cs = await post('C#', 'csharp', 201);
+  assert.equal((await cs.json()).slug, 'c-sharp');
+  const existing = await post('c++', 'cpp', 200);
+  assert.equal(existing.status, 200);
+  assert.ok((await existing.json()).aliases.includes('C++'));
 });
 
-test('tag aliases: add rejects an empty alias, documents 409 alias_conflict and 403', async () => {
-  const bad = await fetch(`${base}/api/tags/postgresql/aliases`, { method: 'POST', headers: json, body: JSON.stringify({ alias: '' }) });
-  assert.equal(bad.status, 400);
-  const conflict = await fetch(`${base}/api/tags/postgresql/aliases`, { method: 'POST', headers: { ...json, prefer: 'code=409' }, body: JSON.stringify({ alias: 'mysql' }) });
+test('tag aliases: add returns the updated tag with the alias as typed', async () => {
+  const res = await fetch(`${base}/api/tags/c-plus-plus/aliases`, { method: 'POST', headers: { ...json, prefer: 'example=cpp' }, body: JSON.stringify({ alias: 'C++' }) });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.slug, 'c-plus-plus');
+  assert.deepEqual(body.aliases, ['C++']);
+  const dotnet = await fetch(`${base}/api/tags/net/aliases`, { method: 'POST', headers: json, body: JSON.stringify({ alias: '.NET' }) });
+  assert.equal(dotnet.status, 200);
+});
+
+test('tag aliases: non-ASCII, empty and control characters are rejected by the contract', async () => {
+  for (const alias of ['caf\u00e9', '', 'tab\there', 'emoji \u{1F600}']) {
+    const res = await fetch(`${base}/api/tags/postgresql/aliases`, { method: 'POST', headers: json, body: JSON.stringify({ alias }) });
+    assert.equal(res.status, 400, JSON.stringify(alias));
+  }
+  const documented = await fetch(`${base}/api/tags/postgresql/aliases`, { method: 'POST', headers: { ...json, prefer: 'code=400, example=nonAscii' }, body: JSON.stringify({ alias: 'ok' }) });
+  assert.equal(documented.status, 400);
+  const body = await documented.json();
+  assert.equal(body.code, 'validation_failed');
+  assert.equal(body.details[0].field, 'alias');
+});
+
+test('tag aliases: the case-insensitive conflict names the other tag, 403 is documented', async () => {
+  const conflict = await fetch(`${base}/api/tags/postgresql/aliases`, { method: 'POST', headers: { ...json, prefer: 'code=409' }, body: JSON.stringify({ alias: 'MYSQL' }) });
   assert.equal(conflict.status, 409);
-  const conflictBody = await conflict.json();
-  assert.equal(conflictBody.code, 'alias_conflict');
-  assert.equal(conflictBody.conflictingSlug, 'mysql');
+  const body = await conflict.json();
+  assert.equal(body.code, 'alias_conflict');
+  assert.equal(body.conflictingSlug, 'mysql');
   const csrf = await fetch(`${base}/api/tags/postgresql/aliases`, { method: 'POST', headers: { ...json, prefer: 'code=403' }, body: JSON.stringify({ alias: 'pg' }) });
   assert.equal(csrf.status, 403);
   assert.equal((await csrf.json()).code, 'csrf_invalid');
 });
 
-test('tag aliases: remove returns the updated tag and 404 is documented', async () => {
-  const res = await fetch(`${base}/api/tags/postgresql/aliases/postgres`, { method: 'DELETE', headers: json });
+test('tag aliases: the alias C on c-plus-plus conflicts with slug c, and DELETE without alias has an alias-specific 400', async () => {
+  const conflict = await fetch(`${base}/api/tags/c-plus-plus/aliases`, { method: 'POST', headers: { ...json, prefer: 'code=409, example=aliasEqualsOtherSlug' }, body: JSON.stringify({ alias: 'C' }) });
+  assert.equal(conflict.status, 409);
+  assert.equal((await conflict.json()).conflictingSlug, 'c');
+  const bad = await fetch(`${base}/api/tags/c-plus-plus/aliases`, { method: 'DELETE', headers: json });
+  assert.equal(bad.status, 400);
+  assert.equal((await bad.json()).details[0].field, 'alias');
+});
+
+test('tag aliases: DELETE takes a percent-encoded alias query parameter', async () => {
+  const res = await fetch(`${base}/api/tags/c-plus-plus/aliases?alias=${encodeURIComponent('C++')}`, { method: 'DELETE', headers: json });
   assert.equal(res.status, 200);
   assert.deepEqual((await res.json()).aliases, []);
-  const missing = await fetch(`${base}/api/tags/postgresql/aliases/nope`, { method: 'DELETE', headers: { ...json, prefer: 'code=404' } });
+  const missing = await fetch(`${base}/api/tags/c-plus-plus/aliases?alias=nope`, { method: 'DELETE', headers: { ...json, prefer: 'code=404' } });
   assert.equal(missing.status, 404);
+  const noParam = await fetch(`${base}/api/tags/c-plus-plus/aliases`, { method: 'DELETE', headers: json });
+  assert.equal(noParam.status, 400);
+  // the old path-segment form no longer exists
+  const old = await fetch(`${base}/api/tags/c-plus-plus/aliases/cpp`, { method: 'DELETE', headers: json });
+  assert.equal(old.status, 404);
 });
