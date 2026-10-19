@@ -59,7 +59,7 @@ jobs:
       - if: steps.has.outputs.present == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '26'
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
       - if: steps.has.outputs.present == 'true'
@@ -76,7 +76,7 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '26'
           cache: pnpm
           cache-dependency-path: api-contract/pnpm-lock.yaml
       - working-directory: api-contract
