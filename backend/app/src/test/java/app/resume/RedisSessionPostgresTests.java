@@ -2,7 +2,6 @@ package app.resume;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import jakarta.servlet.http.Cookie;
@@ -38,7 +37,7 @@ class RedisSessionPostgresTests extends PostgresContainerSupport {
     @Test
     void sessionIsStoredInRedisAndRemovedOnLogout() throws Exception {
         assertThat(sessions).isInstanceOf(RedisSessionRepository.class);
-        var res = mvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content(creds("redisuser")))
+        var res = mvc.perform(CsrfSupport.post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content(creds("redisuser")))
                 .andExpect(status().isCreated()).andReturn().getResponse();
         String setCookie = res.getHeaders("Set-Cookie").stream().filter(h -> h.startsWith("SESSION=")).findFirst().orElseThrow();
         assertThat(setCookie).contains("HttpOnly").contains("SameSite=Lax");
@@ -48,7 +47,7 @@ class RedisSessionPostgresTests extends PostgresContainerSupport {
         assertThat(keys).isNotEmpty();
         mvc.perform(get("/api/me").cookie(cookie)).andExpect(status().isOk());
 
-        mvc.perform(post("/api/auth/logout").cookie(cookie)).andExpect(status().isNoContent());
+        mvc.perform(CsrfSupport.post("/api/auth/logout").cookie(cookie)).andExpect(status().isNoContent());
         mvc.perform(get("/api/me").cookie(cookie)).andExpect(status().isUnauthorized());
         assertThat(redis.keys("spring:session:sessions:*")).doesNotContainAnyElementsOf(keys);
     }
@@ -62,7 +61,7 @@ class RedisSessionPostgresTests extends PostgresContainerSupport {
         for (int i = 0; i < n; i++) {
             Callable<Integer> task = () -> {
                 go.await();
-                return mvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content(creds("racer")))
+                return mvc.perform(CsrfSupport.post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content(creds("racer")))
                         .andReturn().getResponse().getStatus();
             };
             results.add(pool.submit(task));
