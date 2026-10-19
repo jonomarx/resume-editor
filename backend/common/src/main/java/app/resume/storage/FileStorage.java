@@ -25,7 +25,9 @@ import java.util.Optional;
 public interface FileStorage {
     /**
      * Registers the key as PENDING (own transaction), then stores the bytes, and returns the URI to keep in the
-     * database (`file:` for local disk). The write is atomic: readers see either no file or the complete file.
+     * database (`file:` for local disk). The write is atomic: readers see either no file or the complete file. The
+     * registry insert uses its own transaction, so a caller that already holds a pooled database connection needs a
+     * second one available while it calls this.
      *
      * @throws KeyAlreadyExistsException if the key already holds different bytes (putting identical bytes again is
      *         a harmless no-op that returns the same URI, so a retry after a crash is safe; a PENDING key whose file

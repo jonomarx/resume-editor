@@ -153,4 +153,57 @@ class RegistryStorageTests {
         assertThat(registry.find(key).orElseThrow().size()).isEqualTo(5);
         assertThat(storage.get(key).orElseThrow()).isEqualTo(b("first"));
     }
+
+    @Test
+    void underscoreInAPrefixIsALiteralNotALikeWildcard() {
+        String underscore = "users/" + uid + "/res_1/v1.json";
+        String lookalike = "users/" + uid + "/resX1/v1.json";
+        storage.put(underscore, b("a"));
+        storage.put(lookalike, b("b"));
+        assertThat(storage.list("users/" + uid + "/res_1/", FileState.PENDING)).extracting(StoredFile::key)
+                .containsExactly(underscore);
+    }
+
+    @Test
+    void racingWritersWithDifferentBytesLeaveARowThatDescribesTheStoredFile() throws Exception {
+        LocalFileStorage other = new LocalFileStorage(dir, registry); // a second instance: separate in-process locks
+        for (int round = 0; round < 30; round++) {
+            String k = StorageKeys.resumeVersion(uid, 100 + round, 1);
+            java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(8);
+            java.util.concurrent.CountDownLatch go = new java.util.concurrent.CountDownLatch(1);
+            List<java.util.concurrent.Future<Boolean>> fs = new java.util.ArrayList<>();
+            for (int i = 0; i < 8; i++) {
+                final int w = i;
+                fs.add(pool.submit(() -> {
+                    go.await();
+                    try { (w % 2 == 0 ? storage : other).put(k, b("writer-" + w + "-" + "q".repeat(50 + w * 13))); return true; }
+                    catch (KeyAlreadyExistsException e) { return false; }
+                }));
+            }
+            go.countDown();
+            int winners = 0;
+            for (var f : fs) if (f.get()) winners++;
+            pool.shutdown();
+            assertThat(winners).isEqualTo(1);
+            byte[] stored = storage.get(k).orElseThrow();
+            var row = registry.find(k).orElseThrow();
+            assertThat(row.sha256()).as("round " + round).isEqualTo(FileRegistryTestSupport.sha256(stored));
+            assertThat(row.size()).as("round " + round).isEqualTo(stored.length);
+            assertThat(row.state()).isEqualTo(FileState.PENDING);
+        }
+    }
+
+    @Test
+    void aLateWinnerRepairsARowAnotherWriterTookOver() {
+        // simulate the interleaving: B took over A's unwritten PENDING row, then A's file lands
+        assertThatThrownBy(() -> crashingStorage().put(key, b("A-bytes"))).isInstanceOf(IllegalStateException.class);
+        assertThat(registry.register(key, dir.resolve("x").toUri(), b("B-bytes-longer"), false))
+                .isEqualTo(FileRegistry.Registration.REPLACED_UNWRITTEN); // the row now describes B
+        // A links its file and then syncs: the row must describe A's bytes, because A's bytes are in the file
+        new LocalFileStorage(dir, registry) {
+            @Override protected void afterRegistered(String k) {}
+        };
+        registry.syncPending(key, dir.resolve("x").toUri(), b("A-bytes"));
+        assertThat(registry.find(key).orElseThrow().size()).isEqualTo(7);
+    }
 }

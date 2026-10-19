@@ -41,11 +41,31 @@ public class LocalFileStorage implements FileStorage {
     @Override
     public URI put(String key, byte[] bytes) {
         Path target = resolve(key);
-        FileRegistry.Registration reg = registry.register(key, target.toUri(), bytes, Files.isRegularFile(target));
-        if (reg == FileRegistry.Registration.CONFLICT) throw new KeyAlreadyExistsException(key);
-        afterRegistered(key);
         String dirKey = target.getParent().toString();
-        return dirLocks.call(dirKey, () -> write(key, target, bytes));
+        // Register, the exists-check and the write all happen under the resume directory's lock, so a takeover of an
+        // unwritten PENDING row can never interleave with a live writer of the same key in this JVM.
+        return dirLocks.call(dirKey, () -> {
+            FileRegistry.Registration reg = registry.register(key, target.toUri(), bytes, Files.isRegularFile(target));
+            if (reg == FileRegistry.Registration.CONFLICT) throw new KeyAlreadyExistsException(key);
+            afterRegistered(key);
+            URI uri;
+            try {
+                uri = write(key, target, bytes);
+            } catch (KeyAlreadyExistsException lost) {
+                // Another writer's file won. If we had taken over the row before it landed, put the row back to describe
+                // the file that is really there (our own metadata must never outlive a lost race).
+                try {
+                    registry.syncPending(key, target.toUri(), Files.readAllBytes(target));
+                } catch (IOException e) {
+                    throw new UncheckedIOException("cannot verify " + key, e);
+                }
+                throw lost;
+            }
+            // Whoever's bytes ended up in the file is the one the row must describe, even if another process (a second
+            // instance, which has its own locks) took the row over meanwhile. A loser throws above and never gets here.
+            registry.syncPending(key, uri, bytes);
+            return uri;
+        });
     }
 
     /** Test hook: runs after the PENDING row exists and before anything is written (a crash here leaves only the row). */

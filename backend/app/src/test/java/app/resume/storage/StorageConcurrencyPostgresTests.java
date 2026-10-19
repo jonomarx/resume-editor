@@ -95,6 +95,10 @@ class StorageConcurrencyPostgresTests extends PostgresContainerSupport {
         assertThat(winners).isEqualTo(1);
         assertThat(new String(one.get(key).orElseThrow(), StandardCharsets.UTF_8)).matches("writer-\\d+-y{100000}");
         assertThat(one.tempFilesIn(key)).isZero();
+        byte[] stored = one.get(key).orElseThrow(); // the registry row describes exactly the bytes that won
+        var row = registry.find(key).orElseThrow();
+        assertThat(row.sha256()).isEqualTo(FileRegistryTestSupport.sha256(stored));
+        assertThat(row.size()).isEqualTo(stored.length);
     }
 
     @Test

@@ -70,6 +70,17 @@ public class FileRegistry {
         }
     }
 
+    /**
+     * After the file is in place, makes a still-PENDING row describe exactly the stored bytes (own transaction). It only
+     * ever runs for the writer whose bytes are in the file, so a loser's metadata can never replace the winner's.
+     */
+    public void syncPending(String key, URI uri, byte[] bytes) {
+        String sha = sha256(bytes);
+        own.executeWithoutResult(s -> jdbc.update(
+                "update file_registry set sha256 = ?, size = ?, uri = ? where file_key = ? and state = 'PENDING'"
+                        + " and (sha256 <> ? or size <> ?)", sha, bytes.length, uri.toString(), key, sha, (long) bytes.length));
+    }
+
     /** Joins the caller's transaction: the flip to COMMITTED commits or rolls back with the referencing row. */
     public void commit(String key) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
