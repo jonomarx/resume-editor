@@ -16,6 +16,10 @@
 
   <properties>
     <java.version>21</java.version>
+    <!-- Test tiers (see backend/README.md): the default fast loop excludes this JUnit tag. -->
+    <excludedTestGroups>postgres</excludedTestGroups>
+    <!-- Override of the Spring Boot BOM (1.21.3): older Testcontainers cannot talk to Docker 29+. -->
+    <testcontainers.version>1.21.4</testcontainers.version>
   </properties>
 
   <modules>
@@ -24,6 +28,25 @@
     <module>backend/jobs</module>
     <module>backend/app</module>
   </modules>
+
+  <dependencies>
+    <!-- Testcontainers for the slow, @Tag("postgres") loop; versions come from the Spring Boot BOM. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-testcontainers</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
 
   <dependencyManagement>
     <dependencies>
@@ -44,4 +67,47 @@
       </dependency>
     </dependencies>
   </dependencyManagement>
+
+  <build>
+    <plugins>
+      <!-- mvn test: H2, everything except @Tag("postgres"). -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <excludedGroups>${excludedTestGroups}</excludedGroups>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+  <profiles>
+    <!-- mvn verify -Ppostgres: also runs @Tag("postgres") tests on Testcontainers (needs Docker). -->
+    <profile>
+      <id>postgres</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-failsafe-plugin</artifactId>
+            <configuration>
+              <groups>postgres</groups>
+              <includes>
+                <include>**/*Tests.java</include>
+                <include>**/*Test.java</include>
+              </includes>
+            </configuration>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>integration-test</goal>
+                  <goal>verify</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

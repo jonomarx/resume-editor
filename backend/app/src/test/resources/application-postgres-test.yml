@@ -1,0 +1,2 @@
+# Datasource comes from the Testcontainers @ServiceConnection; nothing else to override.
+spring: {}
