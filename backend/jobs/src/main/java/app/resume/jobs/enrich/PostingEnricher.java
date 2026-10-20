@@ -1,6 +1,7 @@
 package app.resume.jobs.enrich;
 
 import app.resume.jobs.extract.ExtractionLlm;
+import app.resume.vocabulary.TagVocabulary;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;

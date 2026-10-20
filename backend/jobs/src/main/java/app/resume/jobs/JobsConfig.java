@@ -3,7 +3,7 @@ package app.resume.jobs;
 import app.resume.jobs.crawl.CrawlService;
 import app.resume.jobs.crawl.DailyRun;
 import app.resume.jobs.enrich.PostingEnricher;
-import app.resume.jobs.enrich.TagVocabulary;
+import app.resume.vocabulary.TagVocabulary;
 import app.resume.jobs.extract.ExtractionLlm;
 import app.resume.jobs.extract.LlmPostingExtractor;
 import app.resume.jobs.fetch.AshbyAdapter;
