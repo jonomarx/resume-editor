@@ -9,6 +9,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -33,7 +34,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api")
 public class AuthController {
-    /** BCrypt only uses the first 72 bytes. The contract says the rest is ignored, at sign-up and login alike. */
+    /**
+     * BCrypt's limit: it only looks at the first 72 bytes, so a longer password would be silently truncated. We reject
+     * it instead (sign-up 400, login 401) and never pass such a value to BCrypt. No Unicode normalization is applied:
+     * the password is hashed as the raw UTF-8 bytes as sent.
+     */
     static final int MAX_PASSWORD_BYTES = 72;
 
     public record Credentials(
@@ -59,13 +64,18 @@ public class AuthController {
 
     @PostMapping(path = "/auth/signup", consumes = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<?> signUp(@Valid @RequestBody Credentials body, HttpServletRequest req, HttpServletResponse res) {
+        String problem = passwordProblem(body.password());
+        if (problem != null) {
+            return ResponseEntity.badRequest().body(new ApiError("validation_failed", "Request failed validation",
+                    List.of(new ApiError.FieldProblem("password", problem))));
+        }
         String key = AppUser.keyOf(body.username());
         if (users.findByUsernameKey(key).isPresent()) {
             return taken();
         }
         AppUser saved;
         try {
-            saved = users.saveAndFlush(new AppUser(body.username(), encoder.encode(usablePassword(body.password()))));
+            saved = users.saveAndFlush(new AppUser(body.username(), encoder.encode(body.password())));
         } catch (DataIntegrityViolationException race) { // the unique constraint is the final guard
             return taken();
         }
@@ -79,9 +89,12 @@ public class AuthController {
     ResponseEntity<?> logIn(@Valid @RequestBody Credentials body, HttpServletRequest req, HttpServletResponse res) {
         Authentication auth;
         try {
+            if (passwordProblem(body.password()) != null) { // can never match a stored password; checked before BCrypt
+                throw new BadCredentialsException("unusable password");
+            }
             auth = authManager.authenticate(
-                    UsernamePasswordAuthenticationToken.unauthenticated(body.username(), usablePassword(body.password())));
-        } catch (AuthenticationException e) { // unknown user and wrong password look the same
+                    UsernamePasswordAuthenticationToken.unauthenticated(body.username(), body.password()));
+        } catch (AuthenticationException e) { // unknown user, wrong password and unusable password look the same
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ApiError.of("bad_credentials", "Invalid username or password"));
         }
@@ -105,17 +118,15 @@ public class AuthController {
         return new UserView(principal.getId(), principal.getUsername());
     }
 
-    /** The first 72 UTF-8 bytes of the password, never cutting a multi-byte character in half. */
-    public static String usablePassword(String password) {
-        byte[] bytes = password.getBytes(StandardCharsets.UTF_8);
-        if (bytes.length <= MAX_PASSWORD_BYTES) {
-            return password;
+    /** Why a password cannot be used (contract messages), or null: over 72 UTF-8 bytes, or a control character. */
+    static String passwordProblem(String password) {
+        if (password.getBytes(StandardCharsets.UTF_8).length > MAX_PASSWORD_BYTES) {
+            return "must be at most " + MAX_PASSWORD_BYTES + " bytes in UTF-8";
         }
-        int end = MAX_PASSWORD_BYTES;
-        while (end > 0 && (bytes[end] & 0xC0) == 0x80) { // bytes[end] is a continuation byte: back up to the lead byte
-            end--;
+        if (password.chars().anyMatch(c -> c <= 0x1F || c == 0x7F)) {
+            return "must not contain control characters";
         }
-        return new String(bytes, 0, end, StandardCharsets.UTF_8);
+        return null;
     }
 
     private static ResponseEntity<ApiError> taken() {
