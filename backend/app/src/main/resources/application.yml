@@ -28,6 +28,7 @@ app:
   renderer:
     url: ${RENDERER_URL:http://localhost:8081}
     timeout-seconds: 30
+    connect-timeout-seconds: 3
   render:
     max-bytes: 1000000
   storage:

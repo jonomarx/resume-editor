@@ -2,7 +2,7 @@ import type { components } from './schema'
 
 export type User = components['schemas']['User']
 export type Credentials = components['schemas']['Credentials']
-export type ApiErrorBody = components['schemas']['Error'] & { currentVersion?: number }
+export type ApiErrorBody = components['schemas']['Error'] & { currentVersion?: number; conflictingSlug?: string }
 export type ResumeDocument = components['schemas']['ResumeDocument']
 export type ResumeVersionSummary = components['schemas']['ResumeVersionSummary']
 export type ResumeTree = components['schemas']['ResumeTree']
@@ -16,6 +16,8 @@ export class ApiError extends Error {
   readonly code: string
   /** Present on 409 version_conflict: the version now stored. */
   readonly currentVersion?: number
+  /** Present on 409 alias_conflict: the tag that already holds the name. */
+  readonly conflictingSlug?: string
   /** Per-field problems on 400 validation_failed. */
   readonly details?: ApiErrorBody['details']
 
@@ -25,6 +27,7 @@ export class ApiError extends Error {
     this.status = status
     this.code = body.code
     this.currentVersion = body.currentVersion
+    this.conflictingSlug = body.conflictingSlug
     this.details = body.details
   }
 }

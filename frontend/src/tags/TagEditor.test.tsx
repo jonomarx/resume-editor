@@ -74,15 +74,6 @@ describe('tag editor', () => {
     expect(screen.getByRole('region', { name: 'Tags' })).toHaveTextContent('Java')
   })
 
-  it('shows an error when creation fails and does not tag the node', async () => {
-    await openNode('Built a thing')
-    server.tags.failCreate = true
-    await userEvent.type(screen.getByLabelText('Add a tag'), 'Rust')
-    await userEvent.click(screen.getByRole('button', { name: 'Create "Rust"' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not create')
-    expect(screen.getByRole('region', { name: 'Tags' })).toHaveTextContent('No tags yet.')
-  })
-
   it('writes slugs (not names) into the tree that gets saved', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     try {

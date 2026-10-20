@@ -22,7 +22,7 @@ A per-user web app where you keep one verbose LaTeX **master resume** (Jake's te
 | Component | Choice | Notes |
 | --- | --- | --- |
 | Web app | React, Vite, TypeScript, pnpm | Compiled to static files; Vitest for tests |
-| API server | Spring Boot (Java 21+), built with Maven | Spring Web, Security, Data JPA, Flyway, Spring Session |
+| API server | Spring Boot (Java 21+), built with Maven | Spring Web, Security, Data JPA, Flyway, Spring Session. Data access: Spring Data JPA for plain entity tables (users, and new tables that are simple CRUD); Spring JDBC (`JdbcTemplate`) for code that coordinates rows with files on disk, locks or explicit transactions: the file registry, the resume locks, the resume save and restore flow and the node tag index |
 | Database | Postgres | H2 (PostgreSQL mode) for fast local tests |
 | Sessions | Redis | Spring Session; HttpOnly, SameSite=Lax cookie; CSRF tokens on (`XSRF-TOKEN` cookie echoed in an `X-XSRF-TOKEN` header on every state-changing request) |
 | File storage | Local disk behind `FileStorage` | `FILE_STORAGE=local`; S3 later is a new implementation |
@@ -35,7 +35,7 @@ No load balancer. Deployment target: Docker containers on another of your machin
 
 **How React is served.** Spring Boot serves the compiled Vite build from the same origin (no CORS, simple cookie sessions). Vite is the frontend build tool: a fast dev server with instant reload, and a production bundler that outputs static files. In dev, Vite runs on :5173 and proxies `/api` to Spring on :8080. In prod, a multi-stage Dockerfile builds `frontend/` and copies `dist/` into the jar's `static/`; a controller forwards non-`/api`, non-asset paths to `index.html`; hashed assets are cached long, `index.html` never. No server-side rendering.
 
-**Sign-in rules.** Usernames match `^[A-Za-z0-9_.-]{3,40}$` and are unique case-insensitively (database constraint). Passwords are at least 8 characters, and only their first 72 bytes (UTF-8, never splitting a character) are used, the same way at sign-up and login (BCrypt's limit). State-changing requests without a valid CSRF token get `403 csrf_invalid`. The contract (`api-contract/openapi.yaml`) defines the exact mechanism.
+**Sign-in rules.** Usernames match `^[A-Za-z0-9_.-]{3,40}$` and are unique case-insensitively (database constraint). Passwords are at least 8 characters and at most 72 bytes in UTF-8 (BCrypt's limit); a longer password is rejected at sign-up with 400 `validation_failed` on `password`, and at login it is the same 401 as any wrong password, so nothing is ever silently truncated. State-changing requests without a valid CSRF token get `403 csrf_invalid`. The contract (`api-contract/openapi.yaml`) defines the exact mechanism.
 
 **Repository layout**
 
