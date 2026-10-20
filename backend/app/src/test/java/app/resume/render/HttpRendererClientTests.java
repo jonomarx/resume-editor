@@ -129,11 +129,13 @@ class HttpRendererClientTests {
     }
 
     @Test
-    void theDefaultsAreAppliedWhenNothingIsConfigured() {
-        // the record defaults apply when the keys are absent (connect timeout 3 s, read timeout 30 s)
+    void theDefaultsComeFromApplicationYml() throws Exception {
+        // the only place with defaults is application.yml (connect timeout 3 s, read timeout 30 s)
+        var sources = new org.springframework.boot.env.YamlPropertySourceLoader()
+                .load("application", new org.springframework.core.io.ClassPathResource("application.yml"));
         var bound = new org.springframework.boot.context.properties.bind.Binder(
-                new org.springframework.boot.context.properties.source.MapConfigurationPropertySource(
-                        java.util.Map.of("app.renderer.url", "http://r"))).bind("app.renderer", RendererProperties.class).get();
+                org.springframework.boot.context.properties.source.ConfigurationPropertySources.from(sources.get(0)))
+                .bind("app.renderer", RendererProperties.class).get();
         assertThat(bound.timeoutSeconds()).isEqualTo(30);
         assertThat(bound.connectTimeoutSeconds()).isEqualTo(3);
     }

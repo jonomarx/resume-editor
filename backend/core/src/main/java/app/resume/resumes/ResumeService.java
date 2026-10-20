@@ -20,6 +20,7 @@ import java.util.Optional;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -53,7 +54,7 @@ public class ResumeService {
 
     public ResumeService(JdbcTemplate jdbc, PlatformTransactionManager txManager, FileStorage storage, ResumeLocks locks,
             ResumeTreeValidator validator, TagService tags, StarterTree starter, ObjectMapper mapper, NodeTagIndex nodeTags,
-            @org.springframework.beans.factory.annotation.Value("${app.resumes.max-orphan-key-attempts}") int maxOrphanKeyAttempts) {
+            @Value("${app.resumes.max-orphan-key-attempts}") int maxOrphanKeyAttempts) {
         this.jdbc = jdbc;
         this.tx = new TransactionTemplate(txManager);
         this.storage = storage;
