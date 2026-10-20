@@ -12,6 +12,8 @@ export interface FakeServer {
   /** Test hook: invalidate the current token as if the server had rotated it. */
   rotateToken(): void
   resume: FakeResume
+  /** Test hook: the next sign-up is rejected with a 400 on `password`. */
+  rejectNextSignupPassword(message: string): void
   render: FakeRender
   tags: FakeTags
 }
@@ -22,6 +24,7 @@ export function createFakeServer(): FakeServer {
   let currentUserId: number | null = null
   let token = ''
   let counter = 0
+  let rejectPassword: string | null = null
   const resume = createFakeResume()
   const render = createFakeRender()
   const tags = createFakeTags()
@@ -62,6 +65,13 @@ export function createFakeServer(): FakeServer {
     }
     const key = body.username.toLowerCase()
     if (path === '/api/auth/signup') {
+      const bytes = new TextEncoder().encode(body.password).length
+      // eslint-disable-next-line no-control-regex
+      if (rejectPassword || bytes > 72 || /[\u0000-\u001F\u007F]/.test(body.password)) {
+        const message = rejectPassword ?? 'must be at most 72 bytes and contain no control characters'
+        rejectPassword = null
+        return reply(400, { code: 'validation_failed', message: 'Request failed validation', details: [{ field: 'password', message }] })
+      }
       if (accounts.has(key)) return err(409, 'username_taken', 'That username is taken')
       const a = { id: nextId++, username: body.username, password: body.password }
       accounts.set(key, a)
@@ -82,6 +92,9 @@ export function createFakeServer(): FakeServer {
   return {
     fetch: ((input: RequestInfo | URL, init: RequestInit = {}) => handle(String(input), init)) as typeof fetch,
     resume,
+    rejectNextSignupPassword: (m) => {
+      rejectPassword = m
+    },
     render,
     tags,
     rotateToken: () => {
