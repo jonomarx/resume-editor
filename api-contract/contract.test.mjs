@@ -280,3 +280,21 @@ test('sign-up: a password over 72 bytes is a 400 on password (named example), lo
   assert.equal(login.status, 401);
   assert.equal((await login.json()).code, 'bad_credentials');
 });
+
+test('sign-up: a control character in the password is a 400 on password; login treats it as a wrong password', async () => {
+  const documented = await fetch(`${base}/api/auth/signup`, { method: 'POST', headers: { ...json, prefer: 'code=400, example=passwordControlCharacter' }, body: JSON.stringify({ username: 'ada', password: 'correct-horse-battery' }) });
+  assert.equal(documented.status, 400);
+  const body = await documented.json();
+  assert.equal(body.details[0].field, 'password');
+  assert.match(body.details[0].message, /control characters/);
+  for (const bad of ['correct\u0000horse', 'correct\thorse-battery', 'correct\u007Fhorse-battery']) {
+    const res = await fetch(`${base}/api/auth/signup`, { method: 'POST', headers: json, body: JSON.stringify({ username: 'ada', password: bad }) });
+    assert.equal(res.status, 400, JSON.stringify(bad));
+  }
+  const login = await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { ...json, prefer: 'code=401' }, body: JSON.stringify({ username: 'ada', password: 'bad\u0000password' }) });
+  assert.equal(login.status, 401);
+  assert.equal((await login.json()).code, 'bad_credentials');
+  // length boundary is by characters in the schema (first check) and the example names the byte limit: 72 characters pass the schema
+  const ok72 = await fetch(`${base}/api/auth/signup`, { method: 'POST', headers: json, body: JSON.stringify({ username: 'ada', password: 'x'.repeat(72) }) });
+  assert.equal(ok72.status, 201);
+});
