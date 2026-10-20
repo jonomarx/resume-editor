@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Resume Editor API
-  version: 0.4.0
+  version: 0.5.0
   description: |
     Contract v0 (US-003, fixes in US-076): auth, master resume, tags, render.
     Changed only through stories labeled `contract`.
@@ -45,7 +45,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/Credentials' }
+            schema: { $ref: '#/components/schemas/SignUpRequest' }
             example: { username: ada, password: correct-horse-battery }
       responses:
         '403': { $ref: '#/components/responses/CsrfInvalid' }
@@ -59,7 +59,32 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/User' }
               example: { id: 1, username: ada }
-        '400': { $ref: '#/components/responses/ValidationError' }
+        '400':
+          description: Request failed validation (username pattern, password shorter than 8 characters, longer than 72 UTF-8 bytes, or containing a control character)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                usernameInvalid:
+                  value:
+                    code: validation_failed
+                    message: Request failed validation
+                    details:
+                      - { field: username, message: must be 3 to 40 characters }
+                passwordTooLong:
+                  summary: Password over 72 bytes in UTF-8 (rejected, not truncated)
+                  value:
+                    code: validation_failed
+                    message: Request failed validation
+                    details:
+                      - { field: password, message: must be at most 72 bytes in UTF-8 }
+                passwordControlCharacter:
+                  summary: Password containing NUL or another control character (U+0000 to U+001F, U+007F)
+                  value:
+                    code: validation_failed
+                    message: Request failed validation
+                    details:
+                      - { field: password, message: must not contain control characters }
         '409':
           description: Username already taken
           content:
@@ -94,7 +119,7 @@ paths:
               example: { id: 1, username: ada }
         '400': { $ref: '#/components/responses/ValidationError' }
         '401':
-          description: Wrong username or password
+          description: Wrong username or password. A password longer than 72 bytes is just a wrong password (same response, never a 400 and never truncated).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -713,6 +738,27 @@ components:
             currentVersion:
               type: integer
               description: The version now stored; reload it before saving again
+    SignUpRequest:
+      description: Credentials for a new account (the sign-up password rules are on `password`).
+      allOf:
+        - $ref: '#/components/schemas/Credentials'
+        - type: object
+          properties:
+            password:
+              type: string
+              minLength: 8
+              maxLength: 72
+              pattern: '^[^\u0000-\u001F\u007F]*$'
+              format: password
+              description: |
+                At least 8 characters and at most 72 bytes in UTF-8 (the limit of the hashing algorithm), with no
+                control characters (U+0000 to U+001F and U+007F). The byte count is authoritative, not the character
+                count: exactly 72 bytes is accepted, 73 bytes is rejected, and a multi-byte character counts as 2 to 4
+                bytes. A password breaking the byte limit or containing a control character is rejected with 400
+                `validation_failed` on `password`; it is never truncated. The schema `maxLength: 72` and `pattern` are
+                cheap first checks (72 characters can be up to 288 bytes). No Unicode normalization is applied: the
+                password is hashed as the raw UTF-8 bytes as sent, so the same visible text in different normalization
+                forms (for example precomposed and decomposed accented letters) is a different password.
     Credentials:
       type: object
       required: [username, password]
@@ -728,8 +774,10 @@ components:
           minLength: 8
           format: password
           description: |
-            At least 8 characters. Only the first 72 bytes (UTF-8, never cutting a character in half) are used;
-            anything beyond is ignored, identically at sign-up and login. There is no maximum length.
+            The password. At sign-up the stricter rules of `SignUpRequest.password` apply. At login any text is accepted by
+            the schema: a password longer than 72 bytes or containing a control character is simply a wrong password, the
+            same 401 `bad_credentials` as any other (nothing special, never a 400, never truncated). No Unicode
+            normalization is applied anywhere: the password is used as the raw UTF-8 bytes as sent.
     User:
       type: object
       required: [id, username]

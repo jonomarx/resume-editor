@@ -20,6 +20,7 @@ import java.util.Optional;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -39,7 +40,6 @@ public class ResumeService {
     private record Current(long id, long version, String hash, Instant updatedAt) {}
 
     private static final String MASTER = "MASTER";
-    private static final int MAX_FILE_KEY_ATTEMPTS = 20;
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
@@ -50,9 +50,11 @@ public class ResumeService {
     private final StarterTree starter;
     private final ObjectMapper mapper;
     private final NodeTagIndex nodeTags;
+    private final int maxOrphanKeyAttempts;
 
     public ResumeService(JdbcTemplate jdbc, PlatformTransactionManager txManager, FileStorage storage, ResumeLocks locks,
-            ResumeTreeValidator validator, TagService tags, StarterTree starter, ObjectMapper mapper, NodeTagIndex nodeTags) {
+            ResumeTreeValidator validator, TagService tags, StarterTree starter, ObjectMapper mapper, NodeTagIndex nodeTags,
+            @Value("${app.resumes.max-orphan-key-attempts}") int maxOrphanKeyAttempts) {
         this.jdbc = jdbc;
         this.tx = new TransactionTemplate(txManager);
         this.storage = storage;
@@ -62,6 +64,7 @@ public class ResumeService {
         this.starter = starter;
         this.mapper = mapper;
         this.nodeTags = nodeTags;
+        this.maxOrphanKeyAttempts = maxOrphanKeyAttempts;
     }
 
     /** The current master; the first call creates it from the starter tree (version 1). */
@@ -211,8 +214,8 @@ public class ResumeService {
     /**
      * Puts the version's file. A key left behind by a crashed or rolled-back earlier attempt (PENDING, unreferenced, maybe
      * with other bytes) is never reused: the next free suffix is taken (`v3.json`, `v3-r1.json`, ...), and the row records
-     * the key that was actually written. Known limit: after 20 consecutive orphans for the same version number the save
-     * fails with an IllegalStateException until the reconciliation worker (US-070) sweeps the PENDING files.
+     * the key that was actually written. Known limit (`app.resumes.max-orphan-key-attempts`, default 20): after that many consecutive orphans for the same version
+     * number the save fails with an IllegalStateException until the reconciliation worker (US-070) sweeps the PENDING files.
      */
     private Written putVersionFile(long userId, long resumeId, long version, ResumeTree tree) {
         byte[] bytes;
@@ -222,7 +225,7 @@ public class ResumeService {
             throw new IllegalStateException(e);
         }
         String base = StorageKeys.resumeVersion(userId, resumeId, version);
-        for (int attempt = 0; attempt < MAX_FILE_KEY_ATTEMPTS; attempt++) {
+        for (int attempt = 0; attempt < maxOrphanKeyAttempts; attempt++) {
             String key = attempt == 0 ? base : base.replace(".json", "-r" + attempt + ".json");
             try {
                 return new Written(key, storage.put(key, bytes).toString());
