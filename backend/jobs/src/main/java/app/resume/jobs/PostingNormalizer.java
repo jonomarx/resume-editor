@@ -126,7 +126,8 @@ public final class PostingNormalizer {
         return NON_ALNUM.matcher(decomposed.toLowerCase(Locale.ROOT)).replaceAll(" ").strip();
     }
 
-    private static String sha256(String s) {
+    /** SHA-256 hex of the UTF-8 text (page and feed hashes use this too). */
+    public static String sha256(String s) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(s.getBytes(StandardCharsets.UTF_8)));
         } catch (java.security.NoSuchAlgorithmException e) {
