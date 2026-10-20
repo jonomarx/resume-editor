@@ -1,5 +1,6 @@
 package app.resume.storage;
 
+import app.resume.locks.KeyedLocks;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.function.Supplier;
