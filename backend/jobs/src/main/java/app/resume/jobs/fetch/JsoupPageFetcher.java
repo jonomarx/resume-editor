@@ -19,24 +19,47 @@ public class JsoupPageFetcher implements PageFetcher {
     private final String userAgent;
     private final DomainRateLimiter limiter;
     private final int timeoutMillis;
+    private final HostPolicy hostPolicy;
+    static final int MAX_REDIRECTS = 5;
     private final ConcurrentMap<String, RobotsRules> robotsByOrigin = new ConcurrentHashMap<>();
 
+    /** Production constructor: public hosts only ({@link PublicHostPolicy}). */
     public JsoupPageFetcher(String userAgent, DomainRateLimiter limiter, int timeoutMillis) {
+        this(userAgent, limiter, timeoutMillis, new PublicHostPolicy());
+    }
+
+    public JsoupPageFetcher(String userAgent, DomainRateLimiter limiter, int timeoutMillis, HostPolicy hostPolicy) {
         this.userAgent = userAgent;
         this.limiter = limiter;
         this.timeoutMillis = timeoutMillis;
+        this.hostPolicy = hostPolicy;
     }
 
+    /**
+     * Follows at most {@value #MAX_REDIRECTS} redirects by hand so that every hop (scheme, host, addresses, robots.txt)
+     * is checked like the first request.
+     */
     @Override
     public FetchResult fetch(String url) {
-        URI uri = parse(url);
-        String origin = uri.getScheme() + "://" + uri.getAuthority();
-        RobotsRules rules = robotsByOrigin.computeIfAbsent(origin, this::loadRobots);
-        String pathAndQuery = (uri.getRawPath() == null || uri.getRawPath().isEmpty() ? "/" : uri.getRawPath())
-                + (uri.getRawQuery() == null ? "" : "?" + uri.getRawQuery());
-        if (!rules.allows(pathAndQuery)) throw new RobotsDisallowedException(url);
-        Connection.Response r = get(url, uri.getHost());
-        return new FetchResult(url, r.url().toString(), r.statusCode(), r.contentType(), r.body());
+        String current = url;
+        for (int hop = 0; hop <= MAX_REDIRECTS; hop++) {
+            URI uri = parse(current);
+            hostPolicy.check(uri.getHost());
+            String origin = uri.getScheme() + "://" + uri.getAuthority();
+            RobotsRules rules = robotsByOrigin.computeIfAbsent(origin, this::loadRobots);
+            String pathAndQuery = (uri.getRawPath() == null || uri.getRawPath().isEmpty() ? "/" : uri.getRawPath())
+                    + (uri.getRawQuery() == null ? "" : "?" + uri.getRawQuery());
+            if (!rules.allows(pathAndQuery)) throw new RobotsDisallowedException(current);
+            Connection.Response r = get(current, uri.getHost());
+            String location = r.statusCode() >= 300 && r.statusCode() < 400 ? r.header("Location") : null;
+            if (location == null) return new FetchResult(url, current, r.statusCode(), r.contentType(), r.body());
+            try {
+                current = uri.resolve(location.strip()).toString();
+            } catch (IllegalArgumentException e) {
+                throw new FetchException("bad redirect target from " + current, e);
+            }
+        }
+        throw new FetchException("too many redirects: " + url);
     }
 
     private RobotsRules loadRobots(String origin) {
@@ -54,7 +77,7 @@ public class JsoupPageFetcher implements PageFetcher {
     private Connection.Response get(String url, String host) {
         limiter.acquire(host);
         try {
-            return Jsoup.connect(url).userAgent(userAgent).timeout(timeoutMillis).followRedirects(true)
+            return Jsoup.connect(url).userAgent(userAgent).timeout(timeoutMillis).followRedirects(false)
                     .ignoreHttpErrors(true).ignoreContentType(true).maxBodySize(MAX_BODY_BYTES).execute();
         } catch (IOException | IllegalArgumentException e) {
             throw new FetchException("fetch failed: " + url, e);

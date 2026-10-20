@@ -23,6 +23,15 @@
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
     </dependency>
+    <!-- US-032: web controllers and the SecurityContext-based user lookup live in jobs; Spring Boot BOM versions. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
     <!-- US-030: migrations for the job tables live in this module; tests apply them on H2. -->
     <dependency>
       <groupId>org.flywaydb</groupId>

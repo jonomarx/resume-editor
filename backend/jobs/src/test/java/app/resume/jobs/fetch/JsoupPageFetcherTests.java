@@ -49,7 +49,7 @@ class JsoupPageFetcherTests {
         server.start();
         base = "http://127.0.0.1:" + server.getAddress().getPort();
         fetcher = new JsoupPageFetcher(JsoupPageFetcher.DEFAULT_USER_AGENT,
-                new DomainRateLimiter(250, System::currentTimeMillis, sleeps::add), 5000);
+                new DomainRateLimiter(250, System::currentTimeMillis, sleeps::add), 5000, HostPolicy.ALLOW_ALL);
     }
 
     @AfterEach
@@ -91,7 +91,7 @@ class JsoupPageFetcherTests {
         assertThat(fetcher.fetch(base + "/private/x").ok()).isTrue();
 
         robotsStatus = 503;
-        var strict = new JsoupPageFetcher(JsoupPageFetcher.DEFAULT_USER_AGENT, new DomainRateLimiter(0), 5000);
+        var strict = new JsoupPageFetcher(JsoupPageFetcher.DEFAULT_USER_AGENT, new DomainRateLimiter(0), 5000, HostPolicy.ALLOW_ALL);
         assertThatThrownBy(() -> strict.fetch(base + "/jobs")).isInstanceOf(RobotsDisallowedException.class);
     }
 
@@ -107,7 +107,7 @@ class JsoupPageFetcherTests {
         assertThatThrownBy(() -> fetcher.fetch("ftp://x.example/a")).isInstanceOf(FetchException.class);
         assertThatThrownBy(() -> fetcher.fetch("not a url")).isInstanceOf(FetchException.class);
         server.stop(0);
-        assertThatThrownBy(() -> new JsoupPageFetcher("ua", new DomainRateLimiter(0), 1000).fetch(base + "/x"))
+        assertThatThrownBy(() -> new JsoupPageFetcher("ua", new DomainRateLimiter(0), 1000, HostPolicy.ALLOW_ALL).fetch(base + "/x"))
                 .isInstanceOf(FetchException.class);
     }
 }

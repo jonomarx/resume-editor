@@ -19,17 +19,19 @@ import java.util.regex.Pattern;
 public final class PostingNormalizer {
     private PostingNormalizer() {}
 
-    /** Query parameters that only track where a click came from; never part of a posting's identity. */
-    private static final Set<String> TRACKING_PARAMS = Set.of("fbclid", "gclid", "dclid", "msclkid", "mc_cid", "mc_eid",
-            "igshid", "ref", "ref_src", "referrer", "trk", "trkinfo", "gh_src", "lever-source",
-            "lever-origin", "_hsenc", "_hsmi", "yclid", "wbraid", "gbraid", "li_fat_id");
-    private static final List<String> TRACKING_PREFIXES = List.of("utm_", "mkt_", "pk_", "hsa_", "vero_", "ga_");
+    /**
+     * Query parameters dropped by the contract (openapi.yaml, `createSource`): exactly utm_*, gclid, fbclid, mc_cid,
+     * mc_eid, ref and ref_src. Nothing else is rewritten, because other parameters can identify a posting.
+     */
+    private static final Set<String> TRACKING_PARAMS = Set.of("gclid", "fbclid", "mc_cid", "mc_eid", "ref", "ref_src");
+    private static final List<String> TRACKING_PREFIXES = List.of("utm_");
     private static final Pattern NON_ALNUM = Pattern.compile("[^\\p{L}\\p{N}]+");
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
     /**
-     * Canonical form: http(s) only, lower-case scheme and host, default port and fragment removed, tracking
-     * parameters removed, remaining parameters sorted, trailing slash removed (except for the root path).
+     * Canonical form (the contract's normalization): http(s) only; lower-case scheme and host; default port and
+     * fragment dropped; tracking parameters dropped; remaining parameters sorted by name; an empty path becomes
+     * {@code /} and a trailing slash is removed from any other path; percent-encoding hex digits upper-cased.
      *
      * @throws IllegalArgumentException if the text is not an absolute http(s) URL
      */
@@ -50,10 +52,10 @@ public final class PostingNormalizer {
         boolean defaultPort = port == -1 || (scheme.equals("http") && port == 80) || (scheme.equals("https") && port == 443);
         String path = uri.getRawPath() == null ? "" : uri.getRawPath();
         while (path.length() > 1 && path.endsWith("/")) path = path.substring(0, path.length() - 1);
-        if (path.equals("/")) path = "";
+        if (path.isEmpty()) path = "/";
         StringBuilder out = new StringBuilder(scheme).append("://").append(host);
         if (!defaultPort) out.append(':').append(port);
-        out.append(path);
+        out.append(upperPercent(path));
         List<String> kept = new ArrayList<>();
         if (uri.getRawQuery() != null) {
             for (String pair : uri.getRawQuery().split("&")) {
@@ -62,9 +64,29 @@ public final class PostingNormalizer {
                 if (!isTracking(name)) kept.add(pair);
             }
         }
-        kept.sort(null);
+        kept.replaceAll(PostingNormalizer::upperPercent);
+        // Sorted by name, then by whole pair so equal names keep a stable order.
+        kept.sort(java.util.Comparator.comparing((String pair) -> pair.contains("=") ? pair.substring(0, pair.indexOf('=')) : pair)
+                .thenComparing(java.util.Comparator.naturalOrder()));
         if (!kept.isEmpty()) out.append('?').append(String.join("&", kept));
         return out.toString();
+    }
+
+    private static String upperPercent(String s) {
+        StringBuilder b = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            b.append(c);
+            if (c == '%' && i + 2 < s.length() && isHex(s.charAt(i + 1)) && isHex(s.charAt(i + 2))) {
+                b.append(Character.toUpperCase(s.charAt(i + 1))).append(Character.toUpperCase(s.charAt(i + 2)));
+                i += 2;
+            }
+        }
+        return b.toString();
+    }
+
+    private static boolean isHex(char c) {
+        return Character.digit(c, 16) >= 0;
     }
 
     private static boolean isTracking(String name) {
