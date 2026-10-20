@@ -1,5 +1,6 @@
 package app.resume.llm;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.networknt.schema.JsonSchema;
@@ -43,15 +44,18 @@ public class ValidatingLlmClient implements LlmClient {
         String text = complete(request);
         JsonNode json;
         try {
-            json = mapper.readTree(text);
+            // exactly one JSON document: trailing text after it is rejected, so the returned text is that document
+            json = mapper.readerFor(JsonNode.class).with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(text);
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw new LlmInvalidOutputException("the model's answer is not valid JSON", List.of("$: not valid JSON"));
+            throw new LlmInvalidOutputException("the model's answer is not valid JSON", List.of("answer is not a single valid JSON document"));
         }
         if (json == null || json.isMissingNode()) {
             throw new LlmInvalidOutputException("the model's answer is empty", List.of("$: empty answer"));
         }
         List<String> problems = new ArrayList<>();
-        schema.validate(json).forEach(m -> problems.add(m.getInstanceLocation() + ": " + m.getMessage()));
+        // Only our own wording: the violated schema keyword and its place in OUR schema. Neither the validator's message
+        // nor the instance location is used, because both can contain model-chosen text (property names).
+        schema.validate(json).forEach(m -> problems.add(m.getType() + " violated at schema path " + m.getEvaluationPath()));
         if (!problems.isEmpty()) {
             throw new LlmInvalidOutputException("the model's answer does not match the schema", problems);
         }

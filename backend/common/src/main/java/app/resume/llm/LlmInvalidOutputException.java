@@ -13,7 +13,10 @@ public class LlmInvalidOutputException extends LlmException {
         this.problems = List.copyOf(problems);
     }
 
-    /** What was wrong, one entry per violation (JSON pointer and message). Safe to log; never contains the model text. */
+    /**
+     * What was wrong, one entry per violation: fixed wording, the violated schema keyword and its path in the caller's
+     * own schema. Never contains text chosen by the model (not values, not property names), so it is safe to log.
+     */
     public List<String> problems() {
         return problems;
     }
