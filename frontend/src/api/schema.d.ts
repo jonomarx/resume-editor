@@ -309,6 +309,21 @@ export interface components {
             /** @description The version now stored; reload it before saving again */
             currentVersion: number;
         };
+        /** @description Credentials for a new account (the sign-up password rules are on `password`). */
+        SignUpRequest: components["schemas"]["Credentials"] & {
+            /**
+             * Format: password
+             * @description At least 8 characters and at most 72 bytes in UTF-8 (the limit of the hashing algorithm), with no
+             *     control characters (U+0000 to U+001F and U+007F). The byte count is authoritative, not the character
+             *     count: exactly 72 bytes is accepted, 73 bytes is rejected, and a multi-byte character counts as 2 to 4
+             *     bytes. A password breaking the byte limit or containing a control character is rejected with 400
+             *     `validation_failed` on `password`; it is never truncated. The schema `maxLength: 72` and `pattern` are
+             *     cheap first checks (72 characters can be up to 288 bytes). No Unicode normalization is applied: the
+             *     password is hashed as the raw UTF-8 bytes as sent, so the same visible text in different normalization
+             *     forms (for example precomposed and decomposed accented letters) is a different password.
+             */
+            password?: string;
+        };
         Credentials: {
             /**
              * @description 3 to 40 characters: letters, digits, underscore, dot, hyphen. Unique case-insensitively
@@ -317,8 +332,10 @@ export interface components {
             username: string;
             /**
              * Format: password
-             * @description At least 8 characters. Only the first 72 bytes (UTF-8, never cutting a character in half) are used;
-             *     anything beyond is ignored, identically at sign-up and login. There is no maximum length.
+             * @description The password. At sign-up the stricter rules of `SignUpRequest.password` apply. At login any text is accepted by
+             *     the schema: a password longer than 72 bytes or containing a control character is simply a wrong password, the
+             *     same 401 `bad_credentials` as any other (nothing special, never a 400, never truncated). No Unicode
+             *     normalization is applied anywhere: the password is used as the raw UTF-8 bytes as sent.
              */
             password: string;
         };
@@ -578,7 +595,7 @@ export interface operations {
                  *       "password": "correct-horse-battery"
                  *     }
                  */
-                "application/json": components["schemas"]["Credentials"];
+                "application/json": components["schemas"]["SignUpRequest"];
             };
         };
         responses: {
@@ -599,7 +616,15 @@ export interface operations {
                     "application/json": components["schemas"]["User"];
                 };
             };
-            400: components["responses"]["ValidationError"];
+            /** @description Request failed validation (username pattern, password shorter than 8 characters, longer than 72 UTF-8 bytes, or containing a control character) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             403: components["responses"]["CsrfInvalid"];
             /** @description Username already taken */
             409: {
@@ -661,7 +686,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["ValidationError"];
-            /** @description Wrong username or password */
+            /** @description Wrong username or password. A password longer than 72 bytes is just a wrong password (same response, never a 400 and never truncated). */
             401: {
                 headers: {
                     [name: string]: unknown;

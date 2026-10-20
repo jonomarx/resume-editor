@@ -2,6 +2,7 @@ import type { components } from './schema'
 
 export type User = components['schemas']['User']
 export type Credentials = components['schemas']['Credentials']
+export type SignUpRequest = components['schemas']['SignUpRequest']
 export type ApiErrorBody = components['schemas']['Error'] & { currentVersion?: number; conflictingSlug?: string }
 export type ResumeDocument = components['schemas']['ResumeDocument']
 export type ResumeVersionSummary = components['schemas']['ResumeVersionSummary']
@@ -34,7 +35,7 @@ export class ApiError extends Error {
 
 /** Auth operations (openapi operationIds signUp, logIn, logOut, getMe). */
 export interface AuthApi {
-  signUp(credentials: Credentials): Promise<User>
+  signUp(credentials: SignUpRequest & Credentials): Promise<User>
   logIn(credentials: Credentials): Promise<User>
   logOut(): Promise<void>
   /** Resolves to null when nobody is signed in (401). */

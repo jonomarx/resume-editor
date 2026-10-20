@@ -27,7 +27,8 @@ class RenderFailureTests {
         });
         server.start();
         try {
-            return new HttpRendererClient("http://127.0.0.1:" + server.getAddress().getPort(), 5, mapper).render("x");
+            return new HttpRendererClient(org.springframework.web.client.RestClient.builder(),
+                    new RendererProperties("http://127.0.0.1:" + server.getAddress().getPort(), 5, 3), mapper).render("x");
         } finally {
             server.stop(0);
         }

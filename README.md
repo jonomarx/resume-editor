@@ -26,6 +26,8 @@ JDK 21, Maven, Node 24 LTS, pnpm 12.14.0, and Docker with Compose.
 
 `docker-compose.yml` starts Postgres and Redis (and the renderer). `DB_PASSWORD` is required; use any local value and never commit it. See `.env.example` for the other variables.
 
+**Settings.** Operational settings live in `backend/app/src/main/resources/application.yml`, the only place with defaults; an environment variable overrides one where the file names it: `DB_URL`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `FILE_STORAGE`, `DATA_DIR`, `RENDERER_URL`, and `MAX_ORPHAN_KEY_ATTEMPTS` (default 20: how many orphaned storage keys one version number may skip before a save fails). Limits fixed by the API contract (password length, tag name, alias and slug lengths) are code constants, not settings.
+
 ### Whole stack in Docker (serves the app on :8080)
 
 ```sh
@@ -36,12 +38,14 @@ docker run -d --name resume-app --network host -e DB_PASSWORD \
   -e DB_URL=jdbc:postgresql://localhost:5432/resume resume-editor-app
 ```
 
-Open http://localhost:8080. The root `Dockerfile` builds the frontend, bakes it into the Spring jar, and runs it. Stop with:
+Open http://localhost:8080. The root `Dockerfile` builds the frontend, bakes it into the Spring jar, and runs it as the non-root user `app` (uid 10001). Stop with:
 
 ```sh
 docker rm -f resume-app
 docker compose down -v
 ```
+
+**Data directory.** Resume files and the render cache are written to `DATA_DIR`, which is `/data` in the image: it exists, is owned by the app user, and is declared a `VOLUME`, so the container works with no extra flags (a fresh anonymous volume is created per `docker run`). To keep the files across containers mount a named volume or a host directory writable by uid 10001, for example `-v resume-data:/data`; a host directory needs `chown 10001:10001`. Back up Postgres and `DATA_DIR` together. Outside Docker, `DATA_DIR` defaults to `./data`.
 
 ### Dev loop (Vite on :5173, API on :8080)
 
