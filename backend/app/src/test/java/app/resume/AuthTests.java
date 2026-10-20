@@ -28,7 +28,11 @@ class AuthTests {
     @Autowired JdbcTemplate jdbc;
 
     static String creds(String user, String pass) {
-        return "{\"username\":\"" + user + "\",\"password\":\"" + pass + "\"}";
+        StringBuilder esc = new StringBuilder(); // JSON-escape control characters (raw ones are malformed JSON)
+        for (char c : pass.toCharArray()) {
+            if (c < 0x20 || c == 0x7f) esc.append(String.format("\\u%04x", (int) c)); else esc.append(c);
+        }
+        return "{\"username\":\"" + user + "\",\"password\":\"" + esc + "\"}";
     }
 
     MockHttpServletResponse signUp(String user, String pass) throws Exception {
