@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { Tag, TagCategory } from '../api/types'
+import { describeTagError, type TagError } from './tagErrors'
 import { TAG_CATEGORIES, TAG_LABELS, TAG_SUGGESTION_LIMIT } from '../config/constants'
 
 interface Props {
@@ -18,7 +19,9 @@ const matches = (t: Tag, q: string) =>
 export default function TagEditor({ selected, vocabulary, onAdd, onRemove, onCreate }: Props) {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<TagCategory>(TAG_CATEGORIES[0].value)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<TagError | null>(null)
+  const [tipOpen, setTipOpen] = useState(false)
+  const tipId = useId()
   const q = query.trim().toLowerCase()
   const nameOf = (slug: string) => vocabulary.find((t) => t.slug === slug)?.name ?? slug
   const candidates = q ? vocabulary.filter((t) => !selected.includes(t.slug) && matches(t, q)).slice(0, TAG_SUGGESTION_LIMIT) : []
@@ -27,14 +30,15 @@ export default function TagEditor({ selected, vocabulary, onAdd, onRemove, onCre
   const add = (slug: string) => {
     onAdd(slug)
     setQuery('')
+    setError(null)
   }
 
   async function create() {
     setError(null)
     try {
       add((await onCreate(query.trim(), category)).slug)
-    } catch {
-      setError(TAG_LABELS.createFailed)
+    } catch (e) {
+      setError(describeTagError(e))
     }
   }
 
@@ -57,8 +61,39 @@ export default function TagEditor({ selected, vocabulary, onAdd, onRemove, onCre
       )}
       <label>
         {TAG_LABELS.addLabel}
-        <input value={query} onChange={(e) => setQuery(e.target.value)} />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? tipId : undefined}
+          onKeyDown={(e) => e.key === 'Escape' && setTipOpen(false)}
+        />
       </label>
+      {error && (
+        <span style={{ position: 'relative' }}>
+          <button
+            type="button"
+            aria-label={TAG_LABELS.errorIndicator}
+            aria-describedby={tipId}
+            onMouseEnter={() => setTipOpen(true)}
+            onMouseLeave={() => setTipOpen(false)}
+            onFocus={() => setTipOpen(true)}
+            onBlur={() => setTipOpen(false)}
+            onKeyDown={(e) => e.key === 'Escape' && setTipOpen(false)}
+          >
+            {TAG_LABELS.errorMark}
+          </button>
+          <span id={tipId} role="tooltip" hidden={!tipOpen} style={{ position: 'absolute', left: 0, top: '100%', background: '#222', color: '#fff', padding: '4px 8px', width: 'max-content', maxWidth: '20rem', zIndex: 10 }}>
+            {error.message}
+            {error.signIn && (
+              <>
+                {' '}
+                <a href="/login" style={{ color: 'inherit' }}>{TAG_LABELS.signIn}</a>
+              </>
+            )}
+          </span>
+        </span>
+      )}
       {candidates.length > 0 && (
         <ul aria-label={TAG_LABELS.matchingLabel}>
           {candidates.map((t) => (
@@ -81,7 +116,6 @@ export default function TagEditor({ selected, vocabulary, onAdd, onRemove, onCre
           <button type="button" onClick={() => void create()}>{TAG_LABELS.create(query.trim())}</button>
         </div>
       )}
-      {error && <p role="alert">{error}</p>}
     </section>
   )
 }

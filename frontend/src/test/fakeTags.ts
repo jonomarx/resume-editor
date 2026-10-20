@@ -4,7 +4,8 @@ import type { Tag, TagCategory } from '../api/types'
 export interface FakeTags {
   handle(method: string, path: string, body: unknown): Response | null
   vocabulary: Tag[]
-  failCreate: boolean
+  /** Test hook: make create fail with an HTTP error body, or throw a network error. */
+  failCreate: { status: number; body: unknown } | 'network' | null
 }
 
 export const slugify = (name: string) =>
@@ -18,11 +19,12 @@ export function createFakeTags(): FakeTags {
   ]
   const fake: FakeTags = {
     vocabulary,
-    failCreate: false,
+    failCreate: null,
     handle(method, path, body) {
       if (path !== '/api/tags') return null
       if (method === 'GET') return new Response(JSON.stringify(vocabulary), { status: 200 })
-      if (fake.failCreate) return new Response(JSON.stringify({ code: 'server_error', message: 'x' }), { status: 500 })
+      if (fake.failCreate === 'network') throw new TypeError('Failed to fetch')
+      if (fake.failCreate) return new Response(JSON.stringify(fake.failCreate.body), { status: fake.failCreate.status })
       const { name, category } = body as { name: string; category: TagCategory }
       const slug = slugify(name)
       const existing = vocabulary.find((t) => t.slug === slug || t.aliases.some((a) => a.toLowerCase() === name.trim().toLowerCase()))
