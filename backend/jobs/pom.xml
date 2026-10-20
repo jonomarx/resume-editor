@@ -13,6 +13,16 @@
       <groupId>app.resume</groupId>
       <artifactId>common</artifactId>
     </dependency>
+    <!-- US-033: jsoup is the page fetcher and HTML parser named in the design; not in the Spring Boot BOM, so pinned here. -->
+    <dependency>
+      <groupId>org.jsoup</groupId>
+      <artifactId>jsoup</artifactId>
+      <version>1.21.2</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
     <!-- US-030: migrations for the job tables live in this module; tests apply them on H2. -->
     <dependency>
       <groupId>org.flywaydb</groupId>
