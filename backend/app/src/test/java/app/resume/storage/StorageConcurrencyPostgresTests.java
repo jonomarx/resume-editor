@@ -25,6 +25,7 @@ import org.junit.jupiter.api.io.TempDir;
 class StorageConcurrencyPostgresTests extends PostgresContainerSupport {
     @TempDir Path dir;
     @Autowired FileRegistry registry;
+    @Autowired org.springframework.transaction.PlatformTransactionManager txManager;
     @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     static byte[] b(String s) { return s.getBytes(StandardCharsets.UTF_8); }
@@ -136,5 +137,30 @@ class StorageConcurrencyPostgresTests extends PostgresContainerSupport {
         done.set(true);
         reader.join();
         assertThat(partial.get()).isZero();
+    }
+
+    @Test
+    void deleteRacingAPutOfTheSameKeyNeverLeavesAFileWithoutARow() throws Exception {
+        LocalFileStorage storage = new LocalFileStorage(dir, registry);
+        org.springframework.transaction.support.TransactionTemplate tx =
+                new org.springframework.transaction.support.TransactionTemplate(txManager);
+        int rounds = 300;
+        for (int round = 0; round < rounds; round++) {
+            String key = StorageKeys.resumeVersion(77, 1000 + round, 1);
+            storage.put(key, b("original"));
+            List<Future<Boolean>> r = runAll(2, i -> () -> {
+                if (i == 0) return storage.delete(key);
+                try { storage.put(key, b("replacement")); return true; } catch (KeyAlreadyExistsException e) { return false; }
+            });
+            for (Future<Boolean> f : r) f.get();
+            boolean file = storage.exists(key);
+            var row = registry.find(key);
+            assertThat(row.isPresent()).as("round " + round + ": file and row exist together").isEqualTo(file);
+            if (file) {
+                byte[] stored = storage.get(key).orElseThrow();
+                assertThat(row.get().sha256()).as("round " + round).isEqualTo(FileRegistryTestSupport.sha256(stored));
+                tx.executeWithoutResult(s -> registry.commit(key)); // the winning writer's commit succeeds
+            }
+        }
     }
 }

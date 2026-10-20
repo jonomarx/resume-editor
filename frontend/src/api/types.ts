@@ -3,12 +3,15 @@ import type { components } from './schema'
 export type User = components['schemas']['User']
 export type Credentials = components['schemas']['Credentials']
 export type SignUpRequest = components['schemas']['SignUpRequest']
-export type ApiErrorBody = components['schemas']['Error'] & { currentVersion?: number; conflictingSlug?: string }
+export type ApiErrorBody = components['schemas']['Error'] & { currentVersion?: number; conflictingSlug?: string; existingSourceId?: number }
 export type ResumeDocument = components['schemas']['ResumeDocument']
 export type ResumeVersionSummary = components['schemas']['ResumeVersionSummary']
 export type ResumeTree = components['schemas']['ResumeTree']
 export type Tag = components['schemas']['Tag']
 export type TagCategory = components['schemas']['TagCategory']
+export type Source = components['schemas']['Source']
+export type SourceHealth = components['schemas']['SourceHealth']
+export type CrawlRun = components['schemas']['CrawlRun']
 export type RenderResult = components['schemas']['RenderResult']
 
 /** Error thrown by any API client call; mirrors the contract's Error schema. */
@@ -19,6 +22,8 @@ export class ApiError extends Error {
   readonly currentVersion?: number
   /** Present on 409 alias_conflict: the tag that already holds the name. */
   readonly conflictingSlug?: string
+  /** Present on 409 source_exists: the source the user already has. */
+  readonly existingSourceId?: number
   /** Per-field problems on 400 validation_failed. */
   readonly details?: ApiErrorBody['details']
 
@@ -29,6 +34,7 @@ export class ApiError extends Error {
     this.code = body.code
     this.currentVersion = body.currentVersion
     this.conflictingSlug = body.conflictingSlug
+    this.existingSourceId = body.existingSourceId
     this.details = body.details
   }
 }
@@ -63,7 +69,18 @@ export interface TagsApi {
   createTag(name: string, category: TagCategory): Promise<Tag>
 }
 
+/** Career page sources (operationIds listSources, createSource, updateSource, deleteSource, getSourceHealth). */
+export interface SourcesApi {
+  list(): Promise<Source[]>
+  create(url: string, name?: string): Promise<Source>
+  update(id: number, changes: { name?: string; enabled?: boolean }): Promise<Source>
+  remove(id: number): Promise<void>
+  /** One entry per source, each carrying its Source. */
+  health(): Promise<SourceHealth[]>
+}
+
 export interface Api {
+  sources: SourcesApi
   tags: TagsApi
   auth: AuthApi
   resume: ResumeApi
