@@ -1,9 +1,10 @@
 openapi: 3.0.3
 info:
   title: Resume Editor API
-  version: 0.5.0
+  version: 0.6.0
   description: |
-    Contract v0 (US-003, fixes in US-076): auth, master resume, tags, render.
+    Contract v0 (US-003, fixes in US-076 and US-097): auth, master resume, tags, render. Contract v1 (US-028, version
+    0.6.0, additive): sources, ingest, jobs, drafts, cutdown.
     Changed only through stories labeled `contract`.
 
     Conventions
@@ -30,6 +31,16 @@ tags:
     description: Shared tag vocabulary
   - name: render
     description: LaTeX to PDF
+  - name: sources
+    description: Career page sources and their crawl health
+  - name: ingest
+    description: Ingest tokens and the ingest API (pasted or forwarded postings)
+  - name: jobs
+    description: The job feed, posting detail and the user's status per posting
+  - name: drafts
+    description: One tailored resume per posting
+  - name: cutdown
+    description: Cut a draft to exactly one page (proposals the user accepts or rejects)
 security:
   - sessionCookie: []
 paths:
@@ -595,12 +606,750 @@ paths:
               schema: { type: string, format: binary }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /api/sources:
+    get:
+      tags: [sources]
+      operationId: listSources
+      summary: The user's career page sources
+      responses:
+        '200':
+          description: Sources, oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Source' }
+              example:
+                - { id: 3, name: Acme Careers, url: 'https://acme.example/careers', enabled: true, extractionTier: json_ld, createdAt: '2026-10-19T10:00:00Z', lastCrawlAt: '2026-10-20T06:00:00Z' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [sources]
+      operationId: createSource
+      summary: Add a career page
+      description: |
+        The URL must be absolute `http` or `https`. It is normalized (tracking parameters and fragment removed, host
+        lower-cased) and a source whose normalized URL the user already has is rejected with 409 `source_exists`.
+        The source is crawled by the next daily run; creating it does not fetch anything.
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSourceRequest' }
+            example: { url: 'https://acme.example/careers', name: Acme Careers }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Source' }
+              example: { id: 3, name: Acme Careers, url: 'https://acme.example/careers', enabled: true, extractionTier: null, createdAt: '2026-10-19T10:00:00Z', lastCrawlAt: null }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '409':
+          description: The user already has this source
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SourceExistsError' }
+              example: { code: source_exists, message: You already added this career page, existingSourceId: 3 }
+  /api/sources/{sourceId}:
+    get:
+      tags: [sources]
+      operationId: getSource
+      summary: One source
+      parameters:
+        - { $ref: '#/components/parameters/SourceId' }
+      responses:
+        '200':
+          description: The source
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Source' }
+              example: { id: 3, name: Acme Careers, url: 'https://acme.example/careers', enabled: true, extractionTier: json_ld, createdAt: '2026-10-19T10:00:00Z', lastCrawlAt: '2026-10-20T06:00:00Z' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [sources]
+      operationId: updateSource
+      summary: Rename or enable or disable a source
+      description: A disabled source is skipped by the daily crawl; its postings are still validity-checked. The URL cannot be changed (delete and add instead).
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+        - { $ref: '#/components/parameters/SourceId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateSourceRequest' }
+            example: { name: Acme (summer), enabled: false }
+      responses:
+        '200':
+          description: The updated source
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Source' }
+              example: { id: 3, name: Acme (summer), url: 'https://acme.example/careers', enabled: false, extractionTier: json_ld, createdAt: '2026-10-19T10:00:00Z', lastCrawlAt: '2026-10-20T06:00:00Z' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [sources]
+      operationId: deleteSource
+      summary: Remove a source
+      description: |
+        Removes the source and its crawl history. Postings it produced stay in the feed (they are validity-checked like
+        any posting) but no longer belong to a source (`sourceId` becomes null).
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+        - { $ref: '#/components/parameters/SourceId' }
+      responses:
+        '204': { description: Removed }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/source-health:
+    get:
+      tags: [sources]
+      operationId: getSourceHealth
+      summary: Health of every source (last run and recent history)
+      responses:
+        '200':
+          description: One entry per source
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SourceHealth' }
+              example:
+                - source: { id: 3, name: Acme Careers, url: 'https://acme.example/careers', enabled: true, extractionTier: json_ld, createdAt: '2026-10-19T10:00:00Z', lastCrawlAt: '2026-10-20T06:00:00Z' }
+                  state: healthy
+                  consecutiveFailures: 0
+                  activePostings: 12
+                  stalePostings: 1
+                  lastRun: { id: 41, startedAt: '2026-10-20T06:00:00Z', finishedAt: '2026-10-20T06:00:09Z', status: succeeded, postingsSeen: 13, added: 2, updated: 1, closed: 0, error: null }
+                  recentRuns:
+                    - { id: 41, startedAt: '2026-10-20T06:00:00Z', finishedAt: '2026-10-20T06:00:09Z', status: succeeded, postingsSeen: 13, added: 2, updated: 1, closed: 0, error: null }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/ingest/tokens:
+    get:
+      tags: [ingest]
+      operationId: listIngestTokens
+      summary: The user's ingest tokens (never the secret)
+      responses:
+        '200':
+          description: Tokens, newest first, including revoked ones
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/IngestToken' }
+              example:
+                - { id: 5, label: Bookmarklet, createdAt: '2026-10-19T10:00:00Z', lastUsedAt: '2026-10-20T07:30:00Z', revokedAt: null }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [ingest]
+      operationId: createIngestToken
+      summary: Create an ingest-only token
+      description: |
+        The secret is returned once, in `token`, and never again; only a hash is stored. The token can call
+        `POST /api/ingest` and the ingest event reads, nothing else.
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateIngestTokenRequest' }
+            example: { label: Bookmarklet }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreatedIngestToken' }
+              example: { id: 5, label: Bookmarklet, createdAt: '2026-10-19T10:00:00Z', lastUsedAt: null, revokedAt: null, token: ing_3f6c0b528a1d4c579e2b5d1a7c4e9f10 }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+  /api/ingest/tokens/{tokenId}:
+    delete:
+      tags: [ingest]
+      operationId: revokeIngestToken
+      summary: Revoke a token
+      description: Takes effect immediately. Revoking an already revoked token is a no-op (204).
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+        - name: tokenId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+          example: 5
+      responses:
+        '204': { description: Revoked }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/ingest:
+    post:
+      tags: [ingest]
+      operationId: ingestPosting
+      summary: Hand the server a posting to process later
+      description: |
+        Authentication: a signed-in session (with the CSRF header like any state-changing call) or an ingest token sent
+        as `Authorization: Bearer <token>`. A request authenticated by a bearer token does not need the CSRF header (it
+        carries no cookie) and is answered with CORS headers (`Access-Control-Allow-Origin: *`, no credentials) so the
+        bookmarklet can post from the job page's origin; session-cookie requests are never CORS-enabled.
+
+        `kind` says what `payload` is: `url` (a posting URL to fetch), `html` (the page source), `text` (pasted
+        text) or `email` (a forwarded email body). `sourceHint` is optional free text that helps extraction, typically
+        the page URL or the company name for `html` and `text`. Posting text is untrusted data: it is never executed
+        and never used as instructions.
+
+        The server answers 202 at once and processes asynchronously; follow progress with
+        `GET /api/ingest/events/{id}`. The call is idempotent: the same URL (after normalization) or the same content
+        hash for the same user returns 202 with the existing event's id and `duplicate: true`, and creates nothing new.
+      security:
+        - sessionCookie: []
+        - ingestToken: []
+      parameters:
+        - name: X-XSRF-TOKEN
+          in: header
+          required: false
+          description: Required with a session cookie; not used with a bearer token.
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IngestRequest' }
+            examples:
+              url: { value: { kind: url, payload: 'https://acme.example/careers/swe-intern', sourceHint: null } }
+              text: { value: { kind: text, payload: 'Software Engineering Intern, Acme. Seattle. Summer 2027 ...', sourceHint: 'https://acme.example/careers/swe-intern' } }
+      responses:
+        '202':
+          description: Accepted for processing
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IngestAccepted' }
+              examples:
+                new: { value: { ingestEventId: 88, status: queued, duplicate: false } }
+                duplicate: { value: { ingestEventId: 88, status: done, duplicate: true } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '413':
+          description: Payload too large
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: too_large, message: The posting is too large }
+        '429':
+          description: Too many ingest requests
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: rate_limited, message: Slow down and try again shortly }
+  /api/ingest/events:
+    get:
+      tags: [ingest]
+      operationId: listIngestEvents
+      summary: Recent ingest events, newest first
+      security:
+        - sessionCookie: []
+        - ingestToken: []
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Events
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/IngestEvent' }
+              example:
+                - { id: 88, kind: text, status: done, receivedAt: '2026-10-20T07:30:00Z', finishedAt: '2026-10-20T07:30:04Z', jobId: 140, error: null }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/ingest/events/{eventId}:
+    get:
+      tags: [ingest]
+      operationId: getIngestEvent
+      summary: One ingest event (poll it until `status` is final)
+      description: Another user's event, or an unknown id, is 404.
+      security:
+        - sessionCookie: []
+        - ingestToken: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+          example: 88
+      responses:
+        '200':
+          description: The event
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IngestEvent' }
+              examples:
+                done: { value: { id: 88, kind: text, status: done, receivedAt: '2026-10-20T07:30:00Z', finishedAt: '2026-10-20T07:30:04Z', jobId: 140, error: null } }
+                failed: { value: { id: 89, kind: url, status: failed, receivedAt: '2026-10-20T07:31:00Z', finishedAt: '2026-10-20T07:31:02Z', jobId: null, error: { code: fetch_failed, message: The page could not be fetched } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/jobs:
+    get:
+      tags: [jobs]
+      operationId: listJobs
+      summary: The job feed
+      description: |
+        Postings visible to the user, scored against the master resume on each request. Closed postings are hidden
+        unless a draft references them. Sort `fit` is highest score first, `newest` is most recently first seen; ties
+        break by id, so a page is stable.
+      parameters:
+        - name: sort
+          in: query
+          schema: { type: string, enum: [fit, newest], default: fit }
+        - name: tag
+          in: query
+          description: Tag slug; repeat for several. A posting must carry every given tag.
+          style: form
+          explode: true
+          schema: { type: array, items: { type: string } }
+        - name: location
+          in: query
+          description: Case-insensitive substring match on the location
+          schema: { type: string }
+        - name: status
+          in: query
+          description: The user's own status for the posting
+          schema: { $ref: '#/components/schemas/JobUserStatus' }
+        - name: maxAgeDays
+          in: query
+          description: Only postings first seen within this many days
+          schema: { type: integer, minimum: 1 }
+        - name: q
+          in: query
+          description: Full-text search over title, company and description
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: One page of the feed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JobPage' }
+              examples:
+                page: { $ref: '#/components/examples/JobPage' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/jobs/{jobId}:
+    get:
+      tags: [jobs]
+      operationId: getJob
+      summary: One posting in full, with its fit explanation
+      parameters:
+        - { $ref: '#/components/parameters/JobId' }
+      responses:
+        '200':
+          description: The posting
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JobDetail' }
+              examples:
+                detail: { $ref: '#/components/examples/JobDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/jobs/{jobId}/status:
+    put:
+      tags: [jobs]
+      operationId: setJobStatus
+      summary: Save, dismiss or mark a posting applied
+      description: Sets the user's own status; it never changes the posting. Setting the current value is a no-op.
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+        - { $ref: '#/components/parameters/JobId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetJobStatusRequest' }
+            example: { status: saved }
+      responses:
+        '200':
+          description: The posting with its new status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JobSummary' }
+              examples:
+                saved: { $ref: '#/components/examples/JobSummary' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/jobs/{jobId}/drafts:
+    post:
+      tags: [drafts]
+      operationId: createDraft
+      summary: Open the draft for a posting, forking the master if there is none
+      description: |
+        There is at most one draft per posting and user. If none exists the current master is copied into a new draft
+        (201); if one exists it is returned unchanged (200). A draft never pulls changes from the master afterwards.
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+        - { $ref: '#/components/parameters/JobId' }
+      responses:
+        '200':
+          description: The existing draft
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Draft' }
+              examples:
+                current: { $ref: '#/components/examples/Draft' }
+        '201':
+          description: A new draft forked from the master
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Draft' }
+              examples:
+                current: { $ref: '#/components/examples/Draft' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/drafts:
+    get:
+      tags: [drafts]
+      operationId: listDrafts
+      summary: The user's drafts, most recently updated first
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/DraftStatus' }
+      responses:
+        '200':
+          description: Drafts
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DraftSummary' }
+              example:
+                - { id: 21, jobId: 140, jobTitle: Software Engineering Intern, company: Acme, status: in_progress, version: 3, updatedAt: '2026-10-20T08:00:00Z' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/drafts/{draftId}:
+    get:
+      tags: [drafts]
+      operationId: getDraft
+      summary: Read the latest version of a draft
+      parameters:
+        - { $ref: '#/components/parameters/DraftId' }
+      responses:
+        '200':
+          description: The draft
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Draft' }
+              examples:
+                current: { $ref: '#/components/examples/Draft' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [drafts]
+      operationId: saveDraft
+      summary: Save a new version of a draft
+      description: |
+        Same rules as saving the master (`PUT /api/resumes/master`): optimistic check on `baseVersion` (a stale one is
+        409 with the current version), a save identical to the current content does not create a version (200,
+        unchanged), the same tag and `{{children}}` validation with 400 `validation_failed`.
+
+        `excludedNodeIds` are the include toggles: the listed nodes, and their children, are left out of the rendered and
+        exported document but stay in the tree, so a toggle can be switched back. Every id must exist in the tree (400
+        otherwise). Header and footer cannot be excluded. `status` is optional and unchanged when omitted; the status
+        is not part of the content hash.
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+        - { $ref: '#/components/parameters/DraftId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SaveDraftRequest' }
+            examples:
+              save: { $ref: '#/components/examples/SaveDraftRequest' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Draft' }
+              examples:
+                current: { $ref: '#/components/examples/Draft' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/VersionConflict' }
+  /api/drafts/{draftId}/export:
+    get:
+      tags: [drafts]
+      operationId: exportDraft
+      summary: Export the draft as a PDF or as LaTeX source
+      description: |
+        Exports the draft's latest version with the include toggles applied. `pdf` compiles it (or serves the cached
+        render) and answers 503 `renderer_unavailable` when the renderer is down, or 422 `compile_failed` when the
+        document does not compile. `tex` is the assembled document including the locked preamble, as `text/x-tex`.
+        Both are sent as attachments.
+      parameters:
+        - { $ref: '#/components/parameters/DraftId' }
+        - name: format
+          in: query
+          required: true
+          schema: { type: string, enum: [pdf, tex] }
+          example: pdf
+      responses:
+        '200':
+          description: The file
+          headers:
+            Content-Disposition:
+              description: attachment with a file name derived from the posting
+              schema: { type: string }
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+            text/x-tex:
+              schema: { type: string }
+              example: '\documentclass[letterpaper,11pt]{article} ...'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          description: The draft does not compile (`format=pdf` only)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: compile_failed, message: The draft did not compile }
+        '503':
+          description: Renderer unavailable or timed out
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: renderer_unavailable, message: The renderer did not respond in time }
+  /api/drafts/{draftId}/versions:
+    get:
+      tags: [drafts]
+      operationId: listDraftVersions
+      summary: Version history of a draft, newest first
+      parameters:
+        - { $ref: '#/components/parameters/DraftId' }
+      responses:
+        '200':
+          description: Versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DraftVersionSummary' }
+              example:
+                - { version: 3, contentHash: e99551fa57d7a6c2858733580847871fae001b49e0f54e59dc8e15ebae6b5203, createdAt: '2026-10-20T08:00:00Z', reason: cutdown_applied }
+                - { version: 2, contentHash: b10af658e08210683091e16185d3c41ddcae75ca55322e125094137dd668097e, createdAt: '2026-10-20T07:59:00Z', reason: before_cutdown }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/drafts/{draftId}/versions/{version}/restore:
+    post:
+      tags: [drafts]
+      operationId: restoreDraftVersion
+      summary: Make an old draft version the newest version
+      description: Same behaviour as `restoreMasterVersion`, including the include toggles of that version. This is how a cutdown is undone.
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+        - { $ref: '#/components/parameters/DraftId' }
+        - { $ref: '#/components/parameters/Version' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RestoreRequest' }
+            example: { baseVersion: 3 }
+      responses:
+        '200':
+          description: Restored as a new version
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Draft' }
+              examples:
+                current: { $ref: '#/components/examples/Draft' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/VersionConflict' }
+  /api/drafts/{draftId}/cutdowns:
+    post:
+      tags: [cutdown]
+      operationId: startCutdown
+      summary: Start a cutdown of the draft to exactly one page
+      description: |
+        Starts a run against the draft's version `baseVersion` (a stale one is 409 `version_conflict`) and answers 202
+        with the run; the work (looping on the renderer, and the LLM in `llm_tighten` mode) happens asynchronously. Poll
+        `GET /api/drafts/{draftId}/cutdowns/{runId}` until `status` is `ready` or `failed`.
+
+        `deterministic` scores every node against the posting, keeps the highest-scoring nodes and loops on the
+        renderer until the document is exactly one page; it can only exclude nodes, never invents text. `llm_tighten`
+        may in addition propose rewordings of node LaTeX; it never adds claims (checked by the server). A run proposes;
+        it changes nothing until `apply`.
+
+        Only one run per draft is active at a time: starting another while one is `queued` or `running` is 409
+        `cutdown_in_progress`.
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+        - { $ref: '#/components/parameters/DraftId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StartCutdownRequest' }
+            example: { baseVersion: 3, mode: deterministic }
+      responses:
+        '202':
+          description: Accepted; the run is queued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CutdownRun' }
+              example: { id: 7, draftId: 21, baseVersion: 3, mode: deterministic, status: queued, createdAt: '2026-10-20T08:05:00Z', pageCountBefore: null, pageCountAfter: null, suggestions: [], error: null }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Stale `baseVersion` (`version_conflict`, with `currentVersion`) or a run is already active (`cutdown_in_progress`)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { $ref: '#/components/schemas/VersionConflictError' }
+                  - { $ref: '#/components/schemas/Error' }
+              examples:
+                stale: { value: { code: version_conflict, message: The resume changed since you loaded it, currentVersion: 4 } }
+                active: { value: { code: cutdown_in_progress, message: A cutdown is already running for this draft } }
+        '429':
+          description: The LLM budget is used up (`llm_tighten` only)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: llm_budget_exceeded, message: The AI budget for this period is used up }
+        '503':
+          description: No LLM is configured or it is unavailable (`llm_tighten` only)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: llm_unavailable, message: The AI service is not available }
+  /api/drafts/{draftId}/cutdowns/{runId}:
+    get:
+      tags: [cutdown]
+      operationId: getCutdown
+      summary: A cutdown run with its per-node suggestions
+      parameters:
+        - { $ref: '#/components/parameters/DraftId' }
+        - { $ref: '#/components/parameters/RunId' }
+      responses:
+        '200':
+          description: The run
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CutdownRun' }
+              examples:
+                ready:
+                  value:
+                    id: 7
+                    draftId: 21
+                    baseVersion: 3
+                    mode: deterministic
+                    status: ready
+                    createdAt: '2026-10-20T08:05:00Z'
+                    pageCountBefore: 2
+                    pageCountAfter: 1
+                    suggestions:
+                      - { id: s1, nodeId: n-exp-1-b2, kind: exclude, reason: Lowest relevance to this posting (score 0.0), score: 0.0, beforeLatex: null, afterLatex: null }
+                      - { id: s2, nodeId: n-exp-1-b1, kind: reword, reason: Shortened to save a line, score: 0.8, beforeLatex: '\resumeItem{Cut batch runtime by 40\% with caching in a nightly job.}', afterLatex: '\resumeItem{Cut batch runtime by 40\% with caching.}' }
+                    error: null
+                failed:
+                  value:
+                    id: 8
+                    draftId: 21
+                    baseVersion: 3
+                    mode: deterministic
+                    status: failed
+                    createdAt: '2026-10-20T08:06:00Z'
+                    pageCountBefore: 3
+                    pageCountAfter: null
+                    suggestions: []
+                    error: { code: cannot_fit, message: The mandatory content alone is longer than one page }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/drafts/{draftId}/cutdowns/{runId}/apply:
+    post:
+      tags: [cutdown]
+      operationId: applyCutdown
+      summary: Accept some or all suggestions of a ready run
+      description: |
+        Applies exactly the suggestions listed in `acceptedSuggestionIds`; the rest are rejected. The server first
+        records the current content as a draft version (`reason: before_cutdown`) and then saves the result as a new
+        version (`reason: cutdown_applied`), so the whole step is undone with `restoreDraftVersion`. Requires the run to
+        be `ready` (else 409 `cutdown_not_ready`) and the draft still at the run's `baseVersion` (else 409
+        `version_conflict`). An unknown suggestion id is 400. Applying marks the run `applied`; applying twice is 409
+        `cutdown_not_ready`. An empty list applies nothing and discards the run (the draft is unchanged, 200).
+      parameters:
+        - { $ref: '#/components/parameters/XsrfToken' }
+        - { $ref: '#/components/parameters/DraftId' }
+        - { $ref: '#/components/parameters/RunId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApplyCutdownRequest' }
+            example: { acceptedSuggestionIds: [s1, s2] }
+      responses:
+        '200':
+          description: The draft after applying
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Draft' }
+              examples:
+                current: { $ref: '#/components/examples/Draft' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Stale draft (`version_conflict`) or the run is not `ready` (`cutdown_not_ready`)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { $ref: '#/components/schemas/VersionConflictError' }
+                  - { $ref: '#/components/schemas/Error' }
+              examples:
+                stale: { value: { code: version_conflict, message: The resume changed since you loaded it, currentVersion: 4 } }
+                notReady: { value: { code: cutdown_not_ready, message: This cutdown cannot be applied } }
 components:
   securitySchemes:
     sessionCookie:
       type: apiKey
       in: cookie
       name: SESSION
+    ingestToken:
+      type: http
+      scheme: bearer
+      description: An ingest-only token (see `createIngestToken`); accepted only where an operation lists it.
   parameters:
     XsrfToken:
       name: X-XSRF-TOKEN
@@ -622,6 +1371,30 @@ components:
       required: true
       schema: { type: integer, minimum: 1 }
       example: 2
+    SourceId:
+      name: sourceId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+      example: 3
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+      example: 140
+    DraftId:
+      name: draftId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+      example: 21
+    RunId:
+      name: runId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+      example: 7
   responses:
     CsrfInvalid:
       description: Missing or wrong `X-XSRF-TOKEN` header
@@ -661,6 +1434,119 @@ components:
             message: The resume changed since you loaded it
             currentVersion: 4
   examples:
+    JobSummary:
+      summary: A posting in the feed
+      value:
+        id: 140
+        title: Software Engineering Intern
+        company: Acme
+        location: Seattle, WA
+        url: 'https://acme.example/careers/swe-intern'
+        description: Build internal tools for the batch platform team.
+        basicRequirements: [Pursuing a BS in computer science, Experience in one object-oriented language]
+        preferredRequirements: [Familiarity with Postgres]
+        tags: [java, postgresql]
+        fitScore: 72
+        userStatus: new
+        postingStatus: active
+        origin: crawl
+        sourceId: 3
+        draftId: null
+        postedAt: '2026-10-15T00:00:00Z'
+        firstSeenAt: '2026-10-19T06:00:03Z'
+        lastSeenAt: '2026-10-20T06:00:05Z'
+    JobPage:
+      summary: One page of the feed
+      value:
+        total: 1
+        limit: 50
+        offset: 0
+        items:
+          - id: 140
+            title: Software Engineering Intern
+            company: Acme
+            location: Seattle, WA
+            url: 'https://acme.example/careers/swe-intern'
+            description: Build internal tools for the batch platform team.
+            basicRequirements: [Pursuing a BS in computer science, Experience in one object-oriented language]
+            preferredRequirements: [Familiarity with Postgres]
+            tags: [java, postgresql]
+            fitScore: 72
+            userStatus: new
+            postingStatus: active
+            origin: crawl
+            sourceId: 3
+            draftId: null
+            postedAt: '2026-10-15T00:00:00Z'
+            firstSeenAt: '2026-10-19T06:00:03Z'
+            lastSeenAt: '2026-10-20T06:00:05Z'
+    JobDetail:
+      summary: A posting in full
+      value:
+        id: 140
+        title: Software Engineering Intern
+        company: Acme
+        location: Seattle, WA
+        url: 'https://acme.example/careers/swe-intern'
+        description: Build internal tools for the batch platform team.
+        fullDescription: Build internal tools for the batch platform team. You will work with senior engineers ...
+        basicRequirements: [Pursuing a BS in computer science, Experience in one object-oriented language]
+        preferredRequirements: [Familiarity with Postgres]
+        tags: [java, postgresql]
+        fitScore: 72
+        userStatus: new
+        postingStatus: active
+        origin: crawl
+        sourceId: 3
+        draftId: null
+        postedAt: '2026-10-15T00:00:00Z'
+        firstSeenAt: '2026-10-19T06:00:03Z'
+        lastSeenAt: '2026-10-20T06:00:05Z'
+        eligibility: { season: Summer 2027, workAuthorization: null, classYear: Rising junior or senior }
+        fit: { matchedTags: [java], missingTags: [postgresql] }
+    Draft:
+      summary: A draft resume for a posting
+      value:
+        id: 21
+        jobId: 140
+        status: in_progress
+        version: 3
+        contentHash: b706a01cf5720a0f5e9044150a32728b0773bfd2a065bfa7704fb9ae91038f82
+        createdAt: '2026-10-20T07:50:00Z'
+        updatedAt: '2026-10-20T08:00:00Z'
+        excludedNodeIds: [n-exp-1-b2]
+        tree:
+          id: root
+          header: { id: n-header, type: header, title: Header, latex: '\begin{center} \textbf{\Huge Ada Lovelace} \end{center}', tags: [], children: [] }
+          sections:
+            - id: n-exp
+              type: section
+              title: Experience
+              latex: "\\section{Experience}\n{{children}}"
+              tags: []
+              children:
+                - { id: n-exp-1-b1, type: subsection_text, title: Bullet, latex: '\resumeItem{Cut batch runtime by 40\% with caching.}', tags: [java], children: [] }
+                - { id: n-exp-1-b2, type: subsection_text, title: Bullet, latex: '\resumeItem{Organized the team picnic.}', tags: [], children: [] }
+          footer: { id: n-footer, type: footer, title: Footer, latex: '', tags: [], children: [] }
+    SaveDraftRequest:
+      summary: Save after toggling one bullet off
+      value:
+        baseVersion: 3
+        excludedNodeIds: [n-exp-1-b2]
+        status: in_progress
+        tree:
+          id: root
+          header: { id: n-header, type: header, title: Header, latex: '\begin{center} \textbf{\Huge Ada Lovelace} \end{center}', tags: [], children: [] }
+          sections:
+            - id: n-exp
+              type: section
+              title: Experience
+              latex: "\\section{Experience}\n{{children}}"
+              tags: []
+              children:
+                - { id: n-exp-1-b1, type: subsection_text, title: Bullet, latex: '\resumeItem{Cut batch runtime by 40\% with caching.}', tags: [java], children: [] }
+                - { id: n-exp-1-b2, type: subsection_text, title: Bullet, latex: '\resumeItem{Organized the team picnic.}', tags: [], children: [] }
+          footer: { id: n-footer, type: footer, title: Footer, latex: '', tags: [], children: [] }
     SaveRequest:
       summary: Save after editing version 3
       value:
@@ -954,3 +1840,295 @@ components:
         errors:
           type: array
           items: { $ref: '#/components/schemas/RenderError' }
+    ExtractionTier:
+      type: string
+      nullable: true
+      enum: [ats_feed, json_ld, llm, null]
+      description: How the source's postings were last extracted; null before the first crawl.
+    Source:
+      type: object
+      required: [id, name, url, enabled, extractionTier, createdAt, lastCrawlAt]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        url: { type: string, description: The normalized career page URL }
+        enabled: { type: boolean }
+        extractionTier: { $ref: '#/components/schemas/ExtractionTier' }
+        createdAt: { type: string, format: date-time }
+        lastCrawlAt: { type: string, format: date-time, nullable: true }
+    CreateSourceRequest:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string, maxLength: 2000, pattern: '^https?://\S+$' }
+        name: { type: string, minLength: 1, maxLength: 100, description: Defaults to the URL's host }
+    UpdateSourceRequest:
+      type: object
+      description: Fields left out are unchanged.
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        enabled: { type: boolean }
+    SourceExistsError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          required: [existingSourceId]
+          properties:
+            existingSourceId: { type: integer, format: int64 }
+    CrawlRun:
+      type: object
+      required: [id, startedAt, finishedAt, status, postingsSeen, added, updated, closed, error]
+      properties:
+        id: { type: integer, format: int64 }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time, nullable: true }
+        status: { type: string, enum: [running, succeeded, failed, skipped_unchanged] }
+        postingsSeen: { type: integer, minimum: 0 }
+        added: { type: integer, minimum: 0 }
+        updated: { type: integer, minimum: 0 }
+        closed: { type: integer, minimum: 0, description: Postings that became stale or closed in this run }
+        error: { type: string, nullable: true, description: Short reason when `status` is `failed` }
+    SourceHealth:
+      type: object
+      required: [source, state, consecutiveFailures, activePostings, stalePostings, lastRun, recentRuns]
+      properties:
+        source: { $ref: '#/components/schemas/Source' }
+        state:
+          type: string
+          enum: [never_run, healthy, degraded, failing]
+          description: '`degraded` is one failed run, `failing` is two or more in a row.'
+        consecutiveFailures: { type: integer, minimum: 0 }
+        activePostings: { type: integer, minimum: 0 }
+        stalePostings: { type: integer, minimum: 0 }
+        lastRun: { type: object, allOf: [ { $ref: '#/components/schemas/CrawlRun' } ], nullable: true }
+        recentRuns:
+          type: array
+          description: The last 10 runs, newest first
+          items: { $ref: '#/components/schemas/CrawlRun' }
+    IngestToken:
+      type: object
+      required: [id, label, createdAt, lastUsedAt, revokedAt]
+      properties:
+        id: { type: integer, format: int64 }
+        label: { type: string }
+        createdAt: { type: string, format: date-time }
+        lastUsedAt: { type: string, format: date-time, nullable: true }
+        revokedAt: { type: string, format: date-time, nullable: true }
+    CreatedIngestToken:
+      allOf:
+        - $ref: '#/components/schemas/IngestToken'
+        - type: object
+          required: [token]
+          properties:
+            token: { type: string, description: The secret; shown only in this response }
+    CreateIngestTokenRequest:
+      type: object
+      required: [label]
+      properties:
+        label: { type: string, minLength: 1, maxLength: 60 }
+    IngestRequest:
+      type: object
+      required: [kind, payload]
+      properties:
+        kind: { type: string, enum: [url, html, text, email] }
+        payload:
+          type: string
+          minLength: 1
+          maxLength: 1000000
+          description: A URL for `url`; the content otherwise. Larger payloads are 413.
+        sourceHint: { type: string, nullable: true, maxLength: 500 }
+    IngestAccepted:
+      type: object
+      required: [ingestEventId, status, duplicate]
+      properties:
+        ingestEventId: { type: integer, format: int64 }
+        status: { $ref: '#/components/schemas/IngestStatus' }
+        duplicate: { type: boolean, description: True when an earlier request for the same URL or content already exists }
+    IngestStatus:
+      type: string
+      enum: [queued, processing, done, failed]
+    IngestEvent:
+      type: object
+      required: [id, kind, status, receivedAt, finishedAt, jobId, error]
+      properties:
+        id: { type: integer, format: int64 }
+        kind: { type: string, enum: [url, html, text, email] }
+        status: { $ref: '#/components/schemas/IngestStatus' }
+        receivedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time, nullable: true }
+        jobId: { type: integer, format: int64, nullable: true, description: 'The posting created or matched, once `done`' }
+        error:
+          type: object
+          nullable: true
+          description: Present when `status` is `failed`
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+    JobUserStatus:
+      type: string
+      enum: [new, saved, dismissed, applied]
+    PostingStatus:
+      type: string
+      enum: [active, stale, closed]
+    JobSummary:
+      type: object
+      required: [id, title, company, location, url, description, basicRequirements, preferredRequirements, tags, fitScore, userStatus, postingStatus, origin, sourceId, draftId, postedAt, firstSeenAt, lastSeenAt]
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+        company: { type: string }
+        location: { type: string, nullable: true }
+        url: { type: string, description: The posting's canonical URL }
+        description: { type: string, description: A brief description (at most 500 characters) }
+        basicRequirements: { type: array, items: { type: string } }
+        preferredRequirements: { type: array, items: { type: string } }
+        tags: { type: array, items: { type: string, description: Tag slug } }
+        fitScore:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: How well the master resume fits the posting, computed per request (0 when the master has no tags)
+        userStatus: { $ref: '#/components/schemas/JobUserStatus' }
+        postingStatus: { $ref: '#/components/schemas/PostingStatus' }
+        origin: { type: string, enum: [crawl, ingest] }
+        sourceId: { type: integer, format: int64, nullable: true }
+        draftId: { type: integer, format: int64, nullable: true, description: 'The user''s draft for this posting, if any' }
+        postedAt: { type: string, format: date-time, nullable: true }
+        firstSeenAt: { type: string, format: date-time }
+        lastSeenAt: { type: string, format: date-time }
+    Eligibility:
+      type: object
+      required: [season, workAuthorization, classYear]
+      description: Hard-filter fields extracted from the posting; null when the posting does not say.
+      properties:
+        season: { type: string, nullable: true }
+        workAuthorization: { type: string, nullable: true }
+        classYear: { type: string, nullable: true }
+    JobDetail:
+      allOf:
+        - $ref: '#/components/schemas/JobSummary'
+        - type: object
+          required: [fullDescription, eligibility, fit]
+          properties:
+            fullDescription: { type: string }
+            eligibility: { $ref: '#/components/schemas/Eligibility' }
+            fit:
+              type: object
+              required: [matchedTags, missingTags]
+              description: Why the score is what it is
+              properties:
+                matchedTags: { type: array, items: { type: string }, description: Posting tags the master resume also has }
+                missingTags: { type: array, items: { type: string }, description: Posting tags the master resume lacks }
+    JobPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/JobSummary' } }
+        total: { type: integer, minimum: 0, description: 'Postings matching the filters, ignoring paging' }
+        limit: { type: integer }
+        offset: { type: integer }
+    SetJobStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { $ref: '#/components/schemas/JobUserStatus' }
+    DraftStatus:
+      type: string
+      enum: [in_progress, ready, applied]
+    Draft:
+      type: object
+      required: [id, jobId, status, version, contentHash, createdAt, updatedAt, excludedNodeIds, tree]
+      properties:
+        id: { type: integer, format: int64 }
+        jobId: { type: integer, format: int64 }
+        status: { $ref: '#/components/schemas/DraftStatus' }
+        version: { type: integer, minimum: 1 }
+        contentHash:
+          type: string
+          description: Hash of the canonical tree and the sorted `excludedNodeIds`
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        excludedNodeIds:
+          type: array
+          items: { type: string }
+          description: Include toggles that are off (see `saveDraft`)
+        tree: { $ref: '#/components/schemas/ResumeTree' }
+    DraftSummary:
+      type: object
+      required: [id, jobId, jobTitle, company, status, version, updatedAt]
+      properties:
+        id: { type: integer, format: int64 }
+        jobId: { type: integer, format: int64 }
+        jobTitle: { type: string }
+        company: { type: string }
+        status: { $ref: '#/components/schemas/DraftStatus' }
+        version: { type: integer, minimum: 1 }
+        updatedAt: { type: string, format: date-time }
+    SaveDraftRequest:
+      type: object
+      required: [baseVersion, tree, excludedNodeIds]
+      properties:
+        baseVersion: { type: integer, minimum: 1 }
+        tree: { $ref: '#/components/schemas/ResumeTree' }
+        excludedNodeIds: { type: array, items: { type: string } }
+        status: { $ref: '#/components/schemas/DraftStatus' }
+    DraftVersionSummary:
+      type: object
+      required: [version, contentHash, createdAt, reason]
+      properties:
+        version: { type: integer, minimum: 1 }
+        contentHash: { type: string }
+        createdAt: { type: string, format: date-time }
+        reason:
+          type: string
+          enum: [fork, save, restore, before_cutdown, cutdown_applied]
+    StartCutdownRequest:
+      type: object
+      required: [baseVersion]
+      properties:
+        baseVersion: { type: integer, minimum: 1 }
+        mode: { type: string, enum: [deterministic, llm_tighten], default: deterministic }
+    CutdownSuggestion:
+      type: object
+      required: [id, nodeId, kind, reason, score, beforeLatex, afterLatex]
+      properties:
+        id: { type: string, description: Unique within the run }
+        nodeId: { type: string }
+        kind:
+          type: string
+          enum: [exclude, reword]
+          description: '`exclude` turns the node''s include toggle off; `reword` replaces its `latex`.'
+        reason: { type: string, description: 'Human-readable, safe to show' }
+        score: { type: number, nullable: true, description: The node's relevance to the posting (0 to 1) }
+        beforeLatex: { type: string, nullable: true, description: The node's latex now (`reword` only) }
+        afterLatex: { type: string, nullable: true, description: The proposed latex (`reword` only) }
+    CutdownRun:
+      type: object
+      required: [id, draftId, baseVersion, mode, status, createdAt, pageCountBefore, pageCountAfter, suggestions, error]
+      properties:
+        id: { type: integer, format: int64 }
+        draftId: { type: integer, format: int64 }
+        baseVersion: { type: integer, minimum: 1 }
+        mode: { type: string, enum: [deterministic, llm_tighten] }
+        status: { type: string, enum: [queued, running, ready, failed, applied, discarded] }
+        createdAt: { type: string, format: date-time }
+        pageCountBefore: { type: integer, nullable: true }
+        pageCountAfter:
+          type: integer
+          nullable: true
+          description: Pages after the accepted suggestions are applied; exactly 1 when `status` is `ready`
+        suggestions: { type: array, items: { $ref: '#/components/schemas/CutdownSuggestion' } }
+        error:
+          type: object
+          nullable: true
+          description: 'Present when `failed`: `cannot_fit` (the content that cannot be excluded is longer than one page), `renderer_unavailable`, `llm_unavailable`, `llm_budget_exceeded`'
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+    ApplyCutdownRequest:
+      type: object
+      required: [acceptedSuggestionIds]
+      properties:
+        acceptedSuggestionIds: { type: array, items: { type: string } }
