@@ -22,9 +22,9 @@ A per-user web app where you keep one verbose LaTeX **master resume** (Jake's te
 | Component | Choice | Notes |
 | --- | --- | --- |
 | Web app | React, Vite, TypeScript, pnpm | Compiled to static files; Vitest for tests |
-| API server | Spring Boot (Java 21+), built with Maven | Spring Web, Security, Data JPA, Flyway, Spring Session |
+| API server | Spring Boot (Java 21+), built with Maven | Spring Web, Security, Data JPA, Flyway, Spring Session. Data access: Spring Data JPA for plain entity tables (users, and new tables that are simple CRUD); Spring JDBC (`JdbcTemplate`) for code that coordinates rows with files on disk, locks or explicit transactions: the file registry, the resume locks, the resume save and restore flow and the node tag index |
 | Database | Postgres | H2 (PostgreSQL mode) for fast local tests |
-| Sessions | Redis | Spring Session; HttpOnly, SameSite=Lax cookie |
+| Sessions | Redis | Spring Session; HttpOnly, SameSite=Lax cookie; CSRF tokens on (`XSRF-TOKEN` cookie echoed in an `X-XSRF-TOKEN` header on every state-changing request) |
 | File storage | Local disk behind `FileStorage` | `FILE_STORAGE=local`; S3 later is a new implementation |
 | LaTeX renderer | TeX Live in its own container | No network, hard timeout, shell escape off |
 | Scheduler | Spring `@Scheduled` | Daily validity check then crawl |
@@ -34,6 +34,8 @@ A per-user web app where you keep one verbose LaTeX **master resume** (Jake's te
 No load balancer. Deployment target: Docker containers on another of your machines.
 
 **How React is served.** Spring Boot serves the compiled Vite build from the same origin (no CORS, simple cookie sessions). Vite is the frontend build tool: a fast dev server with instant reload, and a production bundler that outputs static files. In dev, Vite runs on :5173 and proxies `/api` to Spring on :8080. In prod, a multi-stage Dockerfile builds `frontend/` and copies `dist/` into the jar's `static/`; a controller forwards non-`/api`, non-asset paths to `index.html`; hashed assets are cached long, `index.html` never. No server-side rendering.
+
+**Sign-in rules.** Usernames match `^[A-Za-z0-9_.-]{3,40}$` and are unique case-insensitively (database constraint). Passwords are at least 8 characters and at most 72 bytes in UTF-8 (BCrypt's limit); a longer password is rejected at sign-up with 400 `validation_failed` on `password`, and at login it is the same 401 as any wrong password, so nothing is ever silently truncated. State-changing requests without a valid CSRF token get `403 csrf_invalid`. The contract (`api-contract/openapi.yaml`) defines the exact mechanism.
 
 **Repository layout**
 
@@ -68,6 +70,7 @@ Postgres holds records and pointers; resume content lives on disk behind `FileSt
 | `app_user` | Account (username, password hash) |
 | `resume` | Master or draft; `storage_uri`, `content_hash`, `version`, `job_posting_id` for drafts |
 | `resume_version` | Snapshot history of the master |
+| `file_registry` | One row per stored file: `key`, `uri`, `size`, `sha256`, `user_id`, `state` (`PENDING`, `COMMITTED`), `created_at`; written as an intent row before the file; `FileStorage.list(prefix)` is answered from this table |
 | `tag`, `resume_node_tag`, `job_posting_tag` | Shared tag vocabulary and its links; the resume file stays the source of truth, `resume_node_tag` is a derived index |
 | `job_source` | Your career page links |
 | `job_posting` | One posting; `owner_user_id`, `origin` (crawl or ingest), `canonical_url`, `url_hash`, `content_hash`, `status` (active, stale, closed), requirements, eligibility fields; unique on (owner_user_id, url_hash) |
@@ -92,7 +95,9 @@ Postgres holds records and pointers; resume content lives on disk behind `FileSt
 | Subsection text (tagged) | What I did on the job | `\resumeItem` bullets |
 | Footer | Anything after the last section | Text before `\end{document}` |
 
-Header and footer are separate top-level nodes. The document is assembled as: locked preamble from Jake's template, header, sections in order, footer, `\end{document}`. The preamble is visible only in an Advanced view. The assembler writes a comment marker per node so compile errors map back to nodes.
+**Template status.** Jake's template is a **reference**, not the final template. Our actual template is a derivative of it and will differ (preamble, macros, layout details). The reference copy lives at `docs/reference/jake-resume-template.tex`; use it to understand structure and macro names, but do not hard-code its exact preamble or content. Keep the preamble, macro names, and starter tree in one replaceable place so the derivative template can be swapped in later. US-011 creates the derivative from the reference and records the decisions in `docs/decision-002-template.md`: for now it keeps Jake's layout, fonts and macro names, with the macro definitions in the hidden locked header, and its starter tree is Jake's sample content broken into nodes under Education, Experience, Projects and Skills; changes come as new stories. Until US-011 lands, the reference is the stand-in. Mark any code that depends on Jake-specific details with a `TEMPLATE` comment.
+
+Header and footer are separate top-level nodes. The document is assembled as: locked preamble (the template's hidden header: preamble plus macro definitions, never shown to the user and not editable), header, sections in order, footer, `\end{document}`. The assembler writes a comment marker per node so compile errors map back to nodes.
 
 **Layout.** Left: outline tree (add, rename, reorder, delete, collapse). Center: LaTeX editor for the selected node (CodeMirror 6) with snippet buttons, plus the tag editor (pick from the vocabulary, create new, many per node). Right: PDF preview (PDF.js) with a page counter and an error panel.
 
@@ -118,7 +123,7 @@ Header and footer are separate top-level nodes. The document is assembled as: lo
 
 ## 6. Tags and matching (backend part 1)
 
-**Tags.** Master resume nodes can be tagged (many per node). Tags come from one shared, user-extensible vocabulary: canonical name, slug, category (language, framework, domain, role type), aliases. Free text is never stored as a tag; typing a new one creates a vocabulary entry first. The Job List Manager tags postings from the same list and may *propose* new entries, which wait for your approval. A story generates your starter list from your master resume for you to approve.
+**Tags.** Master resume nodes can be tagged (many per node). For now only the two text node types, section text and subsection text, carry tags (section and subsection headings do not): the editor offers no tag editor on other nodes, and tags found on other nodes are ignored by the index and the matcher. A later story may derive a heading's tags from its children. Tags come from one shared, user-extensible vocabulary: canonical name, slug, category (language, framework, domain, role type), aliases. Aliases (for example "reactjs" for React, or "C++" for the tag whose slug is `c-plus-plus`) are managed through the API: add and remove an alias on a tag. An alias is any printable ASCII text, stored as typed and compared case-insensitively; it is unique per user and never equals another tag's slug or alias. Canonical slugs stay normalized (lowercase letters, digits and hyphens, with `+` mapped to `plus` and `#` to `sharp`, so C, C++ and C# are distinct). Node tags always store slugs.
 
 **Matching** is done by the web controller on each request, not by the Job List Manager. Order of build:
 
@@ -157,11 +162,11 @@ Recipes, not scripts: running LLM-written Python means executing untrusted code.
 | --- | --- |
 | Resume files | Immutable versioned files, temp file then atomic rename, one writer per resume via a per-resume lock |
 | Resume rows | Optimistic locking (`version`); a stale save returns 409 and the UI offers a reload |
-| File versus row | Write file first, then commit the row; never delete before commit; a reconciliation job removes orphans |
+| File versus row | Insert a `PENDING` `file_registry` row first, then write the file, then commit the resume row; the registry row becomes `COMMITTED` once a committed resume row references the file; never delete before commit; a scheduled reconciliation worker (Spring `@Scheduled`) removes orphans: `PENDING` rows older than a grace period with no referencing row get their file and row deleted, and `COMMITTED` rows whose file is missing are reported, never silently dropped |
 | Render | Idempotent on content hash; atomic cache writes; stateless renderer |
 | Daily run and ingest | Lock per source; unique (owner_user_id, url_hash) as final guard |
 | Tags | Unique (user_id, slug); get-or-create |
-| Sessions | Spring Session on Redis; no custom session state |
+| Sessions | Spring Session on Redis; no custom session state; CSRF token required on state-changing requests |
 | Board cards | Assign, then re-read |
 
 **Testing.** Fast loop (your machine, CI on every push): unit tests on H2 in PostgreSQL mode, Vitest for the frontend. Slow loop (when a feature is nearly complete and at each merge gate): Postgres tests via Testcontainers in Docker (`mvn verify -Ppostgres`). Anything using Postgres-only features (full-text, JSON columns, `SKIP LOCKED`, pgvector) and all concurrency tests are tagged `@Tag("postgres")`. End-to-end: Playwright in `/e2e`, run on `integration` only.
@@ -199,17 +204,19 @@ Roles: B Backend, F Frontend, J Job List Manager, I Integration, H you. **Depend
 | US-003 | B | OpenAPI v0: auth, master resume, tags, render; plus mock server script | none | none |
 | US-004 | B | CI (H2 unit tests per push, Postgres profile on demand, frontend job that runs once `frontend/` exists), board helper scripts (move epic to TODO, archive epic), list of `DUMMY` markers on pull requests | US-001 | Frontend skeleton (US-002) |
 | US-005 | B | Spring serves the Vite build with SPA fallback; multi-stage Dockerfile | US-001 | Vite build output (US-002): a placeholder `index.html` fixture for tests |
-| US-006 | B | Username and password sign-up, login, logout; Spring Session on Redis; `GET /api/me` | US-001, US-003 | none |
+| US-006 | B | Username and password sign-up, login, logout (CSRF tokens on, 72-byte password rule, username pattern); Spring Session on Redis; `GET /api/me` | US-001, US-003 | none |
 | US-007 | F | Login page, route guard, typed API client from OpenAPI | US-002, US-003 | Auth endpoints (US-006) |
 | US-008 | I | E2E: sign up, log in, log out | US-005, US-006, US-007 | none |
+| US-077 | F | API client sends the CSRF token (`X-XSRF-TOKEN`), obtains one before login, retries once on `csrf_invalid` | US-076 (contract) | Backend CSRF behaviour (US-006) |
+| US-076 | B | Contract fixes to OpenAPI v0 from the US-003 and US-006 reviews: full-hash PDF route, no version bump on identical save, restore 400, unknown tag slugs, same `contentHash`, CSRF mechanism, password and username rules | US-003 | none |
 | US-009 | B | Test setup: H2 profile, `postgres` Maven profile with Testcontainers, `@Tag("postgres")` convention | US-001 | none |
 
 ### Epic 1: Master resume (merge M1)
 
 | ID | Role | Story | Depends on | Dummy until ready |
 | --- | --- | --- | --- | --- |
-| US-010 | B | `FileStorage` plus local-disk implementation; immutable versions, atomic writes, per-resume lock, concurrency tests | US-001 | none |
-| US-011 | B | Resume tree model with tags, JSON schema, tree-to-LaTeX assembler with node markers | US-001 | none |
+| US-010 | B | `FileStorage` plus local-disk implementation; immutable versions, atomic writes, per-resume lock, Postgres `file_registry` with intent rows, `list(prefix)` served from the database, concurrency tests | US-001 | none |
+| US-011 | B | Resume tree model with tags, JSON schema, tree-to-LaTeX assembler with node markers, and creation of our derivative template from the Jake reference (one replaceable resource plus a decision record) | US-001 | none |
 | US-012 | B | Renderer container (TeX Live, no network, timeout) and spike proving Jake's template compiles | none | none |
 | US-013 | B | `POST /api/render` with cache, page count, error-to-node mapping | US-006, US-011, US-012 | none |
 | US-014 | B | Master resume read and write with version check (409), versions, restore; Jake-template starter tree | US-006, US-010, US-011 | none |
@@ -217,7 +224,7 @@ Roles: B Backend, F Frontend, J Job List Manager, I Integration, H you. **Depend
 | US-016 | F | Node LaTeX editor (CodeMirror) with snippet buttons | US-015 | none |
 | US-017 | F | PDF preview, debounced render (`RENDER_DEBOUNCE_MS`), "Render now" button, error panel, page counter | US-016, US-003 | Render endpoint (US-013) |
 | US-018 | F | Autosave, 409 conflict handling, version history UI | US-016, US-003 | Master resume endpoints (US-014) |
-| US-020 | B | Tag vocabulary: table, normalization, aliases, list and create endpoints | US-006, US-003 | none |
+| US-020 | B | Tag vocabulary: table, normalization, aliases (add and remove, via a contract story for the endpoints), list and create endpoints | US-006, US-003 | none |
 | US-021 | B | Tags on resume nodes: save, read, derived `resume_node_tag` index | US-014, US-020 | none |
 | US-022 | F | Tag editor on nodes | US-016, US-003 | Tag endpoints (US-020, US-021) |
 | US-023 | F | Placeholder content when a node is created | US-015 | none |
@@ -274,7 +281,7 @@ Roles: B Backend, F Frontend, J Job List Manager, I Integration, H you. **Depend
 
 | ID | Role | Story | Depends on | Dummy until ready |
 | --- | --- | --- | --- | --- |
-| US-070 | B | Backups for Postgres and `DATA_DIR`; orphan reconciliation | US-014, US-060 | none |
+| US-070 | B | Backups for Postgres and `DATA_DIR`; scheduled orphan reconciliation worker driven by `file_registry` | US-014, US-060 | none |
 | US-071 | B | Rate and size limits on render and ingest | US-013 | Ingest endpoint (US-041) |
 | US-072 | B | Structured logs and metrics for render and LLM usage | US-013 | Crawl records (US-035) |
 | US-073 | F | Loading, empty, and error states everywhere | US-067 | none |

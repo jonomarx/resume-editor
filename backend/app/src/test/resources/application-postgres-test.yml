@@ -1,0 +1,3 @@
+app:
+  storage:
+    data-dir: target/test-data/${random.uuid}

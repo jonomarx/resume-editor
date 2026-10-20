@@ -1,0 +1,40 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/resume}
+    username: ${DB_USER:resume}
+    password: ${DB_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  flyway:
+    locations: classpath:db/migration
+  web:
+    resources:
+      # The SPA config in app.resume.web.SpaWebConfig owns static serving.
+      add-mappings: false
+server:
+  servlet:
+    session:
+      cookie:
+        name: SESSION
+        http-only: true
+        same-site: lax
+app:
+  renderer:
+    url: ${RENDERER_URL:http://localhost:8081}
+    timeout-seconds: 30
+    connect-timeout-seconds: 3
+  render:
+    max-bytes: 1000000
+  resumes:
+    # Known limit from the US-014 review: how many orphaned storage keys (v3.json, v3-r1.json, ...) one version number may
+    # skip before a save fails; the reconciliation worker (US-070) removes orphans.
+    max-orphan-key-attempts: ${MAX_ORPHAN_KEY_ATTEMPTS:20}
+  storage:
+    type: ${FILE_STORAGE:local}
+    data-dir: ${DATA_DIR:./data}

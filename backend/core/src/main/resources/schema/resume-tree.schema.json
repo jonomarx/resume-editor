@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://resume-editor.local/schema/resume-tree.schema.json",
+  "description": "Resume tree (contract ResumeTree). Sections hold section_text or subsection nodes; a subsection holds only subsection_text bullets, so nothing nests deeper than one subsection level.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "header", "sections", "footer"],
+  "properties": {
+    "id": { "$ref": "#/definitions/nodeId" },
+    "header": { "$ref": "#/definitions/header" },
+    "sections": { "type": "array", "maxItems": 50, "items": { "$ref": "#/definitions/section" } },
+    "footer": { "$ref": "#/definitions/footer" }
+  },
+  "definitions": {
+    "nodeId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+    "slug": { "type": "string", "maxLength": 80, "description": "A vocabulary slug; whether it exists is checked against the user's tags (unknown slug names the node), not by the schema" },
+    "leafChildren": { "type": "array", "maxItems": 0 },
+    "header": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "type", "title", "latex", "tags", "children"],
+      "properties": {
+        "id": { "$ref": "#/definitions/nodeId" }, "type": { "const": "header" },
+        "title": { "type": "string", "maxLength": 200 }, "latex": { "type": "string", "maxLength": 20000 },
+        "tags": { "type": "array", "items": { "$ref": "#/definitions/slug" } },
+        "children": { "$ref": "#/definitions/leafChildren" }
+      }
+    },
+    "footer": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "type", "title", "latex", "tags", "children"],
+      "properties": {
+        "id": { "$ref": "#/definitions/nodeId" }, "type": { "const": "footer" },
+        "title": { "type": "string", "maxLength": 200 }, "latex": { "type": "string", "maxLength": 20000 },
+        "tags": { "type": "array", "items": { "$ref": "#/definitions/slug" } },
+        "children": { "$ref": "#/definitions/leafChildren" }
+      }
+    },
+    "sectionText": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "type", "title", "latex", "tags", "children"],
+      "properties": {
+        "id": { "$ref": "#/definitions/nodeId" }, "type": { "const": "section_text" },
+        "title": { "type": "string", "maxLength": 200 }, "latex": { "type": "string", "maxLength": 20000 },
+        "tags": { "type": "array", "items": { "$ref": "#/definitions/slug" } },
+        "children": { "$ref": "#/definitions/leafChildren" }
+      }
+    },
+    "subsectionText": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "type", "title", "latex", "tags", "children"],
+      "properties": {
+        "id": { "$ref": "#/definitions/nodeId" }, "type": { "const": "subsection_text" },
+        "title": { "type": "string", "maxLength": 200 }, "latex": { "type": "string", "maxLength": 20000 },
+        "tags": { "type": "array", "items": { "$ref": "#/definitions/slug" } },
+        "children": { "$ref": "#/definitions/leafChildren" }
+      }
+    },
+    "subsection": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "type", "title", "latex", "tags", "children"],
+      "properties": {
+        "id": { "$ref": "#/definitions/nodeId" }, "type": { "const": "subsection" },
+        "title": { "type": "string", "maxLength": 200 }, "latex": { "type": "string", "maxLength": 20000 },
+        "tags": { "type": "array", "items": { "$ref": "#/definitions/slug" } },
+        "children": { "type": "array", "maxItems": 200, "items": { "$ref": "#/definitions/subsectionText" } }
+      }
+    },
+    "section": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "type", "title", "latex", "tags", "children"],
+      "properties": {
+        "id": { "$ref": "#/definitions/nodeId" }, "type": { "const": "section" },
+        "title": { "type": "string", "maxLength": 200 }, "latex": { "type": "string", "maxLength": 20000 },
+        "tags": { "type": "array", "items": { "$ref": "#/definitions/slug" } },
+        "children": {
+          "type": "array", "maxItems": 200,
+          "items": { "oneOf": [ { "$ref": "#/definitions/sectionText" }, { "$ref": "#/definitions/subsection" } ] }
+        }
+      }
+    }
+  }
+}
