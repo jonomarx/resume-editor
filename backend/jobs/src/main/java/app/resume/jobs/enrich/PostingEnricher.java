@@ -1,6 +1,7 @@
 package app.resume.jobs.enrich;
 
-import app.resume.jobs.extract.ExtractionLlm;
+import app.resume.llm.LlmClient;
+import app.resume.llm.LlmRequest;
 import app.resume.vocabulary.TagVocabulary;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -28,14 +29,20 @@ public class PostingEnricher {
             Tags are short skill, technology, domain or role names the posting asks for. Copy requirements from the
             posting; do not invent any. Use null when the posting does not say.
             """.formatted(OPEN, CLOSE);
+    static final String SCHEMA = """
+            {"type":"object","required":["tags"],"properties":{"tags":{"type":"array","items":{"type":"object","required":["name","category"],
+            "properties":{"name":{"type":"string"},"category":{"enum":["language","framework","domain","role_type"]}}}},
+            "basicRequirements":{"type":["string","null"]},"preferredRequirements":{"type":["string","null"]},"season":{"type":["string","null"]},
+            "workAuthorization":{"type":["string","null"]},"classYear":{"type":["string","null"]}}}
+            """;
     static final int MAX_TEXT = 20_000;
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
-    private final ExtractionLlm llm;
+    private final LlmClient llm;
     private final TagVocabulary vocabulary;
 
-    public PostingEnricher(JdbcTemplate jdbc, TransactionTemplate tx, ExtractionLlm llm, TagVocabulary vocabulary) {
+    public PostingEnricher(JdbcTemplate jdbc, TransactionTemplate tx, LlmClient llm, TagVocabulary vocabulary) {
         this.jdbc = jdbc;
         this.tx = tx;
         this.llm = llm;
@@ -47,7 +54,7 @@ public class PostingEnricher {
         record Row(long owner, String title, String company, String location, String description) {}
         Row p = jdbc.queryForObject("SELECT owner_user_id, title, company, location, description FROM job_posting WHERE id = ?",
                 (rs, i) -> new Row(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5)), postingId);
-        Enrichment e = EnrichmentParser.parse(llm.complete(SYSTEM_PROMPT, userPrompt(p.title, p.company, p.location, p.description)));
+        Enrichment e = EnrichmentParser.parse(llm.completeJson(new LlmRequest(SYSTEM_PROMPT, userPrompt(p.title, p.company, p.location, p.description), 4000), SCHEMA));
 
         // Resolve outside the transaction; the vocabulary is read-only here.
         Set<Long> tagIds = new LinkedHashSet<>();

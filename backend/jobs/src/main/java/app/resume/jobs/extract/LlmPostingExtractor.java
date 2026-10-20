@@ -1,6 +1,8 @@
 package app.resume.jobs.extract;
 
 import app.resume.jobs.fetch.ExtractedPosting;
+import app.resume.llm.LlmClient;
+import app.resume.llm.LlmRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
@@ -14,7 +16,7 @@ import org.jsoup.nodes.Document;
  *
  * <p>Untrusted content rules: the page is reduced to visible text, truncated, wrapped in a random-free but
  * unforgeable-by-construction delimiter pair (any delimiter lookalike in the text is neutralized), and described to the
- * model as data. The model is given no tools (the {@link ExtractionLlm} interface has none). Its output is parsed as
+ * model as data. The model is given no tools (the {@link LlmRequest} has no tool field). Its output is parsed as
  * JSON and validated field by field; anything outside the schema is rejected as a whole, never repaired or executed.
  */
 public class LlmPostingExtractor {
@@ -36,16 +38,23 @@ public class LlmPostingExtractor {
             Include only postings that are actually on the page. If there are none, reply {"postings":[]}.
             """.formatted(OPEN, CLOSE);
 
+    /** Shape the model must return (checked by the LlmClient); parseAndValidate then applies the stricter sanity checks. */
+    static final String SCHEMA = """
+            {"type":"object","required":["postings"],"properties":{"postings":{"type":"array","items":{"type":"object","required":["title"],
+            "properties":{"title":{"type":"string"},"company":{"type":["string","null"]},"location":{"type":["string","null"]},
+            "description":{"type":["string","null"]},"url":{"type":["string","null"]},"datePosted":{"type":["string","null"]},
+            "employmentType":{"type":["string","null"]}}}}}}
+            """;
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private final ExtractionLlm llm;
+    private final LlmClient llm;
 
-    public LlmPostingExtractor(ExtractionLlm llm) {
+    public LlmPostingExtractor(LlmClient llm) {
         this.llm = llm;
     }
 
     public List<ExtractedPosting> extract(String pageHtml, String pageUrl) {
         String userPrompt = buildUserPrompt(pageHtml, pageUrl);
-        return parseAndValidate(llm.complete(SYSTEM_PROMPT, userPrompt), pageUrl);
+        return parseAndValidate(llm.completeJson(new LlmRequest(SYSTEM_PROMPT, userPrompt, 8000), SCHEMA), pageUrl);
     }
 
     static String buildUserPrompt(String pageHtml, String pageUrl) {

@@ -1,5 +1,6 @@
 package app.resume.jobs.crawl;
 
+import app.resume.jobs.support.StubLlmClient;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import app.resume.jobs.PostingNormalizer;
@@ -64,10 +65,10 @@ class CrawlLifecycleTests {
         ada = db.user("ada");
         db.jdbc.update("INSERT INTO job_source (user_id, name, url, url_hash) VALUES (?, 'Acme', 'https://acme.example/careers', 'sh')", ada);
         sourceId = db.jdbc.queryForObject("SELECT id FROM job_source", Long.class);
-        var llm = new LlmPostingExtractor((system, user) -> {
+        var llm = new LlmPostingExtractor(StubLlmClient.of((system, user) -> {
             if (llmOutput == null) throw new ExtractionOutputException("no output");
             return llmOutput;
-        });
+        }));
         crawl = new CrawlService(db.jdbc, fetcher, List.of(new GreenhouseAdapter(), new LeverAdapter(), new AshbyAdapter()), new JsonLdPostingAdapter(),
                 llm, null, () -> now, 2, 4);
         daily = new DailyRun(db.jdbc, new PostingValidityService(db.jdbc, new PostingValidityChecker(fetcher)), crawl);

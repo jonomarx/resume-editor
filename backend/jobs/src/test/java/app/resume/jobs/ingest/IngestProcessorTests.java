@@ -1,5 +1,6 @@
 package app.resume.jobs.ingest;
 
+import app.resume.jobs.support.StubLlmClient;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import app.resume.jobs.extract.LlmPostingExtractor;
@@ -33,10 +34,10 @@ class IngestProcessorTests {
         db = new JobsTestDb();
         ada = db.user("ada");
         PageFetcher fetcher = url -> pages.getOrDefault(url, new FetchResult(url, url, 404, "text/html", ""));
-        var llm = new LlmPostingExtractor((system, user) -> {
+        var llm = new LlmPostingExtractor(StubLlmClient.of((system, user) -> {
             llmCalls.add(new String[] {system, user});
             return llmOutput;
-        });
+        }));
         processor = new IngestProcessor(db.jdbc, fetcher, new JsonLdPostingAdapter(), llm, null, () -> now);
         service = new IngestService(db.jdbc, new PublicHostPolicy(), queue::add, processor, () -> now, 100);
     }

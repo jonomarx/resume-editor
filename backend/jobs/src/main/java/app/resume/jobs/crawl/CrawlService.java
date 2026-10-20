@@ -115,6 +115,10 @@ public class CrawlService {
             return failed(runId, sourceId, "fetch_failed", e.getMessage());
         } catch (ExtractionOutputException e) {
             return failed(runId, sourceId, "extraction_failed", e.getMessage());
+        } catch (app.resume.llm.LlmInvalidOutputException e) {
+            return failed(runId, sourceId, "extraction_failed", e.getMessage());
+        } catch (app.resume.llm.LlmException e) {
+            return failed(runId, sourceId, e.code(), e.getMessage()); // llm_unavailable, llm_budget_exceeded
         } catch (RuntimeException e) {
             log.error("crawl of source {} crashed", sourceId, e);
             return failed(runId, sourceId, "internal_error", "Unexpected error");

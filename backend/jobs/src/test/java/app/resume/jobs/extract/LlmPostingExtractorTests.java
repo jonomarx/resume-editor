@@ -1,5 +1,6 @@
 package app.resume.jobs.extract;
 
+import app.resume.jobs.support.StubLlmClient;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -13,10 +14,10 @@ class LlmPostingExtractorTests {
     final List<String[]> calls = new ArrayList<>();
 
     LlmPostingExtractor with(String modelOutput) {
-        return new LlmPostingExtractor((system, user) -> {
+        return new LlmPostingExtractor(StubLlmClient.of((system, user) -> {
             calls.add(new String[] {system, user});
             return modelOutput;
-        });
+        }));
     }
 
     static final String GOOD = "{\"postings\":[{\"title\":\"Data Intern\",\"company\":\"Acme\",\"location\":\"Austin, TX\","
@@ -101,9 +102,27 @@ class LlmPostingExtractorTests {
     }
 
     @Test
-    void theLlmInterfaceOffersNoToolChannel() {
-        // The only method is complete(system, user) -> String: there is nowhere to pass tools.
-        assertThat(ExtractionLlm.class.getDeclaredMethods()).hasSize(1);
-        assertThat(ExtractionLlm.class.getDeclaredMethods()[0].getParameterTypes()).containsExactly(String.class, String.class);
+    void theRequestAsksForSchemaCheckedJsonAndHasNoToolChannel() {
+        var seen = new java.util.ArrayList<app.resume.llm.LlmRequest>();
+        var client = new app.resume.llm.LlmClient() {
+            @Override public String complete(app.resume.llm.LlmRequest r) { throw new AssertionError("must use completeJson"); }
+            @Override public String completeJson(app.resume.llm.LlmRequest r, String schema) {
+                seen.add(r);
+                assertThat(schema).contains("\"postings\"");
+                return "{\"postings\":[]}";
+            }
+        };
+        new LlmPostingExtractor(client).extract("<p>x</p>", PAGE);
+        assertThat(seen).hasSize(1);
+        // LlmRequest is (systemPrompt, userPrompt, maxOutputTokens): there is nowhere to pass tools.
+        assertThat(app.resume.llm.LlmRequest.class.getRecordComponents()).extracting(c -> c.getName())
+                .containsExactly("systemPrompt", "userPrompt", "maxOutputTokens");
+    }
+
+    @Test
+    void llmFailuresPropagateWithTheirCodes() {
+        var down = new LlmPostingExtractor(StubLlmClient.of((s, u) -> { throw new app.resume.llm.LlmUnavailableException("provider down"); }));
+        assertThatThrownBy(() -> down.extract("<p>x</p>", PAGE)).isInstanceOf(app.resume.llm.LlmException.class)
+                .extracting(e -> ((app.resume.llm.LlmException) e).code()).isEqualTo("llm_unavailable");
     }
 }
