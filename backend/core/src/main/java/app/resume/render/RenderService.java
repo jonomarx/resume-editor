@@ -44,7 +44,7 @@ public class RenderService {
     private final ConcurrentHashMap<String, ReentrantLock> locks = new ConcurrentHashMap<>();
 
     public RenderService(LatexAssembler assembler, RendererClient renderer, RenderCache cache,
-            @Value("${app.render.max-bytes:1000000}") int maxBytes) {
+            @Value("${app.render.max-bytes}") int maxBytes) {
         this.assembler = assembler;
         this.renderer = renderer;
         this.cache = cache;
