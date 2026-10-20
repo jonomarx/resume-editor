@@ -298,3 +298,161 @@ test('sign-up: a control character in the password is a 400 on password; login t
   const ok72 = await fetch(`${base}/api/auth/signup`, { method: 'POST', headers: json, body: JSON.stringify({ username: 'ada', password: 'x'.repeat(72) }) });
   assert.equal(ok72.status, 201);
 });
+
+// ---- Contract v1 (US-028): sources, ingest, jobs, drafts, cutdown ----
+const call = (method, url, { body, prefer, headers } = {}) =>
+  fetch(`${base}${url}`, {
+    method,
+    headers: { ...json, ...(prefer ? { prefer } : {}), ...headers },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+const emptyTree = { id: 'r', header: { id: 'h', type: 'header', title: 'H', latex: '', tags: [], children: [] }, sections: [], footer: { id: 'f', type: 'footer', title: 'F', latex: '', tags: [], children: [] } };
+
+test('sources: list, create, update, delete, and the duplicate 409 names the existing source', async () => {
+  const list = await (await call('GET', '/api/sources')).json();
+  assert.ok(Array.isArray(list) && typeof list[0].url === 'string' && 'extractionTier' in list[0]);
+  const created = await call('POST', '/api/sources', { body: { url: 'https://acme.example/careers', name: 'Acme' }, prefer: 'code=201' });
+  assert.equal(created.status, 201);
+  assert.equal((await call('POST', '/api/sources', { body: { url: 'ftp://nope' } })).status, 400);
+  const dup = await call('POST', '/api/sources', { body: { url: 'https://acme.example/careers' }, prefer: 'code=409' });
+  assert.equal(dup.status, 409);
+  const dupBody = await dup.json();
+  assert.equal(dupBody.code, 'source_exists');
+  assert.equal(typeof dupBody.existingSourceId, 'number');
+  assert.equal((await call('GET', '/api/sources/3')).status, 200);
+  const upd = await call('PUT', '/api/sources/3', { body: { enabled: false } });
+  assert.equal(upd.status, 200);
+  assert.equal((await call('DELETE', '/api/sources/3')).status, 204);
+  assert.equal((await call('GET', '/api/sources/3', { prefer: 'code=404' })).status, 404);
+});
+
+test('source health: one entry per source with state and recent runs', async () => {
+  const health = await (await call('GET', '/api/source-health')).json();
+  assert.ok(health[0].source.id && ['never_run', 'healthy', 'degraded', 'failing'].includes(health[0].state));
+  assert.ok(Array.isArray(health[0].recentRuns) && health[0].lastRun.status);
+});
+
+test('ingest tokens: the secret appears only in the create response', async () => {
+  const created = await (await call('POST', '/api/ingest/tokens', { body: { label: 'Bookmarklet' }, prefer: 'code=201' })).json();
+  assert.match(created.token, /^ing_/);
+  const list = await (await call('GET', '/api/ingest/tokens')).json();
+  assert.ok(list.length && !('token' in list[0]));
+  assert.equal((await call('DELETE', '/api/ingest/tokens/5')).status, 204);
+});
+
+test('ingest: 202 with an event id, kinds are validated, a bearer token needs no CSRF header, duplicates are flagged', async () => {
+  const ok = await call('POST', '/api/ingest', { body: { kind: 'text', payload: 'Software Intern at Acme', sourceHint: null }, prefer: 'code=202, example=new' });
+  assert.equal(ok.status, 202);
+  const accepted = await ok.json();
+  assert.equal(typeof accepted.ingestEventId, 'number');
+  assert.equal(accepted.duplicate, false);
+  assert.equal((await call('POST', '/api/ingest', { body: { kind: 'pdf', payload: 'x' } })).status, 400);
+  assert.equal((await call('POST', '/api/ingest', { body: { kind: 'text' } })).status, 400);
+  // bearer token, no session cookie and no CSRF header
+  const bearer = await fetch(`${base}/api/ingest`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ing_abc' }, body: JSON.stringify({ kind: 'url', payload: 'https://acme.example/jobs/1' }) });
+  assert.equal(bearer.status, 202);
+  const dup = await call('POST', '/api/ingest', { body: { kind: 'text', payload: 'Software Intern at Acme' }, prefer: 'code=202, example=duplicate' });
+  assert.equal((await dup.json()).duplicate, true);
+  assert.equal((await call('POST', '/api/ingest', { body: { kind: 'text', payload: 'x' }, prefer: 'code=413' })).status, 413);
+  assert.equal((await call('POST', '/api/ingest', { body: { kind: 'text', payload: 'x' }, prefer: 'code=429' })).status, 429);
+});
+
+test('ingest events: list and read, a failed event carries an error', async () => {
+  assert.ok((await (await call('GET', '/api/ingest/events')).json()).length >= 1);
+  const failed = await (await call('GET', '/api/ingest/events/89', { prefer: 'example=failed' })).json();
+  assert.equal(failed.status, 'failed');
+  assert.equal(failed.error.code, 'fetch_failed');
+  assert.equal((await call('GET', '/api/ingest/events/9999', { prefer: 'code=404' })).status, 404);
+});
+
+test('jobs: feed page, detail with a fit explanation, status change', async () => {
+  const page = await (await call('GET', '/api/jobs?sort=fit&tag=java&tag=postgresql&status=new&limit=10')).json();
+  assert.ok(page.items[0].fitScore >= 0 && page.items[0].fitScore <= 100);
+  assert.equal(typeof page.total, 'number');
+  assert.equal((await call('GET', '/api/jobs?sort=best')).status, 400);
+  const detail = await (await call('GET', '/api/jobs/140')).json();
+  assert.ok(Array.isArray(detail.fit.matchedTags) && 'season' in detail.eligibility);
+  const status = await call('PUT', '/api/jobs/140/status', { body: { status: 'saved' } });
+  assert.equal(status.status, 200);
+  assert.equal((await call('PUT', '/api/jobs/140/status', { body: { status: 'maybe' } })).status, 400);
+});
+
+test('drafts: fork (201 or 200), read, save with include toggles, list, export, versions, restore', async () => {
+  assert.equal((await call('POST', '/api/jobs/140/drafts', { prefer: 'code=201' })).status, 201);
+  assert.equal((await call('POST', '/api/jobs/140/drafts', { prefer: 'code=200' })).status, 200);
+  const draft = await (await call('GET', '/api/drafts/21')).json();
+  assert.ok(Array.isArray(draft.excludedNodeIds) && draft.tree.header && draft.jobId);
+  assert.equal((await call('PUT', '/api/drafts/21', { body: { baseVersion: 3, tree: draft.tree, excludedNodeIds: ['n-exp-1-b2'], status: 'ready' } })).status, 200);
+  assert.equal((await call('PUT', '/api/drafts/21', { body: { baseVersion: 3, tree: emptyTree } })).status, 400); // excludedNodeIds is required
+  const stale = await call('PUT', '/api/drafts/21', { body: { baseVersion: 1, tree: emptyTree, excludedNodeIds: [] }, prefer: 'code=409' });
+  assert.equal((await stale.json()).code, 'version_conflict');
+  assert.equal((await (await call('GET', '/api/drafts?status=in_progress')).json())[0].status, 'in_progress');
+  assert.equal((await call('GET', '/api/drafts/21/export?format=tex')).status, 200);
+  assert.equal((await call('GET', '/api/drafts/21/export?format=docx')).status, 422); // Prism answers 422 for a bad required query value; the server answers 400
+  assert.equal((await call('GET', '/api/drafts/21/export?format=pdf', { prefer: 'code=422' })).status, 422);
+  assert.equal((await (await call('GET', '/api/drafts/21/versions')).json())[1].reason, 'before_cutdown');
+  assert.equal((await call('POST', '/api/drafts/21/versions/2/restore', { body: { baseVersion: 3 } })).status, 200);
+});
+
+test('cutdown: start (202), poll a ready run with per-node suggestions, apply, and the documented conflicts', async () => {
+  const started = await call('POST', '/api/drafts/21/cutdowns', { body: { baseVersion: 3, mode: 'deterministic' } });
+  assert.equal(started.status, 202);
+  assert.equal((await started.json()).status, 'queued');
+  assert.equal((await call('POST', '/api/drafts/21/cutdowns', { body: { baseVersion: 3, mode: 'magic' } })).status, 400);
+  const active = await call('POST', '/api/drafts/21/cutdowns', { body: { baseVersion: 3 }, prefer: 'code=409, example=active' });
+  assert.equal((await active.json()).code, 'cutdown_in_progress');
+  assert.equal((await call('POST', '/api/drafts/21/cutdowns', { body: { baseVersion: 3, mode: 'llm_tighten' }, prefer: 'code=429' })).status, 429);
+  assert.equal((await call('POST', '/api/drafts/21/cutdowns', { body: { baseVersion: 3, mode: 'llm_tighten' }, prefer: 'code=503' })).status, 503);
+  const run = await (await call('GET', '/api/drafts/21/cutdowns/7', { prefer: 'example=ready' })).json();
+  assert.equal(run.status, 'ready');
+  assert.equal(run.pageCountAfter, 1);
+  assert.deepEqual(run.suggestions.map((s) => s.kind), ['exclude', 'reword']);
+  assert.ok(run.suggestions[1].afterLatex && run.suggestions[0].afterLatex === null);
+  const failed = await (await call('GET', '/api/drafts/21/cutdowns/8', { prefer: 'example=failed' })).json();
+  assert.equal(failed.error.code, 'cannot_fit');
+  const applied = await call('POST', '/api/drafts/21/cutdowns/7/apply', { body: { acceptedSuggestionIds: ['s1', 's2'] } });
+  assert.equal(applied.status, 200);
+  assert.ok(Array.isArray((await applied.json()).excludedNodeIds));
+  const notReady = await call('POST', '/api/drafts/21/cutdowns/7/apply', { body: { acceptedSuggestionIds: [] }, prefer: 'code=409, example=notReady' });
+  assert.equal((await notReady.json()).code, 'cutdown_not_ready');
+});
+
+// ---- Contract v1 delta (US-028 owner decisions) ----
+test('ingest: the CORS preflight is documented (204, no credentials allowed) and needs no authentication', async () => {
+  const res = await fetch(`${base}/api/ingest`, { method: 'OPTIONS', headers: { origin: 'https://jobs.example', 'access-control-request-method': 'POST' } });
+  assert.equal(res.status, 204);
+});
+
+test('ingest: no credential, or an unknown or revoked bearer, is the same 401 unauthorized', async () => {
+  const none = await fetch(`${base}/api/ingest`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'text', payload: 'x' }) });
+  assert.equal(none.status, 401);
+  const noneBody = await none.json();
+  assert.equal(noneBody.code, 'unauthorized');
+  const revoked = await fetch(`${base}/api/ingest`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ing_revoked', prefer: 'code=401' }, body: JSON.stringify({ kind: 'text', payload: 'x' }) });
+  assert.equal(revoked.status, 401);
+  assert.deepEqual(await revoked.json(), noneBody);
+});
+
+test('cutdown: the 409 responses allow either body (anyOf), and afterLatex has a length limit', async () => {
+  const text = (await import('node:fs')).readFileSync(path.join(here, 'openapi.yaml'), 'utf8');
+  assert.ok(!text.includes('oneOf:'), 'oneOf would be ambiguous for a version_conflict body');
+  const spec = (await import('node:fs')).readFileSync(path.join(here, 'openapi.yaml'), 'utf8');
+  assert.match(spec, /afterLatex: \{ type: string, nullable: true, maxLength: 20000/);
+  const notReady = await call('POST', '/api/drafts/21/cutdowns/7/apply', { body: { acceptedSuggestionIds: [] }, prefer: 'code=409, example=stale' });
+  assert.equal((await notReady.json()).currentVersion, 4);
+});
+
+test('the contract states the SSRF, normalization, timeout, pruning and CORS rules', async () => {
+  const text = (await import('node:fs')).readFileSync(path.join(here, 'openapi.yaml'), 'utf8');
+  for (const needle of [
+    '169.254.169.254', 'every\n        redirect target is checked again', 'url_not_allowed', // SSRF
+    'drop the fragment', 'sort the remaining query parameters', // source URL normalization
+    '`timed_out`', '10 minutes', // stuck runs
+    'prunes the tree itself', 'whole subtree', // client pruning for render
+    'the only credential', 'never\n          `Access-Control-Allow-Credentials`', // bearer wins, CORS limits
+    'same body as a missing credential', // 401 for bad tokens
+    'validated on apply', 'same validation as a\n        draft save', // LLM latex validation
+  ]) {
+    assert.ok(text.includes(needle), needle);
+  }
+});
