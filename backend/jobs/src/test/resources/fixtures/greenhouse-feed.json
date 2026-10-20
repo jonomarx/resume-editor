@@ -1,0 +1,7 @@
+{"jobs":[
+ {"id":7789554,"title":"Software Engineer Intern, Summer 2027","company_name":"Airbnb","updated_at":"2026-09-29T20:00:54-04:00","first_published":"2026-04-13T04:49:05-04:00",
+  "absolute_url":"https://careers.example.com/positions/7789554?gh_jid=7789554","location":{"name":"Seattle, WA"},
+  "content":"&lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;Join us.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Java&lt;/li&gt;&lt;li&gt;SQL&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;"},
+ {"id":2,"title":"No Location Role","updated_at":"2026-09-01T00:00:00-04:00","absolute_url":"https://careers.example.com/2","location":null,"content":""},
+ {"id":3,"title":"","absolute_url":"https://careers.example.com/3"}
+],"meta":{"total":3}}
