@@ -96,8 +96,16 @@ public class FileRegistry {
         return rows.stream().findFirst();
     }
 
-    public boolean remove(String key) {
-        Integer n = own.execute(s -> jdbc.update("delete from file_registry where file_key = ?", key));
+    /**
+     * Compare-and-delete (own transaction): removes the row only if it still has the key, sha256 and state of
+     * {@code expected}, so a row that another process or instance changed meanwhile is never removed.
+     *
+     * @return whether a row was removed
+     */
+    public boolean removeIfUnchanged(Entry expected) {
+        Integer n = own.execute(s -> jdbc.update(
+                "delete from file_registry where file_key = ? and sha256 = ? and state = ?",
+                expected.key(), expected.sha256(), expected.state().name()));
         return n != null && n > 0;
     }
 
