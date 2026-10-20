@@ -69,6 +69,9 @@ public class LocalFileStorage implements FileStorage {
         });
     }
 
+    /** Test hook: runs inside delete, under the directory lock, after the file is removed and before the row is. */
+    protected void afterFileRemovedInDelete(String key) {}
+
     /** Test hook: runs after the PENDING row exists and before anything is written (a crash here leaves only the row). */
     protected void afterRegistered(String key) {}
 
@@ -123,18 +126,36 @@ public class LocalFileStorage implements FileStorage {
         }
     }
 
+    /**
+     * Deletes the file and its registry row under the same directory lock as {@link #put}, so a delete can never
+     * interleave with a write of the same key: read the row, remove the file (file first, so a file is never left
+     * without a row), then remove the row only if it is still the row that was read (key, sha256 and state), so a row
+     * another process or instance changed meanwhile is left alone. Idempotent; returns whether a file or a row was removed.
+     *
+     * <p>Failure semantics: there are no retries. If the row removal throws after the file was deleted, the exception
+     * propagates and the row is left describing a missing file; calling {@code delete} again completes the job (the
+     * file is already gone, the row is removed, and it returns true). The reconciliation worker (US-070) is the safety
+     * net for a row that is never retried.
+     *
+     * <p>Known limit (recorded on #57, covered by the US-070 reconciliation): the lock is per JVM. Another instance can
+     * re-register the key with identical bytes while the row is PENDING (the registry answers SAME_CONTENT and leaves the
+     * row unchanged); a delete in this instance can then still remove that row.
+     */
     @Override
     public boolean delete(String key) {
         Path target = resolve(key);
-        boolean fileRemoved = dirLocks.call(target.getParent().toString(), () -> {
+        return dirLocks.call(target.getParent().toString(), () -> {
+            Optional<FileRegistry.Entry> row = registry.find(key);
+            boolean fileRemoved;
             try {
-                return Files.deleteIfExists(target);
+                fileRemoved = Files.deleteIfExists(target);
             } catch (IOException e) {
                 throw new UncheckedIOException("cannot delete " + key, e);
             }
+            afterFileRemovedInDelete(key);
+            boolean rowRemoved = row.isPresent() && registry.removeIfUnchanged(row.get());
+            return fileRemoved || rowRemoved;
         });
-        boolean rowRemoved = registry.remove(key); // file first, then row: never leave a file nobody knows about
-        return fileRemoved || rowRemoved;
     }
 
     @Override
