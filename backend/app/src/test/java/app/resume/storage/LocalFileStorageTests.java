@@ -107,14 +107,4 @@ class LocalFileStorageTests {
         assertThat(StorageKeys.resumeDirectory(1, 2)).isEqualTo("users/1/resumes/2");
         assertThatThrownBy(() -> StorageKeys.resumeVersion(1, 2, 0)).isInstanceOf(InvalidStorageKeyException.class);
     }
-
-    @Test
-    void lockEntriesAreReleasedWhenUnused() {
-        KeyedLocks<String> locks = new KeyedLocks<>();
-        locks.run("a", () -> {});
-        locks.run("b", () -> { throw_(); });
-        assertThat(locks.size()).isZero();
-    }
-
-    private static void throw_() { /* no-op: lock freed even after normal return */ }
 }

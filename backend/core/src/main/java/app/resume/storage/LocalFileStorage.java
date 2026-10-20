@@ -1,5 +1,6 @@
 package app.resume.storage;
 
+import app.resume.locks.KeyedLocks;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
