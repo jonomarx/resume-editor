@@ -1,0 +1,124 @@
+name: E2E
+
+# End-to-end suite (e2e/) against the real stack: Postgres, Redis, the renderer and the app built from the root Dockerfile.
+# Not run on story branches: pushes to integration and pull requests into integration or main only.
+on:
+  push:
+    branches: [integration]
+    paths-ignore: ['docs/**', '**/*.md']
+  pull_request:
+    branches: [integration, main]
+    paths-ignore: ['docs/**', '**/*.md']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PNPM_VERSION: '12.14.0'
+
+jobs:
+  e2e:
+    name: Playwright end-to-end
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Generate throwaway credentials
+        run: |
+          # Generated per run, never stored: not secrets.
+          PW=$(openssl rand -hex 16)
+          echo "::add-mask::$PW"
+          echo "DB_PASSWORD=$PW" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the app image (root Dockerfile)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: resume-editor-app:e2e
+          cache-from: type=gha,scope=e2e-app
+          cache-to: type=gha,scope=e2e-app,mode=max
+
+      - name: Build the renderer image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./renderer
+          load: true
+          tags: resume-renderer:e2e
+          cache-from: type=gha,scope=e2e-renderer
+          cache-to: type=gha,scope=e2e-renderer,mode=max
+
+      - name: Start Postgres and Redis
+        run: docker compose -p e2e up -d --wait postgres redis
+
+      - name: Start the renderer (internal network, hardened like docker-compose.yml) and the app
+        run: |
+          docker network create --internal e2e-render
+          docker run -d --name renderer --network e2e-render --read-only --tmpfs /work:rw,size=64m,uid=10001 \
+            --cap-drop ALL --security-opt no-new-privileges --pids-limit 128 --memory 512m resume-renderer:e2e
+          docker run -d --name app --network e2e_default -p 8080:8080 \
+            -e DB_URL=jdbc:postgresql://postgres:5432/resume -e DB_PASSWORD -e REDIS_HOST=redis \
+            -e RENDERER_URL=http://renderer:8080 resume-editor-app:e2e
+          docker network connect e2e-render app
+          for i in $(seq 60); do
+            curl -sf http://localhost:8080/api/health && break
+            sleep 2
+          done
+          curl -sf http://localhost:8080/api/health
+
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: e2e/pnpm-lock.yaml
+
+      - name: Install dependencies and Chromium
+        working-directory: e2e
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+
+      - name: Run the suite
+        working-directory: e2e
+        run: pnpm test
+        env:
+          BASE_URL: http://localhost:8080
+
+      - name: Upload the Playwright report and traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 7
+
+      - name: Collect container logs
+        if: failure()
+        run: |
+          mkdir -p logs
+          docker logs app > logs/app.log 2>&1 || true
+          docker logs renderer > logs/renderer.log 2>&1 || true
+          docker compose -p e2e logs --no-color > logs/compose.log 2>&1 || true
+      - name: Upload container logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-logs
+          path: logs
+          retention-days: 7
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker rm -f app renderer || true
+          docker compose -p e2e down -v || true
+          docker network rm e2e-render || true
