@@ -22,7 +22,7 @@ A per-user web app where you keep one verbose LaTeX **master resume** (Jake's te
 | Component | Choice | Notes |
 | --- | --- | --- |
 | Web app | React, Vite, TypeScript, pnpm | Compiled to static files; Vitest for tests |
-| API server | Spring Boot (Java 21+), built with Maven | Spring Web, Security, Data JPA, Flyway, Spring Session |
+| API server | Spring Boot (Java 21+), built with Maven | Spring Web, Security, Data JPA, Flyway, Spring Session. Data access: Spring Data JPA for plain entity tables (users, and new tables that are simple CRUD); Spring JDBC (`JdbcTemplate`) for code that coordinates rows with files on disk, locks or explicit transactions: the file registry, the resume locks, the resume save and restore flow and the node tag index |
 | Database | Postgres | H2 (PostgreSQL mode) for fast local tests |
 | Sessions | Redis | Spring Session; HttpOnly, SameSite=Lax cookie; CSRF tokens on (`XSRF-TOKEN` cookie echoed in an `X-XSRF-TOKEN` header on every state-changing request) |
 | File storage | Local disk behind `FileStorage` | `FILE_STORAGE=local`; S3 later is a new implementation |
