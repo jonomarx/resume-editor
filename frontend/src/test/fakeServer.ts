@@ -3,11 +3,19 @@
 import { createHttpApi } from '../api/http'
 import type { Api, Credentials } from '../api/types'
 import { AUTH, CSRF } from '../config/constants'
+import { createFakeRender, type FakeRender } from './fakeRender'
+import { createFakeTags, type FakeTags } from './fakeTags'
+import { createFakeResume, type FakeResume } from './fakeResume'
 
 export interface FakeServer {
   fetch: typeof fetch
   /** Test hook: invalidate the current token as if the server had rotated it. */
   rotateToken(): void
+  resume: FakeResume
+  /** Test hook: the next sign-up is rejected with a 400 on `password`. */
+  rejectNextSignupPassword(message: string): void
+  render: FakeRender
+  tags: FakeTags
 }
 
 export function createFakeServer(): FakeServer {
@@ -16,6 +24,10 @@ export function createFakeServer(): FakeServer {
   let currentUserId: number | null = null
   let token = ''
   let counter = 0
+  let rejectPassword: string | null = null
+  const resume = createFakeResume()
+  const render = createFakeRender()
+  const tags = createFakeTags()
 
   const issueToken = () => {
     token = `fake-token-${++counter}`
@@ -36,7 +48,14 @@ export function createFakeServer(): FakeServer {
     if (method !== 'GET' && headers.get(CSRF.headerName) !== token) {
       return err(403, CSRF.invalidCode, 'Missing or invalid CSRF token')
     }
-    const body = init.body ? (JSON.parse(init.body as string) as Credentials) : undefined
+    const parsed = init.body ? JSON.parse(init.body as string) : undefined
+    const resumeReply = resume.handle(method, path, parsed)
+    if (resumeReply) return resumeReply
+    const renderReply = render.handle(method, path, parsed)
+    if (renderReply) return renderReply
+    const tagsReply = tags.handle(method, path, parsed)
+    if (tagsReply) return tagsReply
+    const body = parsed as Credentials | undefined
     if (path === '/api/auth/logout') {
       currentUserId = null
       return reply(204)
@@ -46,6 +65,13 @@ export function createFakeServer(): FakeServer {
     }
     const key = body.username.toLowerCase()
     if (path === '/api/auth/signup') {
+      const bytes = new TextEncoder().encode(body.password).length
+      // eslint-disable-next-line no-control-regex
+      if (rejectPassword || bytes > 72 || /[\u0000-\u001F\u007F]/.test(body.password)) {
+        const message = rejectPassword ?? 'must be at most 72 bytes and contain no control characters'
+        rejectPassword = null
+        return reply(400, { code: 'validation_failed', message: 'Request failed validation', details: [{ field: 'password', message }] })
+      }
       if (accounts.has(key)) return err(409, 'username_taken', 'That username is taken')
       const a = { id: nextId++, username: body.username, password: body.password }
       accounts.set(key, a)
@@ -65,6 +91,12 @@ export function createFakeServer(): FakeServer {
 
   return {
     fetch: ((input: RequestInfo | URL, init: RequestInit = {}) => handle(String(input), init)) as typeof fetch,
+    resume,
+    rejectNextSignupPassword: (m) => {
+      rejectPassword = m
+    },
+    render,
+    tags,
     rotateToken: () => {
       token = `rotated-${++counter}`
     },

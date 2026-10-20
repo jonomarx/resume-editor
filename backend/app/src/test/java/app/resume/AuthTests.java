@@ -28,7 +28,11 @@ class AuthTests {
     @Autowired JdbcTemplate jdbc;
 
     static String creds(String user, String pass) {
-        return "{\"username\":\"" + user + "\",\"password\":\"" + pass + "\"}";
+        StringBuilder esc = new StringBuilder(); // JSON-escape control characters (raw ones are malformed JSON)
+        for (char c : pass.toCharArray()) {
+            if (c < 0x20 || c == 0x7f) esc.append(String.format("\\u%04x", (int) c)); else esc.append(c);
+        }
+        return "{\"username\":\"" + user + "\",\"password\":\"" + esc + "\"}";
     }
 
     MockHttpServletResponse signUp(String user, String pass) throws Exception {
@@ -135,27 +139,60 @@ class AuthTests {
         mvc.perform(get("/api/anything-else")).andExpect(status().isUnauthorized());
     }
 
-    @Test
-    void passwordsAreTruncatedToTheirFirst72BytesAtSignUpAndLogin() throws Exception {
-        String base = "p".repeat(72);
-        assertThat(signUp("longpass", base + "-this-part-is-ignored").getStatus()).isEqualTo(201);
-        // only the first 72 bytes count, so the 72-byte prefix and any other tail both log in
-        assertThat(logIn("longpass", base).getStatus()).isEqualTo(200);
-        assertThat(logIn("longpass", base + "a-different-tail").getStatus()).isEqualTo(200);
-        assertThat(logIn("longpass", "q" + base.substring(1)).getStatus()).isEqualTo(401);
-        // very long passwords are not an error
-        assertThat(signUp("hugepass", "x".repeat(5000)).getStatus()).isEqualTo(201);
+    private void assertSignUpRejected(String user, String password, String message) throws Exception {
+        MockHttpServletResponse res = signUp(user, password);
+        assertThat(res.getStatus()).as(user).isEqualTo(400);
+        assertThat(res.getContentAsString()).contains("\"code\":\"validation_failed\"")
+                .contains("\"field\":\"password\"").contains(message);
+        assertThat(res.getCookie("SESSION")).isNull();
+        assertThat(logIn(user, "correct-horse-battery").getStatus()).as("nothing stored for " + user).isEqualTo(401);
     }
 
     @Test
-    void truncationNeverCutsAMultiByteCharacterInHalf() {
-        String euro = "\u20ac"; // 3 bytes in UTF-8; 24 of them are exactly 72 bytes
-        String exact = euro.repeat(24);
-        assertThat(AuthController.usablePassword(exact)).isEqualTo(exact);
-        // 71 ASCII bytes + one 3-byte char would straddle byte 72: the whole character is dropped
-        String straddle = "a".repeat(71) + euro + "tail";
-        assertThat(AuthController.usablePassword(straddle)).isEqualTo("a".repeat(71));
-        assertThat(AuthController.usablePassword("short")).isEqualTo("short");
+    void seventyTwoBytesAreAcceptedAndSeventyThreeAreRejectedWithoutTruncation() throws Exception {
+        String exact = "p".repeat(72);
+        assertThat(signUp("exact72", exact).getStatus()).isEqualTo(201);
+        assertThat(logIn("exact72", exact).getStatus()).isEqualTo(200);
+        assertSignUpRejected("over73", exact + "p", "must be at most 72 bytes in UTF-8");
+        // login with 73 bytes is a plain 401 and the 72-byte prefix account is not reachable with a longer tail
+        MockHttpServletResponse res = logIn("exact72", exact + "-tail");
+        assertThat(res.getStatus()).isEqualTo(401);
+        assertThat(res.getContentAsString()).contains("\"code\":\"bad_credentials\"");
+        assertThat(res.getCookie("SESSION")).isNull();
+        assertSignUpRejected("huge5000", "x".repeat(5000), "must be at most 72 bytes in UTF-8");
+    }
+
+    @Test
+    void multiByteCharactersCountByBytes() throws Exception {
+        assertThat(signUp("euro24", "\u20ac".repeat(24)).getStatus()).isEqualTo(201); // 72 bytes
+        assertSignUpRejected("euro25", "\u20ac".repeat(25), "at most 72 bytes");
+        assertSignUpRejected("twobyte40", "\u00e9".repeat(40), "at most 72 bytes"); // 40 characters, 80 bytes
+        assertSignUpRejected("straddle", "a".repeat(71) + "\u20ac", "at most 72 bytes"); // 74 bytes, never cut
+    }
+
+    @Test
+    void controlCharactersAreRejectedAtSignUpAndAre401AtLogin() throws Exception {
+        String[] bad = {"correct-horse\u0000battery", "correct-horse\tbattery", "correct-horse\nbattery",
+                "correct-horse\u007fbattery", "correct-horse-battery\r"};
+        int i = 0;
+        for (String pw : bad) {
+            assertSignUpRejected("ctrl" + i++, pw, "must not contain control characters");
+        }
+        signUp("ctrlok", "correct-horse-battery");
+        for (String pw : bad) {
+            MockHttpServletResponse res = logIn("ctrlok", pw);
+            assertThat(res.getStatus()).isEqualTo(401);
+            assertThat(res.getContentAsString()).contains("\"code\":\"bad_credentials\"");
+        }
+    }
+
+    @Test
+    void passwordsAreHashedAsRawBytesWithoutUnicodeNormalization() throws Exception {
+        String precomposed = "caf\u00e9-au-lait-2024"; // e with acute as one code point
+        String decomposed = "cafe\u0301-au-lait-2024"; // e + combining acute
+        assertThat(signUp("nfc", precomposed).getStatus()).isEqualTo(201);
+        assertThat(logIn("nfc", precomposed).getStatus()).isEqualTo(200);
+        assertThat(logIn("nfc", decomposed).getStatus()).isEqualTo(401);
     }
 
     @Test

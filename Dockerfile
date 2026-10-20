@@ -18,6 +18,11 @@ RUN mvn -q -B -DskipTests package -pl backend/app -am
 
 FROM eclipse-temurin:21-jre
 RUN useradd --system --uid 10001 --no-create-home app
+# Resume files and the render cache live in DATA_DIR. It exists in the image, owned by the app user, so the container
+# works out of the box as a non-root user; mount a volume at /data to keep the files (back up Postgres and DATA_DIR together).
+RUN mkdir -p /data && chown 10001:10001 /data
+ENV DATA_DIR=/data
+VOLUME /data
 WORKDIR /app
 COPY --from=backend /build/backend/app/target/app-*-SNAPSHOT.jar app.jar
 USER 10001
