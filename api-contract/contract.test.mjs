@@ -416,3 +416,43 @@ test('cutdown: start (202), poll a ready run with per-node suggestions, apply, a
   const notReady = await call('POST', '/api/drafts/21/cutdowns/7/apply', { body: { acceptedSuggestionIds: [] }, prefer: 'code=409, example=notReady' });
   assert.equal((await notReady.json()).code, 'cutdown_not_ready');
 });
+
+// ---- Contract v1 delta (US-028 owner decisions) ----
+test('ingest: the CORS preflight is documented (204, no credentials allowed) and needs no authentication', async () => {
+  const res = await fetch(`${base}/api/ingest`, { method: 'OPTIONS', headers: { origin: 'https://jobs.example', 'access-control-request-method': 'POST' } });
+  assert.equal(res.status, 204);
+});
+
+test('ingest: no credential, or an unknown or revoked bearer, is the same 401 unauthorized', async () => {
+  const none = await fetch(`${base}/api/ingest`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'text', payload: 'x' }) });
+  assert.equal(none.status, 401);
+  const noneBody = await none.json();
+  assert.equal(noneBody.code, 'unauthorized');
+  const revoked = await fetch(`${base}/api/ingest`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ing_revoked', prefer: 'code=401' }, body: JSON.stringify({ kind: 'text', payload: 'x' }) });
+  assert.equal(revoked.status, 401);
+  assert.deepEqual(await revoked.json(), noneBody);
+});
+
+test('cutdown: the 409 responses allow either body (anyOf), and afterLatex has a length limit', async () => {
+  const text = (await import('node:fs')).readFileSync(path.join(here, 'openapi.yaml'), 'utf8');
+  assert.ok(!text.includes('oneOf:'), 'oneOf would be ambiguous for a version_conflict body');
+  const spec = (await import('node:fs')).readFileSync(path.join(here, 'openapi.yaml'), 'utf8');
+  assert.match(spec, /afterLatex: \{ type: string, nullable: true, maxLength: 20000/);
+  const notReady = await call('POST', '/api/drafts/21/cutdowns/7/apply', { body: { acceptedSuggestionIds: [] }, prefer: 'code=409, example=stale' });
+  assert.equal((await notReady.json()).currentVersion, 4);
+});
+
+test('the contract states the SSRF, normalization, timeout, pruning and CORS rules', async () => {
+  const text = (await import('node:fs')).readFileSync(path.join(here, 'openapi.yaml'), 'utf8');
+  for (const needle of [
+    '169.254.169.254', 'every\n        redirect target is checked again', 'url_not_allowed', // SSRF
+    'drop the fragment', 'sort the remaining query parameters', // source URL normalization
+    '`timed_out`', '10 minutes', // stuck runs
+    'prunes the tree itself', 'whole subtree', // client pruning for render
+    'the only credential', 'never\n          `Access-Control-Allow-Credentials`', // bearer wins, CORS limits
+    'same body as a missing credential', // 401 for bad tokens
+    'validated on apply', 'same validation as a\n        draft save', // LLM latex validation
+  ]) {
+    assert.ok(text.includes(needle), needle);
+  }
+});

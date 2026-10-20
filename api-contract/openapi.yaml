@@ -627,8 +627,22 @@ paths:
       operationId: createSource
       summary: Add a career page
       description: |
-        The URL must be absolute `http` or `https`. It is normalized (tracking parameters and fragment removed, host
-        lower-cased) and a source whose normalized URL the user already has is rejected with 409 `source_exists`.
+        The URL must be absolute `http` or `https`. It is normalized and a source whose normalized URL the user already
+        has is rejected with 409 `source_exists`. Normalization (the same function the posting normalizer uses for
+        posting URLs, so Frontend can predict duplicates): lower-case the scheme and host; drop a default port (80 for
+        `http`, 443 for `https`); drop the fragment; drop the query parameters `utm_*`, `gclid`, `fbclid`, `mc_cid`,
+        `mc_eid`, `ref` and `ref_src`; sort the remaining query parameters by name; make an empty path `/` and remove a
+        trailing `/` from any other path; upper-case percent-encoding hex digits. Nothing else is rewritten (no `www.`
+        stripping, no `http` to `https` upgrade).
+
+        Only public targets are fetched (SSRF protection): the host must resolve to public addresses only. `localhost`,
+        loopback, link-local (including the cloud metadata address 169.254.169.254), private (RFC 1918, unique local),
+        carrier-grade NAT and other non-routable ranges are refused, for every address a name resolves to, and every
+        redirect target is checked again the same way (redirects are limited to 5 hops, `http` and `https` only).
+        A URL that is obviously not allowed (a literal IP address or `localhost` in a refused range) is rejected at once
+        with 400 `validation_failed` on `url`. A name that only resolves to a refused address is detected when it is
+        fetched: the crawl run fails (`CrawlRun.status` `failed`, `error` `url_not_allowed`).
+
         The source is crawled by the next daily run; creating it does not fetch anything.
       parameters:
         - { $ref: '#/components/parameters/XsrfToken' }
@@ -755,7 +769,9 @@ paths:
       summary: Create an ingest-only token
       description: |
         The secret is returned once, in `token`, and never again; only a hash is stored. The token can call
-        `POST /api/ingest` and the ingest event reads, nothing else.
+        `POST /api/ingest` and the ingest event reads, nothing else: on any other route a bearer token is 401. Tokens
+        can only be created, listed and revoked with a session. A bookmarklet runs inside the job page, so that page's
+        scripts can read the token; that is why it is ingest-only and revocable.
       parameters:
         - { $ref: '#/components/parameters/XsrfToken' }
       requestBody:
@@ -793,15 +809,51 @@ paths:
         '403': { $ref: '#/components/responses/CsrfInvalid' }
         '404': { $ref: '#/components/responses/NotFound' }
   /api/ingest:
+    options:
+      tags: [ingest]
+      operationId: ingestPreflight
+      summary: CORS preflight for the ingest bookmarklet
+      description: |
+        Answers the browser's preflight for `POST /api/ingest` without authentication and without CSRF: 204 with
+        `Access-Control-Allow-Origin: *`, `Access-Control-Allow-Methods: POST, OPTIONS`,
+        `Access-Control-Allow-Headers: Authorization, Content-Type` and `Access-Control-Max-Age: 600`; never
+        `Access-Control-Allow-Credentials`. No other path answers a preflight.
+      security: []
+      responses:
+        '204':
+          description: Preflight allowed
+          headers:
+            Access-Control-Allow-Origin: { schema: { type: string, enum: ['*'] } }
+            Access-Control-Allow-Methods: { schema: { type: string } }
+            Access-Control-Allow-Headers: { schema: { type: string } }
+            Access-Control-Max-Age: { schema: { type: integer } }
     post:
       tags: [ingest]
       operationId: ingestPosting
       summary: Hand the server a posting to process later
       description: |
         Authentication: a signed-in session (with the CSRF header like any state-changing call) or an ingest token sent
-        as `Authorization: Bearer <token>`. A request authenticated by a bearer token does not need the CSRF header (it
-        carries no cookie) and is answered with CORS headers (`Access-Control-Allow-Origin: *`, no credentials) so the
-        bookmarklet can post from the job page's origin; session-cookie requests are never CORS-enabled.
+        as `Authorization: Bearer <token>`.
+
+        - If a request has an `Authorization: Bearer` header, the bearer token is the only credential: any `SESSION`
+          cookie is ignored (never used as a fallback), the CSRF header is not required, and the request is handled as
+          a bearer request below even if the cookie is valid. Without the header, the session rules apply.
+        - A bearer request is answered with CORS headers (`Access-Control-Allow-Origin: *`, never
+          `Access-Control-Allow-Credentials`) so the bookmarklet can post from the job page's origin. This is the only
+          CORS exception in the API: session requests are never CORS-enabled (no CORS headers, preflight not answered
+          with an allowance), and no other route allows bearer tokens or cross-origin calls.
+        - The browser's preflight is `OPTIONS /api/ingest` (no credentials, no authentication needed); see that
+          operation.
+        - An unknown, malformed or revoked token is 401 `unauthorized`, with the same body as a missing credential, so
+          a response never tells which case it was. The 401 carries the same CORS headers.
+
+        For `kind: url` only public targets are fetched (SSRF protection): the host must resolve to public addresses only. `localhost`,
+        loopback, link-local (including the cloud metadata address 169.254.169.254), private (RFC 1918, unique local),
+        carrier-grade NAT and other non-routable ranges are refused, for every address a name resolves to, and every
+        redirect target is checked again the same way (redirects are limited to 5 hops, `http` and `https` only).
+        A URL that is obviously not allowed (a literal IP address or `localhost` in a refused range) is rejected at once
+        with 400 `validation_failed` on `payload`; a name that only resolves to a refused address is detected when the
+        event is processed: the event is `failed` with error code `url_not_allowed`.
 
         `kind` says what `payload` is: `url` (a posting URL to fetch), `html` (the page source), `text` (pasted
         text) or `email` (a forwarded email body). `sourceHint` is optional free text that helps extraction, typically
@@ -1075,6 +1127,12 @@ paths:
         exported document but stay in the tree, so a toggle can be switched back. Every id must exist in the tree (400
         otherwise). Header and footer cannot be excluded. `status` is optional and unchanged when omitted; the status
         is not part of the content hash.
+
+        Rendering with exclusions: `POST /api/render` is unchanged and takes only a tree, so a client that previews a
+        draft (live render, page meter) first prunes the tree itself: remove every node listed in `excludedNodeIds`
+        together with its whole subtree, and send the pruned tree. The server applies exactly the same rule to
+        `exportDraft` and to cutdown runs, so a client-pruned render and the export of the same draft are the same
+        document and the same page count.
       parameters:
         - { $ref: '#/components/parameters/XsrfToken' }
         - { $ref: '#/components/parameters/DraftId' }
@@ -1208,7 +1266,9 @@ paths:
         it changes nothing until `apply`.
 
         Only one run per draft is active at a time: starting another while one is `queued` or `running` is 409
-        `cutdown_in_progress`.
+        `cutdown_in_progress`. A run never blocks the draft forever: one still `queued` or `running` 10 minutes after
+        it was created (a crash, a lost worker, a hung renderer or LLM) is marked `failed` with error code
+        `timed_out` the next time it is read or a new run is started, after which a new run can start.
       parameters:
         - { $ref: '#/components/parameters/XsrfToken' }
         - { $ref: '#/components/parameters/DraftId' }
@@ -1234,7 +1294,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
+                anyOf:
                   - { $ref: '#/components/schemas/VersionConflictError' }
                   - { $ref: '#/components/schemas/Error' }
               examples:
@@ -1305,7 +1365,9 @@ paths:
         records the current content as a draft version (`reason: before_cutdown`) and then saves the result as a new
         version (`reason: cutdown_applied`), so the whole step is undone with `restoreDraftVersion`. Requires the run to
         be `ready` (else 409 `cutdown_not_ready`) and the draft still at the run's `baseVersion` (else 409
-        `version_conflict`). An unknown suggestion id is 400. Applying marks the run `applied`; applying twice is 409
+        `version_conflict`). An unknown suggestion id is 400. The result of applying (rewordings and exclusions) goes through the same validation as a
+        draft save (tags, `{{children}}` rules, `latex` length, node ids): if it fails, nothing is applied and the answer is
+        400 `validation_failed` with `details` naming the suggestion id (`field`). Applying marks the run `applied`; applying twice is 409
         `cutdown_not_ready`. An empty list applies nothing and discards the run (the draft is unchanged, 200).
       parameters:
         - { $ref: '#/components/parameters/XsrfToken' }
@@ -1334,7 +1396,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
+                anyOf:
                   - { $ref: '#/components/schemas/VersionConflictError' }
                   - { $ref: '#/components/schemas/Error' }
               examples:
@@ -1860,7 +1922,7 @@ components:
       type: object
       required: [url]
       properties:
-        url: { type: string, maxLength: 2000, pattern: '^https?://\S+$' }
+        url: { type: string, maxLength: 2000, pattern: '^https?://\S+$', description: 'Absolute http or https URL of a public host (see `createSource` for the normalization and the SSRF rules)' }
         name: { type: string, minLength: 1, maxLength: 100, description: Defaults to the URL's host }
     UpdateSourceRequest:
       type: object
@@ -2052,7 +2114,7 @@ components:
         excludedNodeIds:
           type: array
           items: { type: string }
-          description: Include toggles that are off (see `saveDraft`)
+          description: 'Include toggles that are off: the listed nodes and their subtrees are pruned from the tree before it is rendered, exported or cut down. Clients prune the same way before calling `POST /api/render` (see `saveDraft`).'
         tree: { $ref: '#/components/schemas/ResumeTree' }
     DraftSummary:
       type: object
@@ -2102,7 +2164,7 @@ components:
         reason: { type: string, description: 'Human-readable, safe to show' }
         score: { type: number, nullable: true, description: The node's relevance to the posting (0 to 1) }
         beforeLatex: { type: string, nullable: true, description: The node's latex now (`reword` only) }
-        afterLatex: { type: string, nullable: true, description: The proposed latex (`reword` only) }
+        afterLatex: { type: string, nullable: true, maxLength: 20000, description: 'The proposed latex (`reword` only); LLM-written, so untrusted: it is never executed and is validated on apply' }
     CutdownRun:
       type: object
       required: [id, draftId, baseVersion, mode, status, createdAt, pageCountBefore, pageCountAfter, suggestions, error]
@@ -2122,7 +2184,7 @@ components:
         error:
           type: object
           nullable: true
-          description: 'Present when `failed`: `cannot_fit` (the content that cannot be excluded is longer than one page), `renderer_unavailable`, `llm_unavailable`, `llm_budget_exceeded`'
+          description: 'Present when `failed`: `cannot_fit` (the content that cannot be excluded is longer than one page), `renderer_unavailable`, `llm_unavailable`, `llm_budget_exceeded`, `timed_out` (see `startCutdown`)'
           required: [code, message]
           properties:
             code: { type: string }
