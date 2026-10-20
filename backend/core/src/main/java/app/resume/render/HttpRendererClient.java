@@ -3,59 +3,72 @@ package app.resume.render;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
+import java.io.UncheckedIOException;
 import java.time.Duration;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
-/** Talks to the renderer over HTTP: POST /render with the LaTeX source as the body. URL from RENDERER_URL. */
+/**
+ * Talks to the renderer over HTTP with Spring's {@link RestClient}: POST /render with the LaTeX source as the UTF-8 text
+ * body. Built from the auto-configured builder (so Boot's customizers, observability and message converters apply), with
+ * the timeouts from {@link RendererProperties} applied through Boot's request factory settings.
+ */
 @Component
+@EnableConfigurationProperties(RendererProperties.class)
 public class HttpRendererClient implements RendererClient {
-    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
-    private final URI endpoint;
-    private final Duration timeout;
+    private static final MediaType TEXT_UTF8 = new MediaType("text", "plain", java.nio.charset.StandardCharsets.UTF_8);
+
+    private final RestClient client;
     private final ObjectMapper mapper;
 
-    public HttpRendererClient(@Value("${app.renderer.url}") String url,
-            @Value("${app.renderer.timeout-seconds:30}") long timeoutSeconds, ObjectMapper mapper) {
-        this.endpoint = URI.create(url.replaceAll("/+$", "") + "/render");
-        this.timeout = Duration.ofSeconds(timeoutSeconds);
+    @Autowired
+    public HttpRendererClient(RestClient.Builder builder, RendererProperties props, ObjectMapper mapper) {
+        this(builder.clone()
+                .baseUrl(props.url().replaceAll("/+$", ""))
+                .requestFactory(ClientHttpRequestFactoryBuilder.detect().build(ClientHttpRequestFactorySettings.defaults()
+                        .withConnectTimeout(Duration.ofSeconds(props.connectTimeoutSeconds()))
+                        .withReadTimeout(Duration.ofSeconds(props.timeoutSeconds()))))
+                .build(), mapper);
+    }
+
+    /** For tests: a ready-made client (for example bound to a MockRestServiceServer). */
+    HttpRendererClient(RestClient client, ObjectMapper mapper) {
+        this.client = client;
         this.mapper = mapper;
     }
 
     @Override
     public Outcome render(String tex) {
-        HttpRequest request = HttpRequest.newBuilder(endpoint).timeout(timeout)
-                .header("Content-Type", "text/plain; charset=utf-8")
-                .POST(HttpRequest.BodyPublishers.ofString(tex, StandardCharsets.UTF_8)).build();
         try {
-            HttpResponse<byte[]> res = http.send(request, HttpResponse.BodyHandlers.ofByteArray());
-            return switch (res.statusCode()) {
-                case 200 -> pdfOutcome(res);
-                case 422 -> new CompileError(logOf(res.body()));
-                case 413 -> new TooLarge();
-                case 504 -> new Unavailable("renderer timed out");
-                default -> new Unavailable("renderer answered " + res.statusCode());
-            };
-        } catch (IOException e) {
+            return client.post().uri("/render").contentType(TEXT_UTF8).body(tex).exchange((request, response) -> {
+                HttpStatusCode status = response.getStatusCode();
+                byte[] body = response.getBody().readAllBytes();
+                return switch (status.value()) {
+                    case 200 -> pdfOutcome(body, response.getHeaders().getFirst("X-Page-Count"));
+                    case 422 -> new CompileError(logOf(body));
+                    case 413 -> new TooLarge();
+                    case 504 -> new Unavailable("renderer timed out");
+                    default -> new Unavailable("renderer answered " + status.value());
+                };
+            });
+        } catch (RestClientException | UncheckedIOException e) { // connection refused, connect or read timeout, broken stream
             return new Unavailable("renderer unreachable");
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return new Unavailable("interrupted");
         }
     }
 
     /** A 200 without a usable X-Page-Count is a broken renderer, not a one-page document. */
-    private static Outcome pdfOutcome(HttpResponse<byte[]> res) {
-        String header = res.headers().firstValue("X-Page-Count").orElse(null);
+    private static Outcome pdfOutcome(byte[] body, String header) {
         try {
             int pages = Integer.parseInt(header == null ? "" : header.trim());
             if (pages < 1) return new Unavailable("renderer sent an invalid page count");
-            return new Pdf(res.body(), pages, "");
+            return new Pdf(body, pages, "");
         } catch (NumberFormatException e) {
             return new Unavailable("renderer sent a missing or non-numeric page count");
         }
