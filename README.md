@@ -36,12 +36,14 @@ docker run -d --name resume-app --network host -e DB_PASSWORD \
   -e DB_URL=jdbc:postgresql://localhost:5432/resume resume-editor-app
 ```
 
-Open http://localhost:8080. The root `Dockerfile` builds the frontend, bakes it into the Spring jar, and runs it. Stop with:
+Open http://localhost:8080. The root `Dockerfile` builds the frontend, bakes it into the Spring jar, and runs it as the non-root user `app` (uid 10001). Stop with:
 
 ```sh
 docker rm -f resume-app
 docker compose down -v
 ```
+
+**Data directory.** Resume files and the render cache are written to `DATA_DIR`, which is `/data` in the image: it exists, is owned by the app user, and is declared a `VOLUME`, so the container works with no extra flags (a fresh anonymous volume is created per `docker run`). To keep the files across containers mount a named volume or a host directory writable by uid 10001, for example `-v resume-data:/data`; a host directory needs `chown 10001:10001`. Back up Postgres and `DATA_DIR` together. Outside Docker, `DATA_DIR` defaults to `./data`.
 
 ### Dev loop (Vite on :5173, API on :8080)
 
