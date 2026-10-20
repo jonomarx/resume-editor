@@ -178,3 +178,34 @@ export const PASSWORD_MESSAGES = {
   /** Shown when the server rejects the password with a 400 that has no usable detail text. */
   rejected: 'The server did not accept this password.',
 } as const
+
+export const SOURCES_LABELS = {
+  heading: 'Career page sources',
+  intro: 'Companies whose career pages are crawled once a day.',
+  none: 'No sources yet. Add a career page below.',
+  urlLabel: 'Career page URL',
+  nameLabel: 'Name (optional)',
+  add: 'Add source',
+  rename: 'Rename',
+  save: 'Save',
+  cancel: 'Cancel',
+  enabled: 'Enabled',
+  remove: 'Delete',
+  confirmRemove: 'Confirm delete',
+  removeNote: 'Postings already found stay in the feed.',
+  neverCrawled: 'Never crawled',
+  lastCrawl: (when: string) => `Last crawl ${when}`,
+  postings: (active: number, stale: number) => `${active} active, ${stale} stale postings`,
+  lastRun: (added: number, updated: number, closed: number) => `Last run: ${added} added, ${updated} updated, ${closed} closed`,
+  lastRunFailed: (error: string | null) => `Last run failed${error ? `: ${error}` : ''}`,
+  history: 'Recent runs',
+  exists: 'You already have this source.',
+  loadFailed: 'Could not load sources.',
+  actionFailed: 'That did not work. Try again.',
+  states: {
+    never_run: 'Not crawled yet',
+    healthy: 'Healthy',
+    degraded: 'Last run failed',
+    failing: 'Failing',
+  },
+} as const

@@ -76,3 +76,27 @@ describe('csrf handling', () => {
     expect(await spied().api.auth.getMe()).toBeNull()
   })
 })
+
+describe('httpApi.sources', () => {
+  it('uses the contract paths and methods', async () => {
+    const calls: [string, string][] = []
+    const f = vi.fn(async (path: RequestInfo | URL, init: RequestInit = {}) => {
+      calls.push([init.method ?? 'GET', String(path)])
+      return new Response(init.method === 'DELETE' ? null : '[]', { status: init.method === 'DELETE' ? 204 : 200, headers: {} })
+    }) as unknown as typeof fetch
+    document.cookie = 'XSRF-TOKEN=t; path=/'
+    const api = createHttpApi(f)
+    await api.sources.list()
+    await api.sources.health()
+    await api.sources.create('https://a.example/x')
+    await api.sources.update(5, { enabled: false })
+    await api.sources.remove(5)
+    expect(calls).toEqual([
+      ['GET', '/api/sources'],
+      ['GET', '/api/source-health'],
+      ['POST', '/api/sources'],
+      ['PUT', '/api/sources/5'],
+      ['DELETE', '/api/sources/5'],
+    ])
+  })
+})
