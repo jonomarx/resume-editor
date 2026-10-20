@@ -123,18 +123,31 @@ public class LocalFileStorage implements FileStorage {
         }
     }
 
+    /**
+     * Deletes the file and its registry row under the same directory lock as {@link #put}, so a delete can never
+     * interleave with a write of the same key: read the row, remove the file (file first, so a file is never left
+     * without a row), then remove the row only if it is still the row that was read (key, sha256 and state), so a row
+     * another process or instance changed meanwhile is left alone. Idempotent; returns whether a file or a row was removed.
+     *
+     * <p>Failure semantics: there are no retries. If the row removal throws after the file was deleted, the exception
+     * propagates and the row is left describing a missing file; calling {@code delete} again completes the job (the
+     * file is already gone, the row is removed, and it returns true). The reconciliation worker (US-070) is the safety
+     * net for a row that is never retried.
+     */
     @Override
     public boolean delete(String key) {
         Path target = resolve(key);
-        boolean fileRemoved = dirLocks.call(target.getParent().toString(), () -> {
+        return dirLocks.call(target.getParent().toString(), () -> {
+            Optional<FileRegistry.Entry> row = registry.find(key);
+            boolean fileRemoved;
             try {
-                return Files.deleteIfExists(target);
+                fileRemoved = Files.deleteIfExists(target);
             } catch (IOException e) {
                 throw new UncheckedIOException("cannot delete " + key, e);
             }
+            boolean rowRemoved = row.isPresent() && registry.removeIfUnchanged(row.get());
+            return fileRemoved || rowRemoved;
         });
-        boolean rowRemoved = registry.remove(key); // file first, then row: never leave a file nobody knows about
-        return fileRemoved || rowRemoved;
     }
 
     @Override

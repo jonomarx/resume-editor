@@ -13,6 +13,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
@@ -22,6 +24,8 @@ class LocalFileStorageTests {
 
     @TempDir Path dir;
     @Autowired FileRegistry registry;
+    @Autowired JdbcTemplate jdbc;
+    @Autowired PlatformTransactionManager txManager;
     LocalFileStorage storage;
     long uid;
     String key;
@@ -106,5 +110,52 @@ class LocalFileStorageTests {
         assertThat(StorageKeys.resumeVersion(1, 2, 3)).isEqualTo("users/1/resumes/2/v3.json");
         assertThat(StorageKeys.resumeDirectory(1, 2)).isEqualTo("users/1/resumes/2");
         assertThatThrownBy(() -> StorageKeys.resumeVersion(1, 2, 0)).isInstanceOf(InvalidStorageKeyException.class);
+    }
+
+    @Test
+    void deleteRemovesTheRegistryRowToo() {
+        storage.put(key, b("x"));
+        assertThat(registry.find(key)).isPresent();
+        assertThat(storage.delete(key)).isTrue();
+        assertThat(registry.find(key)).isEmpty();
+    }
+
+    @Test
+    void deleteOfARowWithoutAFileRemovesTheRowAndReturnsTrue() {
+        storage.put(key, b("x"));
+        Path file = Path.of(storage.put(key, b("x")));
+        try { Files.delete(file); } catch (java.io.IOException e) { throw new RuntimeException(e); }
+        assertThat(storage.delete(key)).isTrue();
+        assertThat(registry.find(key)).isEmpty();
+        assertThat(storage.delete(key)).isFalse();
+    }
+
+    @Test
+    void deleteRetriedAfterAFailedRowRemovalCompletesTheJob() {
+        java.util.concurrent.atomic.AtomicBoolean failNext = new java.util.concurrent.atomic.AtomicBoolean(true);
+        FileRegistry flaky = new FileRegistry(jdbc, txManager) {
+            @Override public boolean removeIfUnchanged(Entry expected) {
+                if (failNext.getAndSet(false)) throw new IllegalStateException("simulated row removal failure");
+                return super.removeIfUnchanged(expected);
+            }
+        };
+        LocalFileStorage s = new LocalFileStorage(dir, flaky);
+        s.put(key, b("x"));
+        assertThatThrownBy(() -> s.delete(key)).isInstanceOf(IllegalStateException.class);
+        assertThat(s.exists(key)).as("the file was removed first").isFalse();
+        assertThat(flaky.find(key)).as("the row is left describing a missing file").isPresent();
+        assertThat(s.delete(key)).isTrue(); // idempotent: finishes the job
+        assertThat(flaky.find(key)).isEmpty();
+        assertThat(s.delete(key)).isFalse();
+    }
+
+    @Test
+    void aRowChangedAfterItWasReadIsNotRemoved() {
+        storage.put(key, b("x"));
+        FileRegistry.Entry stale = registry.find(key).orElseThrow();
+        jdbc.update("update file_registry set state = 'COMMITTED' where file_key = ?", key); // another process moved on
+        assertThat(registry.removeIfUnchanged(stale)).isFalse();
+        assertThat(registry.find(key)).isPresent();
+        assertThat(registry.removeIfUnchanged(registry.find(key).orElseThrow())).isTrue();
     }
 }
