@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import app.resume.jobs.extract.ExtractionOutputException;
+import app.resume.vocabulary.TagVocabulary;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -29,7 +30,12 @@ class PostingEnricherTests {
     String modelOutput;
     PostingEnricher enricher;
 
-    final TagVocabulary vocabulary = (user, name) -> Optional.ofNullable(vocab.get(Slugs.slug(name)));
+    final TagVocabulary vocabulary = new TagVocabulary() {
+        @Override public Optional<Long> resolve(long user, String name) { return Optional.ofNullable(vocab.get(Slugs.slug(name))); }
+        @Override public Optional<app.resume.vocabulary.VocabularyTag> find(long user, String name) { throw new UnsupportedOperationException(); }
+        @Override public Optional<app.resume.vocabulary.VocabularyTag> findBySlug(long user, String slug) { throw new UnsupportedOperationException(); }
+        @Override public List<app.resume.vocabulary.VocabularyTag> list(long user, app.resume.vocabulary.VocabularyCategory c) { throw new UnsupportedOperationException(); }
+    };
 
     static String fixture(String name) throws Exception {
         try (var in = PostingEnricherTests.class.getResourceAsStream("/fixtures/" + name)) {
