@@ -122,7 +122,6 @@ class LocalFileStorageTests {
 
     @Test
     void deleteOfARowWithoutAFileRemovesTheRowAndReturnsTrue() {
-        storage.put(key, b("x"));
         Path file = Path.of(storage.put(key, b("x")));
         try { Files.delete(file); } catch (java.io.IOException e) { throw new RuntimeException(e); }
         assertThat(storage.delete(key)).isTrue();
@@ -157,5 +156,35 @@ class LocalFileStorageTests {
         assertThat(registry.removeIfUnchanged(stale)).isFalse();
         assertThat(registry.find(key)).isPresent();
         assertThat(registry.removeIfUnchanged(registry.find(key).orElseThrow())).isTrue();
+    }
+
+    @Test
+    void aPutOfTheSameBytesCannotSlipInBetweenTheFileRemovalAndTheRowRemovalOfADelete() throws Exception {
+        // With identical bytes register() answers SAME_CONTENT and leaves the row alone, so only the directory lock keeps
+        // the delete from removing the row of the file the put is about to write.
+        java.util.concurrent.CountDownLatch parked = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        LocalFileStorage parking = new LocalFileStorage(dir, registry) {
+            @Override protected void afterFileRemovedInDelete(String k) {
+                parked.countDown();
+                try { release.await(10, java.util.concurrent.TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            }
+        };
+        parking.put(key, b("same"));
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var deleting = pool.submit(() -> parking.delete(key));
+            assertThat(parked.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            var putting = pool.submit(() -> parking.put(key, b("same")));
+            Thread.sleep(500); // without the lock the put finishes now, while the delete is parked
+            release.countDown();
+            deleting.get(10, java.util.concurrent.TimeUnit.SECONDS);
+            putting.get(10, java.util.concurrent.TimeUnit.SECONDS);
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
+        }
+        assertThat(parking.exists(key)).isTrue();
+        assertThat(registry.find(key)).as("a file never exists without its row").isPresent();
     }
 }

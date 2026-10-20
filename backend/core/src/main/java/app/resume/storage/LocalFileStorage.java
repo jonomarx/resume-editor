@@ -69,6 +69,9 @@ public class LocalFileStorage implements FileStorage {
         });
     }
 
+    /** Test hook: runs inside delete, under the directory lock, after the file is removed and before the row is. */
+    protected void afterFileRemovedInDelete(String key) {}
+
     /** Test hook: runs after the PENDING row exists and before anything is written (a crash here leaves only the row). */
     protected void afterRegistered(String key) {}
 
@@ -133,6 +136,10 @@ public class LocalFileStorage implements FileStorage {
      * propagates and the row is left describing a missing file; calling {@code delete} again completes the job (the
      * file is already gone, the row is removed, and it returns true). The reconciliation worker (US-070) is the safety
      * net for a row that is never retried.
+     *
+     * <p>Known limit (recorded on #57, covered by the US-070 reconciliation): the lock is per JVM. Another instance can
+     * re-register the key with identical bytes while the row is PENDING (the registry answers SAME_CONTENT and leaves the
+     * row unchanged); a delete in this instance can then still remove that row.
      */
     @Override
     public boolean delete(String key) {
@@ -145,6 +152,7 @@ public class LocalFileStorage implements FileStorage {
             } catch (IOException e) {
                 throw new UncheckedIOException("cannot delete " + key, e);
             }
+            afterFileRemovedInDelete(key);
             boolean rowRemoved = row.isPresent() && registry.removeIfUnchanged(row.get());
             return fileRemoved || rowRemoved;
         });
