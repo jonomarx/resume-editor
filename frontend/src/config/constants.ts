@@ -168,3 +168,13 @@ export const TAG_ERRORS = {
   network: 'Could not reach the server. Check your connection and try again.',
   generic: 'The tag could not be created. Try again.',
 } as const
+
+/** Sign-up password limit: the hashing algorithm only uses the first 72 UTF-8 bytes, so more is rejected, not truncated. */
+export const PASSWORD_MAX_BYTES = 72
+
+export const PASSWORD_MESSAGES = {
+  tooLong: `Passwords can be at most ${PASSWORD_MAX_BYTES} bytes. Accented letters, symbols and emoji take 2 to 4 bytes each, so shorten it.`,
+  controlCharacter: 'The password cannot contain control characters (such as tab or newline).',
+  /** Shown when the server rejects the password with a 400 that has no usable detail text. */
+  rejected: 'The server did not accept this password.',
+} as const
