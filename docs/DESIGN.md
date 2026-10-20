@@ -35,7 +35,7 @@ No load balancer. Deployment target: Docker containers on another of your machin
 
 **How React is served.** Spring Boot serves the compiled Vite build from the same origin (no CORS, simple cookie sessions). Vite is the frontend build tool: a fast dev server with instant reload, and a production bundler that outputs static files. In dev, Vite runs on :5173 and proxies `/api` to Spring on :8080. In prod, a multi-stage Dockerfile builds `frontend/` and copies `dist/` into the jar's `static/`; a controller forwards non-`/api`, non-asset paths to `index.html`; hashed assets are cached long, `index.html` never. No server-side rendering.
 
-**Sign-in rules.** Usernames match `^[A-Za-z0-9_.-]{3,40}$` and are unique case-insensitively (database constraint). Passwords are at least 8 characters, and only their first 72 bytes (UTF-8, never splitting a character) are used, the same way at sign-up and login (BCrypt's limit). State-changing requests without a valid CSRF token get `403 csrf_invalid`. The contract (`api-contract/openapi.yaml`) defines the exact mechanism.
+**Sign-in rules.** Usernames match `^[A-Za-z0-9_.-]{3,40}$` and are unique case-insensitively (database constraint). Passwords are at least 8 characters and at most 72 bytes in UTF-8 (BCrypt's limit); a longer password is rejected at sign-up with 400 `validation_failed` on `password`, and at login it is the same 401 as any wrong password, so nothing is ever silently truncated. State-changing requests without a valid CSRF token get `403 csrf_invalid`. The contract (`api-contract/openapi.yaml`) defines the exact mechanism.
 
 **Repository layout**
 
