@@ -35,8 +35,7 @@ public class TagService {
         if (slug.isEmpty() || slug.length() > TagNormalizer.MAX_SLUG_LENGTH) {
             throw new IllegalArgumentException("name does not produce a valid tag");
         }
-        Optional<Tag> existing = findByKey(userId, TagNormalizer.aliasKey(name));
-        if (existing.isEmpty()) existing = findByKey(userId, slug);
+        Optional<Tag> existing = lookupBySlug(userId, name, slug);
         if (existing.isPresent()) {
             return new CreateResult(existing.get(), false);
         }
@@ -47,6 +46,17 @@ public class TagService {
             // another request created the same slug (or alias) first; its row wins
             return new CreateResult(findByKey(userId, slug).orElseThrow(() -> lostRace), false);
         }
+    }
+
+    /** The tag a name, slug or alias resolves to (alias keys first, then the computed slug), or empty. Never creates. */
+    public Optional<Tag> lookup(long userId, String name) {
+        if (name == null || name.isBlank()) return Optional.empty();
+        return lookupBySlug(userId, name, TagNormalizer.slug(name));
+    }
+
+    private Optional<Tag> lookupBySlug(long userId, String name, String slug) {
+        Optional<Tag> existing = findByKey(userId, TagNormalizer.aliasKey(name));
+        return existing.isPresent() || slug.isEmpty() ? existing : findByKey(userId, slug);
     }
 
     private Tag insert(long userId, String name, String slug, TagCategory category) {
