@@ -64,7 +64,15 @@ class AuthTests {
         MockHttpServletResponse res = signUp("cookieuser", "correct-horse-battery");
         List<String> setCookies = res.getHeaders("Set-Cookie");
         String header = setCookies.stream().filter(h -> h.startsWith("SESSION=")).findFirst().orElseThrow();
-        assertThat(header).contains("HttpOnly").contains("SameSite=Lax");
+        assertThat(header).contains("HttpOnly").contains("SameSite=Lax").doesNotContain("Secure");
+    }
+
+    @Test
+    void xsrfCookieIsSameSiteLaxAndNotHttpOnlyAndNotSecureByDefault() throws Exception {
+        MockHttpServletResponse res = mvc.perform(get("/api/me")).andReturn().getResponse();
+        List<String> setCookies = res.getHeaders("Set-Cookie");
+        String header = setCookies.stream().filter(h -> h.startsWith("XSRF-TOKEN=")).findFirst().orElseThrow();
+        assertThat(header).contains("SameSite=Lax").doesNotContain("HttpOnly").doesNotContain("Secure");
     }
 
     @Test

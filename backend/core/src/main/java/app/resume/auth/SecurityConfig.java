@@ -7,10 +7,14 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import jakarta.servlet.http.HttpServletResponseWrapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -38,6 +42,13 @@ import org.springframework.security.web.context.SecurityContextRepository;
  */
 @Configuration
 public class SecurityConfig {
+    private final boolean sessionCookieSecure;
+
+    public SecurityConfig(
+            @Value("${server.servlet.session.cookie.secure:${SESSION_COOKIE_SECURE:false}}") boolean sessionCookieSecure) {
+        this.sessionCookieSecure = sessionCookieSecure;
+    }
+
     @Bean
     PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -104,10 +115,59 @@ public class SecurityConfig {
         }
     }
 
+    static class SameSiteCookieCsrfTokenRepository implements CsrfTokenRepository {
+        private final CookieCsrfTokenRepository delegate;
+        private final boolean secure;
+
+        SameSiteCookieCsrfTokenRepository(CookieCsrfTokenRepository delegate, boolean secure) {
+            this.delegate = delegate;
+            this.secure = secure;
+        }
+
+        @Override
+        public CsrfToken generateToken(HttpServletRequest request) {
+            return delegate.generateToken(request);
+        }
+
+        @Override
+        public void saveToken(CsrfToken token, HttpServletRequest request, HttpServletResponse response) {
+            delegate.saveToken(token, request, new HttpServletResponseWrapper(response) {
+                @Override
+                public void addCookie(jakarta.servlet.http.Cookie cookie) {
+                    if ("XSRF-TOKEN".equals(cookie.getName())) {
+                        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie
+                                .from(cookie.getName(), cookie.getValue())
+                                .path(cookie.getPath() != null ? cookie.getPath() : "/")
+                                .httpOnly(cookie.isHttpOnly())
+                                .secure(secure)
+                                .sameSite("Lax");
+                        if (cookie.getMaxAge() >= 0) {
+                            builder.maxAge(cookie.getMaxAge());
+                        }
+                        if (cookie.getDomain() != null) {
+                            builder.domain(cookie.getDomain());
+                        }
+                        response.addHeader(HttpHeaders.SET_COOKIE, builder.build().toString());
+                    } else {
+                        super.addCookie(cookie);
+                    }
+                }
+            });
+        }
+
+        @Override
+        public CsrfToken loadToken(HttpServletRequest request) {
+            return delegate.loadToken(request);
+        }
+    }
+
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityContextRepository repo,
             AuthenticationEntryPoint entryPoint, AccessDeniedHandler deniedHandler) throws Exception {
-        CookieCsrfTokenRepository csrfRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        CookieCsrfTokenRepository cookieRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        cookieRepo.setSecure(sessionCookieSecure);
+        cookieRepo.setCookieCustomizer(c -> c.sameSite("Lax").secure(sessionCookieSecure));
+        CsrfTokenRepository csrfRepository = new SameSiteCookieCsrfTokenRepository(cookieRepo, sessionCookieSecure);
         http.csrf(c -> c
                         .csrfTokenRepository(csrfRepository)
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()))

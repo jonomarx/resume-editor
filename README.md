@@ -24,7 +24,7 @@ JDK 21, Maven, Node 24 LTS, pnpm 12.14.0, and Docker with Compose.
 
 ## Run it
 
-`docker-compose.yml` starts Postgres and Redis (and the renderer). `DB_PASSWORD` is required; use any local value and never commit it. See `.env.example` for the other variables.
+`docker-compose.yml` starts Postgres and Redis (and the renderer). `DB_PASSWORD` is required; use any local value and never commit it. See `.env.example` for the other variables, including `SESSION_COOKIE_SECURE` (default `false` for local HTTP development; set `true` wherever TLS terminates so both `SESSION` and `XSRF-TOKEN` cookies carry the `Secure` flag).
 
 ### Whole stack in Docker (serves the app on :8080)
 
