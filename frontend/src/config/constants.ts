@@ -145,11 +145,26 @@ export const TAG_LABELS = {
   remove: (name: string) => `Remove tag ${name}`,
   removeSymbol: 'x',
   matchingLabel: 'Matching tags',
+  errorIndicator: 'Tag problem',
+  signIn: 'Sign in',
   loadFailed: 'Could not load tags.',
-  createFailed: 'Could not create the tag.',
+  errorMark: '!',
   /** Only the two text node types carry tags for now (DESIGN section 4 and 6); other nodes get no editor. */
   taggable: ['section_text', 'subsection_text'],
 } as const
 
 /** At most this many vocabulary suggestions are listed while typing. */
 export const TAG_SUGGESTION_LIMIT = 8
+
+/** Messages for a failed tag create, by cause. They appear in the tag input's error tooltip. */
+export const TAG_ERRORS = {
+  invalidName: (detail?: string) => `That tag name is not valid${detail ? `: ${detail}` : '.'}`,
+  signedOut: 'You are signed out. Sign in again, then retry.',
+  csrf: 'The security token was rejected even after a refresh. Reload the page and try again.',
+  conflict: (slug?: string) =>
+    slug ? `That name already belongs to another tag (${slug}). Pick that tag instead.` : 'That name conflicts with an existing tag.',
+  rateLimited: 'Too many requests. Wait a moment and try again.',
+  unavailable: 'The server is not available right now. Try again in a moment.',
+  network: 'Could not reach the server. Check your connection and try again.',
+  generic: 'The tag could not be created. Try again.',
+} as const

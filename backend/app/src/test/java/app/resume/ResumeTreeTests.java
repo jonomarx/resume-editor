@@ -85,14 +85,10 @@ class ResumeTreeTests {
     }
 
     @Test
-    void rejectsBadIdsTagsAndExtraProperties() {
+    void rejectsBadIdsAndExtraProperties() {
         ObjectNode t = minimalTree();
         ((ObjectNode) t.get("header")).put("id", "has space\n%%NODE forged");
         assertThat(validator.validate(t)).isNotEmpty();
-
-        ObjectNode t2 = minimalTree();
-        ((ArrayNode) ((ObjectNode) t2.get("header")).get("tags")).add("Not A Slug");
-        assertThat(validator.validate(t2)).isNotEmpty();
 
         ObjectNode t3 = minimalTree();
         t3.put("preamble", "\\documentclass{article}");

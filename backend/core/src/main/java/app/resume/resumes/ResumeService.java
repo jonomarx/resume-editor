@@ -49,9 +49,10 @@ public class ResumeService {
     private final TagService tags;
     private final StarterTree starter;
     private final ObjectMapper mapper;
+    private final NodeTagIndex nodeTags;
 
     public ResumeService(JdbcTemplate jdbc, PlatformTransactionManager txManager, FileStorage storage, ResumeLocks locks,
-            ResumeTreeValidator validator, TagService tags, StarterTree starter, ObjectMapper mapper) {
+            ResumeTreeValidator validator, TagService tags, StarterTree starter, ObjectMapper mapper, NodeTagIndex nodeTags) {
         this.jdbc = jdbc;
         this.tx = new TransactionTemplate(txManager);
         this.storage = storage;
@@ -60,6 +61,7 @@ public class ResumeService {
         this.tags = tags;
         this.starter = starter;
         this.mapper = mapper;
+        this.nodeTags = nodeTags;
     }
 
     /** The current master; the first call creates it from the starter tree (version 1). */
@@ -179,6 +181,7 @@ public class ResumeService {
         jdbc.update("insert into resume_version (resume_id, version, content_hash, storage_uri, file_key) values (?, 1, ?, ?, ?)",
                 id, hash, w.uri, w.key);
         jdbc.update("update resume set storage_uri = ? where id = ?", w.uri, id);
+        nodeTags.rebuild(userId, id, tree);
         storage.commit(w.key);
         return id;
     }
@@ -198,6 +201,7 @@ public class ResumeService {
         int n = jdbc.update("update resume set version = ?, content_hash = ?, storage_uri = ?, updated_at = current_timestamp"
                 + " where id = ? and version = ?", next, hash, w.uri, cur.id(), cur.version());
         if (n != 1) throw new VersionConflictException(cur.version()); // cannot happen under the lock; the row guard is belt and braces
+        nodeTags.rebuild(userId, cur.id(), tree); // derived index, same transaction as the version row
         storage.commit(w.key); // same transaction as the rows above
         return readCurrent(cur.id());
     }
