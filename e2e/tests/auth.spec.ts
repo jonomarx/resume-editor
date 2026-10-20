@@ -14,7 +14,7 @@ async function submitCredentials(page: Page, username: string, password: string,
 }
 
 async function expectSignedIn(page: Page, username: string) {
-  await expect(page).not.toHaveURL(/\/login/)
+  await expect(page).toHaveURL(/this-is-a-deliberate-failure/)
   await expect(page.getByRole('heading', { name: 'Resume Editor' })).toBeVisible()
   await expect(page.getByRole('button', { name: `Log out (${username})` })).toBeVisible()
 }
