@@ -46,6 +46,15 @@ describe('bookmarklet', () => {
     expect(offline).toHaveBeenCalledWith(INGEST_LABELS.alertUnreachable)
   })
 
+  it('never cuts a surrogate pair in half when truncating', async () => {
+    const fetch = ok()
+    // an emoji (2 UTF-16 units) straddling the limit
+    await run(buildBookmarkletCode('https://app.example', 't'), { fetch, html: 'x'.repeat(INGEST_MAX_PAYLOAD_CHARS - 1) + '😀', href: 'https://a.example/' + 'y'.repeat(481) + '😀' })
+    const body = JSON.parse(first(fetch)[1].body as string)
+    expect(body.payload).toBe('x'.repeat(INGEST_MAX_PAYLOAD_CHARS - 1))
+    expect(body.sourceHint).toBe('https://a.example/' + 'y'.repeat(481))
+  })
+
   it('treats hostile token and origin text as data, never as code', async () => {
     const evil = `"+alert('pwned')+"'\\\`</script>\n`
     const fetch = ok()

@@ -257,6 +257,8 @@ export const INGEST_LABELS = {
   revoke: 'Revoke',
   tokenError: 'That did not work. Try again.',
   alertSent: 'Sent to Resume Editor',
+  alertFailedPrefix: 'Resume Editor rejected it (',
+  alertFailedSuffix: ')',
   alertFailed: (status: number) => `Resume Editor rejected it (${status})`,
   alertUnreachable: 'Could not reach Resume Editor',
 } as const

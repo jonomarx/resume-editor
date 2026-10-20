@@ -91,6 +91,42 @@ describe('paste box (against the dummy ingest API)', () => {
   })
 })
 
+describe('polling cancellation', () => {
+  const slow = () => {
+    const ingest = createDummyIngest()
+    const getEvent = vi.fn(async (id: number) => ({ id, kind: 'text' as const, status: 'processing' as const, receivedAt: '', finishedAt: null, jobId: null, error: null }))
+    ingest.getEvent = getEvent
+    return { ingest, getEvent }
+  }
+
+  it('a second submit stops following the first event', async () => {
+    const { ingest, getEvent } = slow()
+    setup(ingest)
+    paste('first posting')
+    await user.click(screen.getByRole('button', { name: L.submit }))
+    await settle(INGEST_POLL_MS + 10)
+    expect(getEvent.mock.calls.map((c) => c[0])).toEqual([1])
+    paste('second posting')
+    await user.click(screen.getByRole('button', { name: L.submit }))
+    await settle(INGEST_POLL_MS * 3 + 10)
+    const ids = getEvent.mock.calls.map((c) => c[0])
+    expect(ids.slice(1).every((id) => id === 2)).toBe(true)
+    expect(ids).toContain(2)
+  })
+
+  it('unmounting stops all polling', async () => {
+    const { ingest, getEvent } = slow()
+    const { unmount } = render(<IngestPage apiClient={{ ingest } as unknown as Api} />)
+    paste('a posting')
+    await user.click(screen.getByRole('button', { name: L.submit }))
+    await settle(INGEST_POLL_MS + 10)
+    const before = getEvent.mock.calls.length
+    unmount()
+    await settle(INGEST_POLL_MS * 5)
+    expect(getEvent.mock.calls.length).toBe(before)
+  })
+})
+
 describe('bookmarklet generator (against the dummy ingest API)', () => {
   it('creates a token, shows the secret and code once, and never stores it', async () => {
     const store = vi.spyOn(Storage.prototype, 'setItem')
@@ -105,6 +141,13 @@ describe('bookmarklet generator (against the dummy ingest API)', () => {
     expect(screen.getByText(L.tokenSecretNote)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: L.bookmarkletLink }).getAttribute('href')).toMatch(/^javascript:/)
     expect(store).not.toHaveBeenCalled()
+  })
+
+  it('does not create a token with a blank name', async () => {
+    setup()
+    await user.clear(screen.getByLabelText(L.tokenLabelLabel))
+    await user.type(screen.getByLabelText(L.tokenLabelLabel), '   ')
+    expect(screen.getByRole('button', { name: L.createToken })).toBeDisabled()
   })
 
   it('lists tokens without their secret and revokes one', async () => {

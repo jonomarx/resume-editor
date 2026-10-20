@@ -10,10 +10,12 @@ export function buildBookmarkletCode(origin: string, token: string): string {
   const L = INGEST_LABELS
   return (
     '(function(){' +
+    // t() cuts to n UTF-16 units without leaving half of a surrogate pair at the end.
+    "function t(s,n){s=s.slice(0,n);var c=s.charCodeAt(s.length-1);return c>=55296&&c<=56319?s.slice(0,-1):s}" +
     `var u=${JSON.stringify(origin + '/api/ingest')};` +
     `fetch(u,{method:'POST',headers:{'Authorization':${JSON.stringify('Bearer ' + token)},'Content-Type':'application/json'},` +
-    `body:JSON.stringify({kind:'html',payload:document.documentElement.outerHTML.slice(0,${INGEST_MAX_PAYLOAD_CHARS}),sourceHint:location.href.slice(0,500)})})` +
-    `.then(function(r){alert(r.ok?${JSON.stringify(L.alertSent)}:${JSON.stringify(L.alertFailed(0))}.replace('0',r.status))})` +
+    `body:JSON.stringify({kind:'html',payload:t(document.documentElement.outerHTML,${INGEST_MAX_PAYLOAD_CHARS}),sourceHint:t(location.href,500)})})` +
+    `.then(function(r){alert(r.ok?${JSON.stringify(L.alertSent)}:${JSON.stringify(L.alertFailedPrefix)}+r.status+${JSON.stringify(L.alertFailedSuffix)})})` +
     `.catch(function(){alert(${JSON.stringify(L.alertUnreachable)})});` +
     '})();'
   )

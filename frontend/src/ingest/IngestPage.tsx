@@ -162,7 +162,7 @@ function BookmarkletSection({ api }: { api: Api }) {
           {L.tokenLabelLabel}
           <input value={label} onChange={(e) => setLabel(e.target.value)} required maxLength={60} />
         </label>
-        <button type="submit">{L.createToken}</button>
+        <button type="submit" disabled={!label.trim()}>{L.createToken}</button>
       </form>
       {error && <p role="alert">{error}</p>}
       {code && (
