@@ -71,8 +71,10 @@ public class IngestProcessor {
             finish(eventId, "failed", null, "robots_disallowed", "The site does not allow fetching that page");
         } catch (FetchException ex) {
             finish(eventId, "failed", null, "fetch_failed", "The page could not be fetched");
-        } catch (ExtractionOutputException ex) {
+        } catch (ExtractionOutputException | app.resume.llm.LlmInvalidOutputException ex) {
             finish(eventId, "failed", null, "extraction_failed", "The posting could not be read");
+        } catch (app.resume.llm.LlmException ex) {
+            finish(eventId, "failed", null, ex.code(), "The posting reader is unavailable right now");
         } catch (RuntimeException ex) {
             log.error("ingest event {} crashed", eventId, ex);
             finish(eventId, "failed", null, "internal_error", "Unexpected error");

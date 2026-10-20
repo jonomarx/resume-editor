@@ -3,8 +3,8 @@ package app.resume.jobs;
 import app.resume.jobs.crawl.CrawlService;
 import app.resume.jobs.crawl.DailyRun;
 import app.resume.jobs.enrich.PostingEnricher;
+import app.resume.llm.LlmClient;
 import app.resume.vocabulary.TagVocabulary;
-import app.resume.jobs.extract.ExtractionLlm;
 import app.resume.jobs.extract.LlmPostingExtractor;
 import app.resume.jobs.fetch.AshbyAdapter;
 import app.resume.jobs.fetch.AtsFeedAdapter;
@@ -55,11 +55,11 @@ public class JobsConfig {
         return new PostingValidityService(jdbc, new PostingValidityChecker(fetcher));
     }
 
-    /** LLM-backed pieces exist only when an {@link ExtractionLlm} is configured (a real client, or the dummy profile). */
+    /** LLM-backed pieces exist only when an {@link LlmClient} bean exists (selected by LLM_PROVIDER). */
     @Bean
-    CrawlService crawlService(JdbcTemplate jdbc, TransactionTemplate tx, PageFetcher fetcher, ObjectProvider<ExtractionLlm> llm,
+    CrawlService crawlService(JdbcTemplate jdbc, TransactionTemplate tx, PageFetcher fetcher, ObjectProvider<LlmClient> llm,
             ObjectProvider<TagVocabulary> vocabulary) {
-        ExtractionLlm model = llm.getIfAvailable();
+        LlmClient model = llm.getIfAvailable();
         TagVocabulary tags = vocabulary.getIfAvailable();
         return new CrawlService(jdbc, fetcher, List.<AtsFeedAdapter>of(new GreenhouseAdapter(), new LeverAdapter(), new AshbyAdapter()),
                 new JsonLdPostingAdapter(), model == null ? null : new LlmPostingExtractor(model),
@@ -73,9 +73,9 @@ public class JobsConfig {
     }
 
     @Bean
-    IngestProcessor ingestProcessor(JdbcTemplate jdbc, TransactionTemplate tx, PageFetcher fetcher, ObjectProvider<ExtractionLlm> llm,
+    IngestProcessor ingestProcessor(JdbcTemplate jdbc, TransactionTemplate tx, PageFetcher fetcher, ObjectProvider<LlmClient> llm,
             ObjectProvider<TagVocabulary> vocabulary) {
-        ExtractionLlm model = llm.getIfAvailable();
+        LlmClient model = llm.getIfAvailable();
         TagVocabulary tags = vocabulary.getIfAvailable();
         return new IngestProcessor(jdbc, fetcher, new JsonLdPostingAdapter(), model == null ? null : new LlmPostingExtractor(model),
                 model != null && tags != null ? new PostingEnricher(jdbc, tx, model, tags) : null, Instant::now);
