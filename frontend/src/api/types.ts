@@ -12,6 +12,11 @@ export type TagCategory = components['schemas']['TagCategory']
 export type Source = components['schemas']['Source']
 export type SourceHealth = components['schemas']['SourceHealth']
 export type CrawlRun = components['schemas']['CrawlRun']
+export type IngestKind = components['schemas']['IngestRequest']['kind']
+export type IngestAccepted = components['schemas']['IngestAccepted']
+export type IngestEvent = components['schemas']['IngestEvent']
+export type IngestToken = components['schemas']['IngestToken']
+export type CreatedIngestToken = components['schemas']['CreatedIngestToken']
 export type RenderResult = components['schemas']['RenderResult']
 
 /** Error thrown by any API client call; mirrors the contract's Error schema. */
@@ -79,7 +84,18 @@ export interface SourcesApi {
   health(): Promise<SourceHealth[]>
 }
 
+/** Ingest (operationIds ingestPosting, getIngestEvent, listIngestTokens, createIngestToken, revokeIngestToken). Session calls only; the bearer token is for the bookmarklet. */
+export interface IngestApi {
+  ingest(kind: IngestKind, payload: string, sourceHint?: string): Promise<IngestAccepted>
+  getEvent(id: number): Promise<IngestEvent>
+  listTokens(): Promise<IngestToken[]>
+  /** The secret is in the result once and never again. */
+  createToken(label: string): Promise<CreatedIngestToken>
+  revokeToken(id: number): Promise<void>
+}
+
 export interface Api {
+  ingest: IngestApi
   sources: SourcesApi
   tags: TagsApi
   auth: AuthApi
