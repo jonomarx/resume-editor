@@ -259,6 +259,25 @@ class IngestApiTests {
         assertThat(DB.jdbc.queryForObject("SELECT user_id FROM ingest_event", Long.class)).isEqualTo(ada);
     }
 
+    @Test
+    void aSuccessfulBearerRequestNeverCreatesRotatesOrReadsASession() throws Exception {
+        String t = newToken("ada");
+        MockHttpSession bobs = session("bob");
+        String before = bobs.getId();
+        MvcResult r = mvc.perform(get("/api/ingest/events").session(bobs).header("Authorization", "Bearer " + t)).andExpect(status().isOk()).andReturn();
+        assertThat(r.getResponse().getHeaders("Set-Cookie")).isEmpty();
+        assertThat(bobs.getId()).as("session id rotated by the bearer request").isEqualTo(before);
+        assertThat(bobs.isInvalid()).isFalse();
+        // the same, for a POST that is accepted, and for a request that carries no session at all
+        mvc.perform(post("/api/ingest").session(bobs).header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON)
+                .content(json("text", "hello"))).andExpect(status().isAccepted());
+        assertThat(bobs.getId()).isEqualTo(before);
+        MvcResult noSession = mvc.perform(get("/api/ingest/events").header("Authorization", "Bearer " + t)).andExpect(status().isOk()).andReturn();
+        assertThat(noSession.getRequest().getSession(false)).as("a bearer request must not create a session").isNull();
+        // the attached session still works as bob afterwards
+        mvc.perform(get("/api/ingest/events").session(bobs)).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+    }
+
     // ---- CORS and sessions ----
 
     @Test

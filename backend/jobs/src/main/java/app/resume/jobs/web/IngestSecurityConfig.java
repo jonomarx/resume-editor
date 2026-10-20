@@ -68,7 +68,7 @@ public class IngestSecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)
-                .sessionManagement(s -> s.sessionCreationPolicy(org.springframework.security.config.http.SessionCreationPolicy.STATELESS))
+                .sessionManagement(s -> s.sessionCreationPolicy(org.springframework.security.config.http.SessionCreationPolicy.STATELESS).sessionFixation(f -> f.none()))
                 .securityContext(c -> c.securityContextRepository(new RequestAttributeSecurityContextRepository()))
                 .exceptionHandling(e -> e.authenticationEntryPoint((req, res, ex) -> unauthorized(res, mapper))
                         .accessDeniedHandler((req, res, ex) -> unauthorized(res, mapper)))
