@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Resume Editor API
-  version: 0.4.0
+  version: 0.5.0
   description: |
     Contract v0 (US-003, fixes in US-076): auth, master resume, tags, render.
     Changed only through stories labeled `contract`.
@@ -45,7 +45,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/Credentials' }
+            schema: { $ref: '#/components/schemas/SignUpRequest' }
             example: { username: ada, password: correct-horse-battery }
       responses:
         '403': { $ref: '#/components/responses/CsrfInvalid' }
@@ -59,7 +59,25 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/User' }
               example: { id: 1, username: ada }
-        '400': { $ref: '#/components/responses/ValidationError' }
+        '400':
+          description: Request failed validation (username pattern, password shorter than 8 characters or longer than 72 UTF-8 bytes)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                usernameInvalid:
+                  value:
+                    code: validation_failed
+                    message: Request failed validation
+                    details:
+                      - { field: username, message: must be 3 to 40 characters }
+                passwordTooLong:
+                  summary: Password over 72 bytes in UTF-8 (rejected, not truncated)
+                  value:
+                    code: validation_failed
+                    message: Request failed validation
+                    details:
+                      - { field: password, message: must be at most 72 bytes in UTF-8 }
         '409':
           description: Username already taken
           content:
@@ -94,7 +112,7 @@ paths:
               example: { id: 1, username: ada }
         '400': { $ref: '#/components/responses/ValidationError' }
         '401':
-          description: Wrong username or password
+          description: Wrong username or password. A password longer than 72 bytes is just a wrong password (same response, never a 400 and never truncated).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -713,6 +731,15 @@ components:
             currentVersion:
               type: integer
               description: The version now stored; reload it before saving again
+    SignUpRequest:
+      description: Credentials for a new account; the password is also limited to 72 UTF-8 bytes.
+      allOf:
+        - $ref: '#/components/schemas/Credentials'
+        - type: object
+          properties:
+            password:
+              type: string
+              maxLength: 72
     Credentials:
       type: object
       required: [username, password]
@@ -728,8 +755,11 @@ components:
           minLength: 8
           format: password
           description: |
-            At least 8 characters. Only the first 72 bytes (UTF-8, never cutting a character in half) are used;
-            anything beyond is ignored, identically at sign-up and login. There is no maximum length.
+            At least 8 characters. At sign-up the password must be at most 72 bytes in UTF-8 (the limit of the hashing
+            algorithm); longer passwords are rejected with 400, never truncated. The schema `maxLength: 72` on the
+            sign-up request is only a cheap first check (72 characters can be up to 288 bytes); the byte count is
+            authoritative. At login any length is accepted by the schema and a password longer than 72 bytes is simply a
+            wrong password: the same 401 `bad_credentials` as any other.
     User:
       type: object
       required: [id, username]
