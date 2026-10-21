@@ -1,5 +1,5 @@
 import { CSRF } from '../config/constants'
-import { ApiError, type Api, type ApiErrorBody, type RenderResult, type Tag, type ResumeDocument, type ResumeVersionSummary, type User } from './types'
+import { ApiError, type Api, type ApiErrorBody, type RenderResult, type CreatedIngestToken, type IngestAccepted, type IngestEvent, type IngestToken, type Source, type SourceHealth, type Tag, type ResumeDocument, type ResumeVersionSummary, type User } from './types'
 
 const MUTATING = new Set(['POST', 'PUT', 'DELETE'])
 
@@ -61,6 +61,27 @@ export function createHttpApi(fetchImpl: typeof fetch = (...a) => fetch(...a)): 
   }
 
   return {
+    ingest: {
+      ingest: async (kind, payload, sourceHint) =>
+        json<IngestAccepted>(await request('POST', '/api/ingest', sourceHint ? { kind, payload, sourceHint } : { kind, payload })),
+      getEvent: async (id) => json<IngestEvent>(await request('GET', `/api/ingest/events/${id}`)),
+      listTokens: async () => json<IngestToken[]>(await request('GET', '/api/ingest/tokens')),
+      createToken: async (label) => json<CreatedIngestToken>(await request('POST', '/api/ingest/tokens', { label })),
+      async revokeToken(id) {
+        const res = await request('DELETE', `/api/ingest/tokens/${id}`)
+        if (!res.ok) throw await toError(res)
+      },
+    },
+    sources: {
+      list: async () => json<Source[]>(await request('GET', '/api/sources')),
+      create: async (url, name) => json<Source>(await request('POST', '/api/sources', name ? { url, name } : { url })),
+      update: async (id, changes) => json<Source>(await request('PUT', `/api/sources/${id}`, changes)),
+      async remove(id) {
+        const res = await request('DELETE', `/api/sources/${id}`)
+        if (!res.ok) throw await toError(res)
+      },
+      health: async () => json<SourceHealth[]>(await request('GET', '/api/source-health')),
+    },
     tags: {
       listTags: async () => json<Tag[]>(await request('GET', '/api/tags')),
       createTag: async (name, category) => json<Tag>(await request('POST', '/api/tags', { name, category })),

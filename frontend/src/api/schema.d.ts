@@ -290,6 +290,491 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The user's career page sources */
+        get: operations["listSources"];
+        put?: never;
+        /**
+         * Add a career page
+         * @description The URL must be absolute `http` or `https`. It is normalized and a source whose normalized URL the user already
+         *     has is rejected with 409 `source_exists`. Normalization (the same function the posting normalizer uses for
+         *     posting URLs, so Frontend can predict duplicates): lower-case the scheme and host; drop a default port (80 for
+         *     `http`, 443 for `https`); drop the fragment; drop the query parameters `utm_*`, `gclid`, `fbclid`, `mc_cid`,
+         *     `mc_eid`, `ref` and `ref_src`; sort the remaining query parameters by name; make an empty path `/` and remove a
+         *     trailing `/` from any other path; upper-case percent-encoding hex digits. Nothing else is rewritten (no `www.`
+         *     stripping, no `http` to `https` upgrade).
+         *
+         *     Only public targets are fetched (SSRF protection): the host must resolve to public addresses only. `localhost`,
+         *     loopback, link-local (including the cloud metadata address 169.254.169.254), private (RFC 1918, unique local),
+         *     carrier-grade NAT and other non-routable ranges are refused, for every address a name resolves to, and every
+         *     redirect target is checked again the same way (redirects are limited to 5 hops, `http` and `https` only).
+         *     A URL that is obviously not allowed (a literal IP address or `localhost` in a refused range) is rejected at once
+         *     with 400 `validation_failed` on `url`. A name that only resolves to a refused address is detected when it is
+         *     fetched: the crawl run fails (`CrawlRun.status` `failed`, `error` `url_not_allowed`).
+         *
+         *     The source is crawled by the next daily run; creating it does not fetch anything.
+         */
+        post: operations["createSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sources/{sourceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One source */
+        get: operations["getSource"];
+        /**
+         * Rename or enable or disable a source
+         * @description A disabled source is skipped by the daily crawl; its postings are still validity-checked. The URL cannot be changed (delete and add instead).
+         */
+        put: operations["updateSource"];
+        post?: never;
+        /**
+         * Remove a source
+         * @description Removes the source and its crawl history. Postings it produced stay in the feed (they are validity-checked like
+         *     any posting) but no longer belong to a source (`sourceId` becomes null).
+         */
+        delete: operations["deleteSource"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/source-health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Health of every source (last run and recent history) */
+        get: operations["getSourceHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ingest/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The user's ingest tokens (never the secret) */
+        get: operations["listIngestTokens"];
+        put?: never;
+        /**
+         * Create an ingest-only token
+         * @description The secret is returned once, in `token`, and never again; only a hash is stored. The token can call
+         *     `POST /api/ingest` and the ingest event reads, nothing else: on any other route a bearer token is 401. Tokens
+         *     can only be created, listed and revoked with a session. A bookmarklet runs inside the job page, so that page's
+         *     scripts can read the token; that is why it is ingest-only and revocable.
+         */
+        post: operations["createIngestToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ingest/tokens/{tokenId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke a token
+         * @description Takes effect immediately. Revoking an already revoked token is a no-op (204).
+         */
+        delete: operations["revokeIngestToken"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ingest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hand the server a posting to process later
+         * @description Authentication: a signed-in session (with the CSRF header like any state-changing call) or an ingest token sent
+         *     as `Authorization: Bearer <token>`.
+         *
+         *     - If a request has an `Authorization: Bearer` header, the bearer token is the only credential: any `SESSION`
+         *       cookie is ignored (never used as a fallback), the CSRF header is not required, and the request is handled as
+         *       a bearer request below even if the cookie is valid. Without the header, the session rules apply.
+         *     - A bearer request is answered with CORS headers (`Access-Control-Allow-Origin: *`, never
+         *       `Access-Control-Allow-Credentials`) so the bookmarklet can post from the job page's origin. This is the only
+         *       CORS exception in the API: session requests are never CORS-enabled (no CORS headers, preflight not answered
+         *       with an allowance), and no other route allows bearer tokens or cross-origin calls.
+         *     - The browser's preflight is `OPTIONS /api/ingest` (no credentials, no authentication needed); see that
+         *       operation.
+         *     - An unknown, malformed or revoked token is 401 `unauthorized`, with the same body as a missing credential, so
+         *       a response never tells which case it was. The 401 carries the same CORS headers.
+         *
+         *     For `kind: url` only public targets are fetched (SSRF protection): the host must resolve to public addresses only. `localhost`,
+         *     loopback, link-local (including the cloud metadata address 169.254.169.254), private (RFC 1918, unique local),
+         *     carrier-grade NAT and other non-routable ranges are refused, for every address a name resolves to, and every
+         *     redirect target is checked again the same way (redirects are limited to 5 hops, `http` and `https` only).
+         *     A URL that is obviously not allowed (a literal IP address or `localhost` in a refused range) is rejected at once
+         *     with 400 `validation_failed` on `payload`; a name that only resolves to a refused address is detected when the
+         *     event is processed: the event is `failed` with error code `url_not_allowed`.
+         *
+         *     `kind` says what `payload` is: `url` (a posting URL to fetch), `html` (the page source), `text` (pasted
+         *     text) or `email` (a forwarded email body). `sourceHint` is optional free text that helps extraction, typically
+         *     the page URL or the company name for `html` and `text`. Posting text is untrusted data: it is never executed
+         *     and never used as instructions.
+         *
+         *     The server answers 202 at once and processes asynchronously; follow progress with
+         *     `GET /api/ingest/events/{id}`. The call is idempotent: the same URL (after normalization) or the same content
+         *     hash for the same user returns 202 with the existing event's id and `duplicate: true`, and creates nothing new.
+         */
+        post: operations["ingestPosting"];
+        delete?: never;
+        /**
+         * CORS preflight for the ingest bookmarklet
+         * @description Answers the browser's preflight for `POST /api/ingest` without authentication and without CSRF: 204 with
+         *     `Access-Control-Allow-Origin: *`, `Access-Control-Allow-Methods: POST, OPTIONS`,
+         *     `Access-Control-Allow-Headers: Authorization, Content-Type` and `Access-Control-Max-Age: 600`; never
+         *     `Access-Control-Allow-Credentials`. No other path answers a preflight.
+         */
+        options: operations["ingestPreflight"];
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ingest/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent ingest events, newest first */
+        get: operations["listIngestEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ingest/events/{eventId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One ingest event (poll it until `status` is final)
+         * @description Another user's event, or an unknown id, is 404.
+         */
+        get: operations["getIngestEvent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The job feed
+         * @description Postings visible to the user, scored against the master resume on each request. Closed postings are hidden
+         *     unless a draft references them. Sort `fit` is highest score first, `newest` is most recently first seen; ties
+         *     break by id, so a page is stable.
+         */
+        get: operations["listJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{jobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One posting in full, with its fit explanation */
+        get: operations["getJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{jobId}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save, dismiss or mark a posting applied
+         * @description Sets the user's own status; it never changes the posting. Setting the current value is a no-op.
+         */
+        put: operations["setJobStatus"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{jobId}/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open the draft for a posting, forking the master if there is none
+         * @description There is at most one draft per posting and user. If none exists the current master is copied into a new draft
+         *     (201); if one exists it is returned unchanged (200). A draft never pulls changes from the master afterwards.
+         */
+        post: operations["createDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The user's drafts, most recently updated first */
+        get: operations["listDrafts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/drafts/{draftId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the latest version of a draft */
+        get: operations["getDraft"];
+        /**
+         * Save a new version of a draft
+         * @description Same rules as saving the master (`PUT /api/resumes/master`): optimistic check on `baseVersion` (a stale one is
+         *     409 with the current version), a save identical to the current content does not create a version (200,
+         *     unchanged), the same tag and `{{children}}` validation with 400 `validation_failed`.
+         *
+         *     `excludedNodeIds` are the include toggles: the listed nodes, and their children, are left out of the rendered and
+         *     exported document but stay in the tree, so a toggle can be switched back. Every id must exist in the tree (400
+         *     otherwise). Header and footer cannot be excluded. `status` is optional and unchanged when omitted; the status
+         *     is not part of the content hash.
+         *
+         *     Rendering with exclusions: `POST /api/render` is unchanged and takes only a tree, so a client that previews a
+         *     draft (live render, page meter) first prunes the tree itself: remove every node listed in `excludedNodeIds`
+         *     together with its whole subtree, and send the pruned tree. The server applies exactly the same rule to
+         *     `exportDraft` and to cutdown runs, so a client-pruned render and the export of the same draft are the same
+         *     document and the same page count.
+         */
+        put: operations["saveDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/drafts/{draftId}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the draft as a PDF or as LaTeX source
+         * @description Exports the draft's latest version with the include toggles applied. `pdf` compiles it (or serves the cached
+         *     render) and answers 503 `renderer_unavailable` when the renderer is down, or 422 `compile_failed` when the
+         *     document does not compile. `tex` is the assembled document including the locked preamble, as `text/x-tex`.
+         *     Both are sent as attachments.
+         */
+        get: operations["exportDraft"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/drafts/{draftId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Version history of a draft, newest first */
+        get: operations["listDraftVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/drafts/{draftId}/versions/{version}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make an old draft version the newest version
+         * @description Same behaviour as `restoreMasterVersion`, including the include toggles of that version. This is how a cutdown is undone.
+         */
+        post: operations["restoreDraftVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/drafts/{draftId}/cutdowns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start a cutdown of the draft to exactly one page
+         * @description Starts a run against the draft's version `baseVersion` (a stale one is 409 `version_conflict`) and answers 202
+         *     with the run; the work (looping on the renderer, and the LLM in `llm_tighten` mode) happens asynchronously. Poll
+         *     `GET /api/drafts/{draftId}/cutdowns/{runId}` until `status` is `ready` or `failed`.
+         *
+         *     `deterministic` scores every node against the posting, keeps the highest-scoring nodes and loops on the
+         *     renderer until the document is exactly one page; it can only exclude nodes, never invents text. `llm_tighten`
+         *     may in addition propose rewordings of node LaTeX; it never adds claims (checked by the server). A run proposes;
+         *     it changes nothing until `apply`.
+         *
+         *     Only one run per draft is active at a time: starting another while one is `queued` or `running` is 409
+         *     `cutdown_in_progress`. A run never blocks the draft forever: one still `queued` or `running` 10 minutes after
+         *     it was created (a crash, a lost worker, a hung renderer or LLM) is marked `failed` with error code
+         *     `timed_out` the next time it is read or a new run is started, after which a new run can start.
+         */
+        post: operations["startCutdown"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/drafts/{draftId}/cutdowns/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A cutdown run with its per-node suggestions */
+        get: operations["getCutdown"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/drafts/{draftId}/cutdowns/{runId}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept some or all suggestions of a ready run
+         * @description Applies exactly the suggestions listed in `acceptedSuggestionIds`; the rest are rejected. The server first
+         *     records the current content as a draft version (`reason: before_cutdown`) and then saves the result as a new
+         *     version (`reason: cutdown_applied`), so the whole step is undone with `restoreDraftVersion`. Requires the run to
+         *     be `ready` (else 409 `cutdown_not_ready`) and the draft still at the run's `baseVersion` (else 409
+         *     `version_conflict`). An unknown suggestion id is 400. The result of applying (rewordings and exclusions) goes through the same validation as a
+         *     draft save (tags, `{{children}}` rules, `latex` length, node ids): if it fails, nothing is applied and the answer is
+         *     400 `validation_failed` with `details` naming the suggestion id (`field`). Applying marks the run `applied`; applying twice is 409
+         *     `cutdown_not_ready`. An empty list applies nothing and discards the run (the draft is unchanged, 200).
+         */
+        post: operations["applyCutdown"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -469,6 +954,285 @@ export interface components {
             log: string;
             errors: components["schemas"]["RenderError"][];
         };
+        /**
+         * @description How the source's postings were last extracted; null before the first crawl.
+         * @enum {string|null}
+         */
+        ExtractionTier: "ats_feed" | "json_ld" | "llm" | null;
+        Source: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            /** @description The normalized career page URL */
+            url: string;
+            enabled: boolean;
+            extractionTier: components["schemas"]["ExtractionTier"];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            lastCrawlAt: string | null;
+        };
+        CreateSourceRequest: {
+            /** @description Absolute http or https URL of a public host (see `createSource` for the normalization and the SSRF rules) */
+            url: string;
+            /** @description Defaults to the URL's host */
+            name?: string;
+        };
+        /** @description Fields left out are unchanged. */
+        UpdateSourceRequest: {
+            name?: string;
+            enabled?: boolean;
+        };
+        SourceExistsError: components["schemas"]["Error"] & {
+            /** Format: int64 */
+            existingSourceId: number;
+        };
+        CrawlRun: {
+            /** Format: int64 */
+            id: number;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            finishedAt: string | null;
+            /** @enum {string} */
+            status: "running" | "succeeded" | "failed" | "skipped_unchanged";
+            postingsSeen: number;
+            added: number;
+            updated: number;
+            /** @description Postings that became stale or closed in this run */
+            closed: number;
+            /** @description Short reason when `status` is `failed` */
+            error: string | null;
+        };
+        SourceHealth: {
+            source: components["schemas"]["Source"];
+            /**
+             * @description `degraded` is one failed run, `failing` is two or more in a row.
+             * @enum {string}
+             */
+            state: "never_run" | "healthy" | "degraded" | "failing";
+            consecutiveFailures: number;
+            activePostings: number;
+            stalePostings: number;
+            lastRun: components["schemas"]["CrawlRun"] | null;
+            /** @description The last 10 runs, newest first */
+            recentRuns: components["schemas"]["CrawlRun"][];
+        };
+        IngestToken: {
+            /** Format: int64 */
+            id: number;
+            label: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            lastUsedAt: string | null;
+            /** Format: date-time */
+            revokedAt: string | null;
+        };
+        CreatedIngestToken: components["schemas"]["IngestToken"] & {
+            /** @description The secret; shown only in this response */
+            token: string;
+        };
+        CreateIngestTokenRequest: {
+            label: string;
+        };
+        IngestRequest: {
+            /** @enum {string} */
+            kind: "url" | "html" | "text" | "email";
+            /** @description A URL for `url`; the content otherwise. Larger payloads are 413. */
+            payload: string;
+            sourceHint?: string | null;
+        };
+        IngestAccepted: {
+            /** Format: int64 */
+            ingestEventId: number;
+            status: components["schemas"]["IngestStatus"];
+            /** @description True when an earlier request for the same URL or content already exists */
+            duplicate: boolean;
+        };
+        /** @enum {string} */
+        IngestStatus: "queued" | "processing" | "done" | "failed";
+        IngestEvent: {
+            /** Format: int64 */
+            id: number;
+            /** @enum {string} */
+            kind: "url" | "html" | "text" | "email";
+            status: components["schemas"]["IngestStatus"];
+            /** Format: date-time */
+            receivedAt: string;
+            /** Format: date-time */
+            finishedAt: string | null;
+            /**
+             * Format: int64
+             * @description The posting created or matched, once `done`
+             */
+            jobId: number | null;
+            /** @description Present when `status` is `failed` */
+            error: {
+                code: string;
+                message: string;
+            } | null;
+        };
+        /** @enum {string} */
+        JobUserStatus: "new" | "saved" | "dismissed" | "applied";
+        /** @enum {string} */
+        PostingStatus: "active" | "stale" | "closed";
+        JobSummary: {
+            /** Format: int64 */
+            id: number;
+            title: string;
+            company: string;
+            location: string | null;
+            /** @description The posting's canonical URL */
+            url: string;
+            /** @description A brief description (at most 500 characters) */
+            description: string;
+            basicRequirements: string[];
+            preferredRequirements: string[];
+            tags: string[];
+            /** @description How well the master resume fits the posting, computed per request (0 when the master has no tags) */
+            fitScore: number;
+            userStatus: components["schemas"]["JobUserStatus"];
+            postingStatus: components["schemas"]["PostingStatus"];
+            /** @enum {string} */
+            origin: "crawl" | "ingest";
+            /** Format: int64 */
+            sourceId: number | null;
+            /**
+             * Format: int64
+             * @description The user's draft for this posting, if any
+             */
+            draftId: number | null;
+            /** Format: date-time */
+            postedAt: string | null;
+            /** Format: date-time */
+            firstSeenAt: string;
+            /** Format: date-time */
+            lastSeenAt: string;
+        };
+        /** @description Hard-filter fields extracted from the posting; null when the posting does not say. */
+        Eligibility: {
+            season: string | null;
+            workAuthorization: string | null;
+            classYear: string | null;
+        };
+        JobDetail: components["schemas"]["JobSummary"] & {
+            fullDescription: string;
+            eligibility: components["schemas"]["Eligibility"];
+            /** @description Why the score is what it is */
+            fit: {
+                /** @description Posting tags the master resume also has */
+                matchedTags: string[];
+                /** @description Posting tags the master resume lacks */
+                missingTags: string[];
+            };
+        };
+        JobPage: {
+            items: components["schemas"]["JobSummary"][];
+            /** @description Postings matching the filters, ignoring paging */
+            total: number;
+            limit: number;
+            offset: number;
+        };
+        SetJobStatusRequest: {
+            status: components["schemas"]["JobUserStatus"];
+        };
+        /** @enum {string} */
+        DraftStatus: "in_progress" | "ready" | "applied";
+        Draft: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            jobId: number;
+            status: components["schemas"]["DraftStatus"];
+            version: number;
+            /** @description Hash of the canonical tree and the sorted `excludedNodeIds` */
+            contentHash: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description Include toggles that are off: the listed nodes and their subtrees are pruned from the tree before it is rendered, exported or cut down. Clients prune the same way before calling `POST /api/render` (see `saveDraft`). */
+            excludedNodeIds: string[];
+            tree: components["schemas"]["ResumeTree"];
+        };
+        DraftSummary: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            jobId: number;
+            jobTitle: string;
+            company: string;
+            status: components["schemas"]["DraftStatus"];
+            version: number;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        SaveDraftRequest: {
+            baseVersion: number;
+            tree: components["schemas"]["ResumeTree"];
+            excludedNodeIds: string[];
+            status?: components["schemas"]["DraftStatus"];
+        };
+        DraftVersionSummary: {
+            version: number;
+            contentHash: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** @enum {string} */
+            reason: "fork" | "save" | "restore" | "before_cutdown" | "cutdown_applied";
+        };
+        StartCutdownRequest: {
+            baseVersion: number;
+            /**
+             * @default deterministic
+             * @enum {string}
+             */
+            mode: "deterministic" | "llm_tighten";
+        };
+        CutdownSuggestion: {
+            /** @description Unique within the run */
+            id: string;
+            nodeId: string;
+            /**
+             * @description `exclude` turns the node's include toggle off; `reword` replaces its `latex`.
+             * @enum {string}
+             */
+            kind: "exclude" | "reword";
+            /** @description Human-readable, safe to show */
+            reason: string;
+            /** @description The node's relevance to the posting (0 to 1) */
+            score: number | null;
+            /** @description The node's latex now (`reword` only) */
+            beforeLatex: string | null;
+            /** @description The proposed latex (`reword` only); LLM-written, so untrusted: it is never executed and is validated on apply */
+            afterLatex: string | null;
+        };
+        CutdownRun: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            draftId: number;
+            baseVersion: number;
+            /** @enum {string} */
+            mode: "deterministic" | "llm_tighten";
+            /** @enum {string} */
+            status: "queued" | "running" | "ready" | "failed" | "applied" | "discarded";
+            /** Format: date-time */
+            createdAt: string;
+            pageCountBefore: number | null;
+            /** @description Pages after the accepted suggestions are applied; exactly 1 when `status` is `ready` */
+            pageCountAfter: number | null;
+            suggestions: components["schemas"]["CutdownSuggestion"][];
+            /** @description Present when `failed`: `cannot_fit` (the content that cannot be excluded is longer than one page), `renderer_unavailable`, `llm_unavailable`, `llm_budget_exceeded`, `timed_out` (see `startCutdown`) */
+            error: {
+                code: string;
+                message: string;
+            } | null;
+        };
+        ApplyCutdownRequest: {
+            acceptedSuggestionIds: string[];
+        };
     };
     responses: {
         /** @description Missing or wrong `X-XSRF-TOKEN` header */
@@ -567,6 +1331,14 @@ export interface components {
         TagSlug: string;
         /** @example 2 */
         Version: number;
+        /** @example 3 */
+        SourceId: number;
+        /** @example 140 */
+        JobId: number;
+        /** @example 21 */
+        DraftId: number;
+        /** @example 7 */
+        RunId: number;
     };
     requestBodies: never;
     headers: never;
@@ -1270,6 +2042,1114 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    listSources: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sources, oldest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example [
+                     *       {
+                     *         "id": 3,
+                     *         "name": "Acme Careers",
+                     *         "url": "https://acme.example/careers",
+                     *         "enabled": true,
+                     *         "extractionTier": "json_ld",
+                     *         "createdAt": "2026-10-19T10:00:00Z",
+                     *         "lastCrawlAt": "2026-10-20T06:00:00Z"
+                     *       }
+                     *     ]
+                     */
+                    "application/json": components["schemas"]["Source"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createSource: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+                 * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+                 */
+                "X-XSRF-TOKEN": components["parameters"]["XsrfToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "url": "https://acme.example/careers",
+                 *       "name": "Acme Careers"
+                 *     }
+                 */
+                "application/json": components["schemas"]["CreateSourceRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "id": 3,
+                     *       "name": "Acme Careers",
+                     *       "url": "https://acme.example/careers",
+                     *       "enabled": true,
+                     *       "extractionTier": null,
+                     *       "createdAt": "2026-10-19T10:00:00Z",
+                     *       "lastCrawlAt": null
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Source"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["CsrfInvalid"];
+            /** @description The user already has this source */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "source_exists",
+                     *       "message": "You already added this career page",
+                     *       "existingSourceId": 3
+                     *     }
+                     */
+                    "application/json": components["schemas"]["SourceExistsError"];
+                };
+            };
+        };
+    };
+    getSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @example 3 */
+                sourceId: components["parameters"]["SourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The source */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "id": 3,
+                     *       "name": "Acme Careers",
+                     *       "url": "https://acme.example/careers",
+                     *       "enabled": true,
+                     *       "extractionTier": "json_ld",
+                     *       "createdAt": "2026-10-19T10:00:00Z",
+                     *       "lastCrawlAt": "2026-10-20T06:00:00Z"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Source"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateSource: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+                 * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+                 */
+                "X-XSRF-TOKEN": components["parameters"]["XsrfToken"];
+            };
+            path: {
+                /** @example 3 */
+                sourceId: components["parameters"]["SourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "name": "Acme (summer)",
+                 *       "enabled": false
+                 *     }
+                 */
+                "application/json": components["schemas"]["UpdateSourceRequest"];
+            };
+        };
+        responses: {
+            /** @description The updated source */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "id": 3,
+                     *       "name": "Acme (summer)",
+                     *       "url": "https://acme.example/careers",
+                     *       "enabled": false,
+                     *       "extractionTier": "json_ld",
+                     *       "createdAt": "2026-10-19T10:00:00Z",
+                     *       "lastCrawlAt": "2026-10-20T06:00:00Z"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Source"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["CsrfInvalid"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteSource: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+                 * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+                 */
+                "X-XSRF-TOKEN": components["parameters"]["XsrfToken"];
+            };
+            path: {
+                /** @example 3 */
+                sourceId: components["parameters"]["SourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["CsrfInvalid"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getSourceHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One entry per source */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example [
+                     *       {
+                     *         "source": {
+                     *           "id": 3,
+                     *           "name": "Acme Careers",
+                     *           "url": "https://acme.example/careers",
+                     *           "enabled": true,
+                     *           "extractionTier": "json_ld",
+                     *           "createdAt": "2026-10-19T10:00:00Z",
+                     *           "lastCrawlAt": "2026-10-20T06:00:00Z"
+                     *         },
+                     *         "state": "healthy",
+                     *         "consecutiveFailures": 0,
+                     *         "activePostings": 12,
+                     *         "stalePostings": 1,
+                     *         "lastRun": {
+                     *           "id": 41,
+                     *           "startedAt": "2026-10-20T06:00:00Z",
+                     *           "finishedAt": "2026-10-20T06:00:09Z",
+                     *           "status": "succeeded",
+                     *           "postingsSeen": 13,
+                     *           "added": 2,
+                     *           "updated": 1,
+                     *           "closed": 0,
+                     *           "error": null
+                     *         },
+                     *         "recentRuns": [
+                     *           {
+                     *             "id": 41,
+                     *             "startedAt": "2026-10-20T06:00:00Z",
+                     *             "finishedAt": "2026-10-20T06:00:09Z",
+                     *             "status": "succeeded",
+                     *             "postingsSeen": 13,
+                     *             "added": 2,
+                     *             "updated": 1,
+                     *             "closed": 0,
+                     *             "error": null
+                     *           }
+                     *         ]
+                     *       }
+                     *     ]
+                     */
+                    "application/json": components["schemas"]["SourceHealth"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listIngestTokens: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tokens, newest first, including revoked ones */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example [
+                     *       {
+                     *         "id": 5,
+                     *         "label": "Bookmarklet",
+                     *         "createdAt": "2026-10-19T10:00:00Z",
+                     *         "lastUsedAt": "2026-10-20T07:30:00Z",
+                     *         "revokedAt": null
+                     *       }
+                     *     ]
+                     */
+                    "application/json": components["schemas"]["IngestToken"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createIngestToken: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+                 * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+                 */
+                "X-XSRF-TOKEN": components["parameters"]["XsrfToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "label": "Bookmarklet"
+                 *     }
+                 */
+                "application/json": components["schemas"]["CreateIngestTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "id": 5,
+                     *       "label": "Bookmarklet",
+                     *       "createdAt": "2026-10-19T10:00:00Z",
+                     *       "lastUsedAt": null,
+                     *       "revokedAt": null,
+                     *       "token": "ing_3f6c0b528a1d4c579e2b5d1a7c4e9f10"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["CreatedIngestToken"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["CsrfInvalid"];
+        };
+    };
+    revokeIngestToken: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+                 * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+                 */
+                "X-XSRF-TOKEN": components["parameters"]["XsrfToken"];
+            };
+            path: {
+                /** @example 5 */
+                tokenId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["CsrfInvalid"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    ingestPosting: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required with a session cookie; not used with a bearer token. */
+                "X-XSRF-TOKEN"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IngestRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted for processing */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngestAccepted"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["CsrfInvalid"];
+            /** @description Payload too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "too_large",
+                     *       "message": "The posting is too large"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many ingest requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "rate_limited",
+                     *       "message": "Slow down and try again shortly"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    ingestPreflight: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Preflight allowed */
+            204: {
+                headers: {
+                    "Access-Control-Allow-Origin"?: "*";
+                    "Access-Control-Allow-Methods"?: string;
+                    "Access-Control-Allow-Headers"?: string;
+                    "Access-Control-Max-Age"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listIngestEvents: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Events */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example [
+                     *       {
+                     *         "id": 88,
+                     *         "kind": "text",
+                     *         "status": "done",
+                     *         "receivedAt": "2026-10-20T07:30:00Z",
+                     *         "finishedAt": "2026-10-20T07:30:04Z",
+                     *         "jobId": 140,
+                     *         "error": null
+                     *       }
+                     *     ]
+                     */
+                    "application/json": components["schemas"]["IngestEvent"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getIngestEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @example 88 */
+                eventId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The event */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngestEvent"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listJobs: {
+        parameters: {
+            query?: {
+                sort?: "fit" | "newest";
+                /** @description Tag slug; repeat for several. A posting must carry every given tag. */
+                tag?: string[];
+                /** @description Case-insensitive substring match on the location */
+                location?: string;
+                /** @description The user's own status for the posting */
+                status?: components["schemas"]["JobUserStatus"];
+                /** @description Only postings first seen within this many days */
+                maxAgeDays?: number;
+                /** @description Full-text search over title, company and description */
+                q?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of the feed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobPage"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @example 140 */
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The posting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setJobStatus: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+                 * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+                 */
+                "X-XSRF-TOKEN": components["parameters"]["XsrfToken"];
+            };
+            path: {
+                /** @example 140 */
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "status": "saved"
+                 *     }
+                 */
+                "application/json": components["schemas"]["SetJobStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description The posting with its new status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["CsrfInvalid"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+                 * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+                 */
+                "X-XSRF-TOKEN": components["parameters"]["XsrfToken"];
+            };
+            path: {
+                /** @example 140 */
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The existing draft */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"];
+                };
+            };
+            /** @description A new draft forked from the master */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["CsrfInvalid"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listDrafts: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["DraftStatus"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Drafts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example [
+                     *       {
+                     *         "id": 21,
+                     *         "jobId": 140,
+                     *         "jobTitle": "Software Engineering Intern",
+                     *         "company": "Acme",
+                     *         "status": "in_progress",
+                     *         "version": 3,
+                     *         "updatedAt": "2026-10-20T08:00:00Z"
+                     *       }
+                     *     ]
+                     */
+                    "application/json": components["schemas"]["DraftSummary"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @example 21 */
+                draftId: components["parameters"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The draft */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    saveDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+                 * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+                 */
+                "X-XSRF-TOKEN": components["parameters"]["XsrfToken"];
+            };
+            path: {
+                /** @example 21 */
+                draftId: components["parameters"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["CsrfInvalid"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["VersionConflict"];
+        };
+    };
+    exportDraft: {
+        parameters: {
+            query: {
+                /** @example pdf */
+                format: "pdf" | "tex";
+            };
+            header?: never;
+            path: {
+                /** @example 21 */
+                draftId: components["parameters"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file */
+            200: {
+                headers: {
+                    /** @description attachment with a file name derived from the posting */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    /** @example \documentclass[letterpaper,11pt]{article} ... */
+                    "text/x-tex": string;
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            /** @description The draft does not compile (`format=pdf` only) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "compile_failed",
+                     *       "message": "The draft did not compile"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Renderer unavailable or timed out */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "renderer_unavailable",
+                     *       "message": "The renderer did not respond in time"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listDraftVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @example 21 */
+                draftId: components["parameters"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Versions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example [
+                     *       {
+                     *         "version": 3,
+                     *         "contentHash": "e99551fa57d7a6c2858733580847871fae001b49e0f54e59dc8e15ebae6b5203",
+                     *         "createdAt": "2026-10-20T08:00:00Z",
+                     *         "reason": "cutdown_applied"
+                     *       },
+                     *       {
+                     *         "version": 2,
+                     *         "contentHash": "b10af658e08210683091e16185d3c41ddcae75ca55322e125094137dd668097e",
+                     *         "createdAt": "2026-10-20T07:59:00Z",
+                     *         "reason": "before_cutdown"
+                     *       }
+                     *     ]
+                     */
+                    "application/json": components["schemas"]["DraftVersionSummary"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    restoreDraftVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+                 * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+                 */
+                "X-XSRF-TOKEN": components["parameters"]["XsrfToken"];
+            };
+            path: {
+                /** @example 21 */
+                draftId: components["parameters"]["DraftId"];
+                /** @example 2 */
+                version: components["parameters"]["Version"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "baseVersion": 3
+                 *     }
+                 */
+                "application/json": components["schemas"]["RestoreRequest"];
+            };
+        };
+        responses: {
+            /** @description Restored as a new version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["CsrfInvalid"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["VersionConflict"];
+        };
+    };
+    startCutdown: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+                 * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+                 */
+                "X-XSRF-TOKEN": components["parameters"]["XsrfToken"];
+            };
+            path: {
+                /** @example 21 */
+                draftId: components["parameters"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "baseVersion": 3,
+                 *       "mode": "deterministic"
+                 *     }
+                 */
+                "application/json": components["schemas"]["StartCutdownRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted; the run is queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "id": 7,
+                     *       "draftId": 21,
+                     *       "baseVersion": 3,
+                     *       "mode": "deterministic",
+                     *       "status": "queued",
+                     *       "createdAt": "2026-10-20T08:05:00Z",
+                     *       "pageCountBefore": null,
+                     *       "pageCountAfter": null,
+                     *       "suggestions": [],
+                     *       "error": null
+                     *     }
+                     */
+                    "application/json": components["schemas"]["CutdownRun"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["CsrfInvalid"];
+            404: components["responses"]["NotFound"];
+            /** @description Stale `baseVersion` (`version_conflict`, with `currentVersion`) or a run is already active (`cutdown_in_progress`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionConflictError"] | components["schemas"]["Error"];
+                };
+            };
+            /** @description The LLM budget is used up (`llm_tighten` only) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "llm_budget_exceeded",
+                     *       "message": "The AI budget for this period is used up"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No LLM is configured or it is unavailable (`llm_tighten` only) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "llm_unavailable",
+                     *       "message": "The AI service is not available"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getCutdown: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @example 21 */
+                draftId: components["parameters"]["DraftId"];
+                /** @example 7 */
+                runId: components["parameters"]["RunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CutdownRun"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    applyCutdown: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description The value of the `XSRF-TOKEN` cookie (see "CSRF protection" in the API description).
+                 * @example 3f6c0b52-8a1d-4c57-9e2b-5d1a7c4e9f10
+                 */
+                "X-XSRF-TOKEN": components["parameters"]["XsrfToken"];
+            };
+            path: {
+                /** @example 21 */
+                draftId: components["parameters"]["DraftId"];
+                /** @example 7 */
+                runId: components["parameters"]["RunId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "acceptedSuggestionIds": [
+                 *         "s1",
+                 *         "s2"
+                 *       ]
+                 *     }
+                 */
+                "application/json": components["schemas"]["ApplyCutdownRequest"];
+            };
+        };
+        responses: {
+            /** @description The draft after applying */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["CsrfInvalid"];
+            404: components["responses"]["NotFound"];
+            /** @description Stale draft (`version_conflict`) or the run is not `ready` (`cutdown_not_ready`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionConflictError"] | components["schemas"]["Error"];
+                };
+            };
         };
     };
 }
