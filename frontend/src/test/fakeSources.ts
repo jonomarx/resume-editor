@@ -1,4 +1,4 @@
-// DUMMY(US-032, US-043): in-memory stand-in for the source CRUD and source-health endpoints. Delete when they are ready.
+// Test-only in-memory sources API (list, create with duplicate/host checks, update, delete, health). Not bundled.
 import { ApiError, type CrawlRun, type Source, type SourceHealth, type SourcesApi } from '../api/types'
 
 const run = (id: number, status: CrawlRun['status'], error: string | null = null): CrawlRun => ({
@@ -24,7 +24,7 @@ function normalize(raw: string): string {
   return `${u.protocol}//${u.host}${path}${u.search}`
 }
 
-export function createDummySources(): SourcesApi {
+export function createFakeSources(): SourcesApi {
   const sources: Source[] = [
     { id: 1, name: 'Acme Careers', url: 'https://acme.example/careers', enabled: true, extractionTier: 'json_ld', createdAt: '2026-10-19T10:00:00Z', lastCrawlAt: '2026-10-20T06:00:00Z' },
     { id: 2, name: 'Globex Jobs', url: 'https://globex.example/jobs', enabled: true, extractionTier: 'json_ld', createdAt: '2026-10-19T11:00:00Z', lastCrawlAt: '2026-10-20T06:00:00Z' },

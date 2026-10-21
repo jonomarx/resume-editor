@@ -1,0 +1,4 @@
+[{"id":"ad208490","text":"Data Intern","hostedUrl":"https://jobs.lever.co/acme/ad208490","applyUrl":"https://jobs.lever.co/acme/ad208490/apply",
+  "createdAt":1788199939703,"workplaceType":"remote","categories":{"commitment":"Intern","location":"Austin, TX","allLocations":["Austin, TX","Denver, CO"],"team":"Data"},
+  "descriptionPlain":"Work with data.","lists":[{"text":"Requirements:","content":"<li>Python</li><li>SQL</li>"}],"additionalPlain":"We are an equal opportunity employer."},
+ {"id":"x2","text":"Ops Intern","hostedUrl":"https://jobs.lever.co/acme/x2","createdAt":1788199939703,"categories":{},"workplaceType":"onsite","descriptionPlain":"Ops."}]
