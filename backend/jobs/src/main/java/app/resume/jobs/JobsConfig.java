@@ -40,8 +40,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class JobsConfig {
     /** The SSRF policy every outbound fetch of the pipeline uses. */
     @Bean
-    PublicHostPolicy publicHostPolicy() {
-        return new PublicHostPolicy();
+    PublicHostPolicy publicHostPolicy(@Value("${app.jobs.fetch.allow-private-hosts:false}") boolean allowPrivateHosts) {
+        if (allowPrivateHosts) {
+            org.slf4j.LoggerFactory.getLogger(JobsConfig.class).warn(
+                    "app.jobs.fetch.allow-private-hosts is ON: SSRF protection is disabled. This is for e2e/test runs only.");
+        }
+        return new PublicHostPolicy(allowPrivateHosts);
     }
 
     @Bean

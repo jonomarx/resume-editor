@@ -130,4 +130,43 @@ class PublicHostPolicyTests {
             server.stop(0);
         }
     }
+
+    // ---- the e2e/test opt-in (app.jobs.fetch.allow-private-hosts) ----
+
+    @Test
+    void defaultsRefusePrivateTargetsAndTheOptInAllowsThem() {
+        for (PublicHostPolicy refusing : new PublicHostPolicy[] {new PublicHostPolicy(), new PublicHostPolicy(false)}) {
+            assertThatThrownBy(() -> refusing.checkLiteral("http://127.0.0.1:9000/")).isInstanceOf(UrlNotAllowedException.class);
+            assertThatThrownBy(() -> refusing.check("localhost")).isInstanceOf(UrlNotAllowedException.class);
+        }
+        PublicHostPolicy open = new PublicHostPolicy(true);
+        assertThatCode(() -> open.checkLiteral("http://127.0.0.1:9000/jobs")).doesNotThrowAnyException();
+        assertThatCode(() -> open.checkLiteral("http://localhost:9000/")).doesNotThrowAnyException();
+        assertThatCode(() -> open.check("127.0.0.1")).doesNotThrowAnyException();
+        assertThatCode(() -> open.check("10.0.0.5")).doesNotThrowAnyException();
+        // the opt-in only relaxes addresses: other schemes and malformed URLs are still refused
+        assertThatThrownBy(() -> open.checkLiteral("file:///etc/passwd")).isInstanceOf(UrlNotAllowedException.class);
+        assertThatThrownBy(() -> open.checkLiteral("ftp://127.0.0.1/")).isInstanceOf(UrlNotAllowedException.class);
+    }
+
+    @Test
+    void withTheOptInTheRealFetcherCrawlsALocalFixtureSite() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", ex -> {
+            byte[] b = ex.getRequestURI().getPath().equals("/robots.txt") ? new byte[0] : "fixture".getBytes();
+            ex.sendResponseHeaders(ex.getRequestURI().getPath().equals("/robots.txt") ? 404 : 200, b.length == 0 ? -1 : b.length);
+            if (b.length > 0) ex.getResponseBody().write(b);
+            ex.close();
+        });
+        server.start();
+        try {
+            String url = "http://127.0.0.1:" + server.getAddress().getPort() + "/careers";
+            var refused = new JsoupPageFetcher("ua", new DomainRateLimiter(0), 2000, new PublicHostPolicy(false));
+            assertThatThrownBy(() -> refused.fetch(url)).isInstanceOf(UrlNotAllowedException.class);
+            var allowed = new JsoupPageFetcher("ua", new DomainRateLimiter(0), 2000, new PublicHostPolicy(true));
+            assertThat(allowed.fetch(url).body()).isEqualTo("fixture");
+        } finally {
+            server.stop(0);
+        }
+    }
 }

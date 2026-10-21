@@ -84,6 +84,14 @@ class IngestApiTests {
             converters.add(new MappingJackson2HttpMessageConverter(mapper()));
         }
         @Bean org.springframework.jdbc.core.JdbcTemplate jdbc() { return DB.jdbc; }
+        /** Test stand-in for core's session CurrentUser: a plain Spring User principal's name is the app_user username. */
+        @Bean app.resume.identity.CurrentUser currentUser() {
+            return () -> {
+                var a = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+                if (a == null || !(a.getPrincipal() instanceof User u)) return java.util.OptionalLong.empty();
+                return java.util.OptionalLong.of(DB.jdbc.queryForObject("SELECT id FROM app_user WHERE username_key = ?", Long.class, u.getUsername()));
+            };
+        }
         @Bean IngestTokenService tokens() { return new IngestTokenService(DB.jdbc, NOW::get); }
         @Bean IngestProcessor processor() {
             PageFetcher fetcher = url -> {

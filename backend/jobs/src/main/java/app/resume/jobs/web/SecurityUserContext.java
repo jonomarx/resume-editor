@@ -1,22 +1,20 @@
 package app.resume.jobs.web;
 
-import org.springframework.jdbc.core.JdbcTemplate;
+import app.resume.identity.CurrentUser;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 /**
- * Resolves the caller from the Spring Security context. A session principal is a {@link UserDetails} whose username is
- * looked up in app_user (jobs may not depend on core's principal class); a bearer-token request carries an
- * {@link IngestPrincipal}.
+ * Resolves the caller. A bearer-token request carries an {@link IngestPrincipal} (resolved here, by this module); a
+ * session login is answered by the {@link CurrentUser} port from common.
  */
 @Component
 public class SecurityUserContext implements UserContext {
-    private final JdbcTemplate jdbc;
+    private final CurrentUser currentUser;
 
-    public SecurityUserContext(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public SecurityUserContext(CurrentUser currentUser) {
+        this.currentUser = currentUser;
     }
 
     @Override
@@ -28,10 +26,6 @@ public class SecurityUserContext implements UserContext {
 
     @Override
     public long requireSessionUserId() {
-        Authentication a = SecurityContextHolder.getContext().getAuthentication();
-        if (a == null || !a.isAuthenticated() || !(a.getPrincipal() instanceof UserDetails u)) throw ApiException.unauthorized();
-        var ids = jdbc.queryForList("SELECT id FROM app_user WHERE username_key = ?", Long.class, u.getUsername().toLowerCase(java.util.Locale.ROOT));
-        if (ids.isEmpty()) throw ApiException.unauthorized();
-        return ids.get(0);
+        return currentUser.sessionUserId().orElseThrow(ApiException::unauthorized);
     }
 }
