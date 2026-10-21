@@ -25,8 +25,19 @@ public class PublicHostPolicy implements HostPolicy {
     /** Dotted numbers (decimal, 0x-hex or leading-zero octal parts) are IPv4 literals in some notation, never names. */
     private static final Pattern IPV4_LIKE = Pattern.compile("^(?:0[xX][0-9a-fA-F]+|[0-9]+)(?:\\.(?:0[xX][0-9a-fA-F]+|[0-9]+))*$");
 
+    /** TEST/E2E ONLY: when true every host is allowed (loopback, private, link-local). Production leaves this false. */
+    private final boolean allowPrivateHosts;
+
     public PublicHostPolicy() {
-        this(host -> {
+        this(false);
+    }
+
+    /**
+     * @param allowPrivateHosts test/e2e switch (`app.jobs.fetch.allow-private-hosts`, default false): lets the pipeline
+     *     crawl a fixture site on localhost. Never enable it in a deployment: it turns the SSRF protection off.
+     */
+    public PublicHostPolicy(boolean allowPrivateHosts) {
+        this(allowPrivateHosts, host -> {
             try {
                 return InetAddress.getAllByName(host);
             } catch (UnknownHostException e) {
@@ -36,12 +47,18 @@ public class PublicHostPolicy implements HostPolicy {
     }
 
     public PublicHostPolicy(Function<String, InetAddress[]> resolver) {
+        this(false, resolver);
+    }
+
+    PublicHostPolicy(boolean allowPrivateHosts, Function<String, InetAddress[]> resolver) {
+        this.allowPrivateHosts = allowPrivateHosts;
         this.resolver = resolver;
     }
 
     /** Cheap, DNS-free check for a URL as typed: scheme, a host, and no refused literal address or localhost name. */
     public void checkLiteral(String url) {
-        String host = hostOf(url);
+        String host = hostOf(url); // the scheme and shape checks always apply
+        if (allowPrivateHosts) return;
         String lower = host.toLowerCase(Locale.ROOT);
         if (lower.equals("localhost") || lower.endsWith(".localhost") || lower.endsWith(".internal") || lower.endsWith(".local")) {
             throw new UrlNotAllowedException("host is not public: " + host);
@@ -53,6 +70,7 @@ public class PublicHostPolicy implements HostPolicy {
 
     @Override
     public void check(String host) {
+        if (allowPrivateHosts) return;
         checkLiteral("http://" + (host.contains(":") && !host.startsWith("[") ? "[" + host + "]" : host) + "/");
         if (looksLikeLiteral(stripBrackets(host))) return; // already checked, nothing to resolve
         InetAddress[] all = resolver.apply(host);
