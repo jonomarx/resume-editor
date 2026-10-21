@@ -1,9 +1,11 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, vi } from 'vitest'
-import { ApiError, type Api, type IngestApi } from '../api/types'
+import { ApiError, type IngestApi } from '../api/types'
 import { INGEST_LABELS as L, INGEST_POLL_MAX_ATTEMPTS, INGEST_POLL_MS } from '../config/constants'
-import { createDummyIngest } from '../dummy/dummyIngest'
+import { createHttpApi } from '../api/http'
+import { createFakeFetch } from '../test/fakeFetch'
+import { createFakeIngest } from '../test/fakeIngest'
 import IngestPage from './IngestPage'
 
 let user: ReturnType<typeof userEvent.setup>
@@ -15,13 +17,13 @@ beforeEach(() => {
 })
 afterEach(() => vi.useRealTimers())
 
-function setup(ingest: IngestApi = createDummyIngest()) {
-  render(<IngestPage apiClient={{ ingest } as unknown as Api} />)
+function setup(ingest: IngestApi = createFakeIngest()) {
+  render(<IngestPage apiClient={createHttpApi(createFakeFetch({ ingest }))} />)
   return ingest
 }
 const paste = (text: string) => fireEvent.change(screen.getByLabelText('Posting'), { target: { value: text } })
 
-describe('paste box (against the dummy ingest API)', () => {
+describe('paste box (real client against the contract paths)', () => {
   it('cannot submit an empty paste', () => {
     setup()
     expect(screen.getByRole('button', { name: L.submit })).toBeDisabled()
@@ -62,7 +64,7 @@ describe('paste box (against the dummy ingest API)', () => {
     [413, L.tooLarge],
     [429, L.tooMany],
   ])('shows the message for a %i response', async (status, text) => {
-    const ingest = createDummyIngest()
+    const ingest = createFakeIngest()
     ingest.ingest = () => Promise.reject(new ApiError(status, { code: 'x', message: 'x' }))
     setup(ingest)
     paste('anything')
@@ -71,7 +73,7 @@ describe('paste box (against the dummy ingest API)', () => {
   })
 
   it('shows the server detail on a 400', async () => {
-    const ingest = createDummyIngest()
+    const ingest = createFakeIngest()
     ingest.ingest = () => Promise.reject(new ApiError(400, { code: 'validation_failed', message: 'Request failed validation', details: [{ field: 'payload', message: 'host is not allowed' }] }))
     setup(ingest)
     paste('http://10.0.0.1/x')
@@ -80,7 +82,7 @@ describe('paste box (against the dummy ingest API)', () => {
   })
 
   it('gives up polling after the maximum number of checks', async () => {
-    const ingest = createDummyIngest()
+    const ingest = createFakeIngest()
     ingest.getEvent = vi.fn(async (id: number) => ({ id, kind: 'text' as const, status: 'processing' as const, receivedAt: '', finishedAt: null, jobId: null, error: null }))
     setup(ingest)
     paste('slow one')
@@ -93,7 +95,7 @@ describe('paste box (against the dummy ingest API)', () => {
 
 describe('polling cancellation', () => {
   const slow = () => {
-    const ingest = createDummyIngest()
+    const ingest = createFakeIngest()
     const getEvent = vi.fn(async (id: number) => ({ id, kind: 'text' as const, status: 'processing' as const, receivedAt: '', finishedAt: null, jobId: null, error: null }))
     ingest.getEvent = getEvent
     return { ingest, getEvent }
@@ -116,7 +118,7 @@ describe('polling cancellation', () => {
 
   it('unmounting stops all polling', async () => {
     const { ingest, getEvent } = slow()
-    const { unmount } = render(<IngestPage apiClient={{ ingest } as unknown as Api} />)
+    const { unmount } = render(<IngestPage apiClient={createHttpApi(createFakeFetch({ ingest }))} />)
     paste('a posting')
     await user.click(screen.getByRole('button', { name: L.submit }))
     await settle(INGEST_POLL_MS + 10)
@@ -127,7 +129,7 @@ describe('polling cancellation', () => {
   })
 })
 
-describe('bookmarklet generator (against the dummy ingest API)', () => {
+describe('bookmarklet generator (real client against the contract paths)', () => {
   it('creates a token, shows the secret and code once, and never stores it', async () => {
     const store = vi.spyOn(Storage.prototype, 'setItem')
     const ingest = setup()
@@ -137,7 +139,7 @@ describe('bookmarklet generator (against the dummy ingest API)', () => {
     const code = (await screen.findByLabelText(L.codeLabel)) as HTMLTextAreaElement
     expect(code.value).toMatch(/^javascript:\(function\(\)\{/)
     expect(code.value).toContain(window.location.origin + '/api/ingest')
-    expect(code.value).toContain('Bearer dummy-ingest-1-')
+    expect(code.value).toContain('Bearer fake-ingest-1-')
     expect(screen.getByText(L.tokenSecretNote)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: L.bookmarkletLink }).getAttribute('href')).toMatch(/^javascript:/)
     expect(store).not.toHaveBeenCalled()
@@ -155,19 +157,19 @@ describe('bookmarklet generator (against the dummy ingest API)', () => {
     await ingest.createToken('Old laptop')
     await user.click(screen.getByRole('button', { name: L.createToken }))
     expect(await screen.findByRole('listitem', { name: 'Old laptop' })).toBeInTheDocument()
-    expect(screen.queryByText(/dummy-ingest-1/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/fake-ingest-1/)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Revoke Old laptop' }))
     expect(await screen.findByText(/Old laptop \(revoked\)/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Revoke Old laptop' })).not.toBeInTheDocument()
   })
 
   it('the secret is gone after the page is shown again', async () => {
-    const ingest = createDummyIngest()
-    const { unmount } = render(<IngestPage apiClient={{ ingest } as unknown as Api} />)
+    const ingest = createFakeIngest()
+    const { unmount } = render(<IngestPage apiClient={createHttpApi(createFakeFetch({ ingest }))} />)
     await user.click(screen.getByRole('button', { name: L.createToken }))
     await screen.findByLabelText(L.codeLabel)
     unmount()
-    render(<IngestPage apiClient={{ ingest } as unknown as Api} />)
+    render(<IngestPage apiClient={createHttpApi(createFakeFetch({ ingest }))} />)
     expect(await screen.findByRole('listitem', { name: L.tokenDefaultLabel })).toBeInTheDocument()
     expect(screen.queryByLabelText(L.codeLabel)).not.toBeInTheDocument()
   })

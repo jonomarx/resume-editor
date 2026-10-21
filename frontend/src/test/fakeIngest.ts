@@ -1,7 +1,7 @@
-// DUMMY(US-041): in-memory stand-in for the ingest, ingest-event and ingest-token endpoints. Delete when US-041 is ready.
+// Test-only in-memory ingest API (ingest with duplicate detection, event polling, tokens). Not bundled.
 import { ApiError, type IngestApi, type IngestEvent, type IngestToken } from '../api/types'
 
-export function createDummyIngest(): IngestApi {
+export function createFakeIngest(): IngestApi {
   const events = new Map<number, { event: IngestEvent; polls: number; fail: boolean }>()
   const byContent = new Map<string, number>()
   const tokens: IngestToken[] = []
@@ -37,7 +37,7 @@ export function createDummyIngest(): IngestApi {
     async createToken(label) {
       const t: IngestToken = { id: nextToken++, label, createdAt: new Date().toISOString(), lastUsedAt: null, revokedAt: null }
       tokens.push(t)
-      return { ...t, token: `dummy-ingest-${t.id}-${Math.random().toString(36).slice(2)}` }
+      return { ...t, token: `fake-ingest-${t.id}-${Math.random().toString(36).slice(2)}` }
     },
     async revokeToken(id) {
       const t = tokens.find((x) => x.id === id)
