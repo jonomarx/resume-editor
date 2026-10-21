@@ -1,18 +1,18 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
-import type { Api } from '../api/types'
-import { createDummySources } from '../dummy/dummySources'
+import { createHttpApi } from '../api/http'
+import { createFakeFetch } from '../test/fakeFetch'
+import { createFakeSources } from '../test/fakeSources'
 import SourcesPage from './SourcesPage'
 
-function setup(sources = createDummySources()) {
-  const api = { sources } as unknown as Api
-  render(<SourcesPage apiClient={api} />)
+function setup(sources = createFakeSources()) {
+  render(<SourcesPage apiClient={createHttpApi(createFakeFetch({ sources }))} />)
   return sources
 }
 const row = (name: string) => screen.findByRole('listitem', { name })
 
-describe('SourcesPage (against the dummy source API)', () => {
+describe('SourcesPage (real client against the contract paths)', () => {
   it('lists sources with their health', async () => {
     setup()
     const acme = await row('Acme Careers')
@@ -81,14 +81,14 @@ describe('SourcesPage (against the dummy source API)', () => {
   })
 
   it('shows an empty state and a load failure', async () => {
-    const sources = createDummySources()
+    const sources = createFakeSources()
     for (const s of await sources.list()) await sources.remove(s.id)
     setup(sources)
     expect(await screen.findByText(/No sources yet/)).toBeInTheDocument()
   })
 
   it('shows a message when loading fails', async () => {
-    const sources = createDummySources()
+    const sources = createFakeSources()
     sources.health = () => Promise.reject(new Error('x'))
     setup(sources)
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load sources.')
