@@ -178,7 +178,6 @@ class SecurityChainsTests {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("BUG: a successful bearer request that carries a SESSION cookie rotates that session (#232)")
     void aSuccessfulBearerRequestLeavesAnAttachedSessionUntouched() throws Exception {
         User a = newUser();
         User b = newUser();
