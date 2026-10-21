@@ -76,3 +76,52 @@ describe('csrf handling', () => {
     expect(await spied().api.auth.getMe()).toBeNull()
   })
 })
+
+describe('httpApi.sources', () => {
+  it('uses the contract paths and methods', async () => {
+    const calls: [string, string][] = []
+    const f = vi.fn(async (path: RequestInfo | URL, init: RequestInit = {}) => {
+      calls.push([init.method ?? 'GET', String(path)])
+      return new Response(init.method === 'DELETE' ? null : '[]', { status: init.method === 'DELETE' ? 204 : 200, headers: {} })
+    }) as unknown as typeof fetch
+    document.cookie = 'XSRF-TOKEN=t; path=/'
+    const api = createHttpApi(f)
+    await api.sources.list()
+    await api.sources.health()
+    await api.sources.create('https://a.example/x')
+    await api.sources.update(5, { enabled: false })
+    await api.sources.remove(5)
+    expect(calls).toEqual([
+      ['GET', '/api/sources'],
+      ['GET', '/api/source-health'],
+      ['POST', '/api/sources'],
+      ['PUT', '/api/sources/5'],
+      ['DELETE', '/api/sources/5'],
+    ])
+  })
+})
+
+describe('httpApi.ingest', () => {
+  it('uses the session (with the csrf header) and never a bearer token', async () => {
+    const seen: { m: string; p: string; h: Headers; b: unknown }[] = []
+    const f = vi.fn(async (path: RequestInfo | URL, init: RequestInit = {}) => {
+      seen.push({ m: init.method ?? 'GET', p: String(path), h: new Headers(init.headers), b: init.body ? JSON.parse(init.body as string) : undefined })
+      return new Response(init.method === 'DELETE' ? null : '{}', { status: init.method === 'DELETE' ? 204 : 200 })
+    }) as unknown as typeof fetch
+    document.cookie = 'XSRF-TOKEN=tt; path=/'
+    const api = createHttpApi(f)
+    await api.ingest.ingest('html', '<p>x</p>', 'https://a.example')
+    await api.ingest.getEvent(7)
+    await api.ingest.createToken('Bookmarklet')
+    await api.ingest.revokeToken(3)
+    expect(seen.map((s) => [s.m, s.p])).toEqual([
+      ['POST', '/api/ingest'],
+      ['GET', '/api/ingest/events/7'],
+      ['POST', '/api/ingest/tokens'],
+      ['DELETE', '/api/ingest/tokens/3'],
+    ])
+    expect(seen[0].b).toEqual({ kind: 'html', payload: '<p>x</p>', sourceHint: 'https://a.example' })
+    expect(seen.every((s) => !s.h.has('Authorization'))).toBe(true)
+    expect(seen[0].h.get('X-XSRF-TOKEN')).toBe('tt')
+  })
+})

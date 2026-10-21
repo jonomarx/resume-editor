@@ -178,3 +178,87 @@ export const PASSWORD_MESSAGES = {
   /** Shown when the server rejects the password with a 400 that has no usable detail text. */
   rejected: 'The server did not accept this password.',
 } as const
+
+export const SOURCES_LABELS = {
+  heading: 'Career page sources',
+  intro: 'Companies whose career pages are crawled once a day.',
+  none: 'No sources yet. Add a career page below.',
+  urlLabel: 'Career page URL',
+  nameLabel: 'Name (optional)',
+  add: 'Add source',
+  rename: 'Rename',
+  save: 'Save',
+  cancel: 'Cancel',
+  enabled: 'Enabled',
+  remove: 'Delete',
+  confirmRemove: 'Confirm delete',
+  removeNote: 'Postings already found stay in the feed.',
+  neverCrawled: 'Never crawled',
+  lastCrawl: (when: string) => `Last crawl ${when}`,
+  postings: (active: number, stale: number) => `${active} active, ${stale} stale postings`,
+  lastRun: (added: number, updated: number, closed: number) => `Last run: ${added} added, ${updated} updated, ${closed} closed`,
+  lastRunFailed: (error: string | null) => `Last run failed${error ? `: ${error}` : ''}`,
+  history: 'Recent runs',
+  exists: 'You already have this source.',
+  loadFailed: 'Could not load sources.',
+  actionFailed: 'That did not work. Try again.',
+  states: {
+    never_run: 'Not crawled yet',
+    healthy: 'Healthy',
+    degraded: 'Last run failed',
+    failing: 'Failing',
+  },
+} as const
+
+/** The bookmarklet sends at most this many characters of page source (the API rejects more with 413). */
+export const INGEST_MAX_PAYLOAD_CHARS = 1_000_000
+
+/** How often the paste box checks an ingest event, and how many checks it makes before giving up. */
+export const INGEST_POLL_MS = 1500
+export const INGEST_POLL_MAX_ATTEMPTS = 40
+
+export const INGEST_KINDS = [
+  { value: 'text', label: 'Pasted text' },
+  { value: 'url', label: 'Posting URL' },
+  { value: 'html', label: 'Page source (HTML)' },
+  { value: 'email', label: 'Forwarded email' },
+] as const
+
+export const INGEST_LABELS = {
+  heading: 'Add a job',
+  pasteHeading: 'Paste a posting',
+  kindLabel: 'What are you pasting?',
+  payloadLabel: 'Posting',
+  hintLabel: 'Page URL or company (optional)',
+  submit: 'Add posting',
+  sending: 'Sending...',
+  queued: 'Received. Processing...',
+  duplicate: 'You already added this posting.',
+  done: 'Done. The posting was added.',
+  failed: (message: string) => `Could not process it: ${message}`,
+  gaveUp: 'Still processing. Check the job feed later.',
+  sendFailed: 'Could not send it. Try again.',
+  tooLarge: 'That is too large to send.',
+  tooMany: 'Too many requests. Wait a moment and try again.',
+  bookmarkletHeading: 'Bookmarklet',
+  bookmarkletIntro: 'Create a token, then drag the link to your bookmarks bar. Click it on any job page to send that page here. The token can only add postings and you can revoke it below.',
+  tokenLabelLabel: 'Token name',
+  tokenDefaultLabel: 'Bookmarklet',
+  createToken: 'Create token',
+  tokenSecretNote: 'This token is shown only now. If you lose it, create a new one. Anyone with it can add postings to your account until you revoke it.',
+  bookmarkletLink: 'Send to Resume Editor',
+  copy: 'Copy bookmarklet code',
+  copied: 'Copied',
+  codeLabel: 'Bookmarklet code',
+  tokensHeading: 'Your tokens',
+  noTokens: 'No tokens yet.',
+  revoked: 'revoked',
+  lastUsed: (when: string | null) => (when ? `last used ${new Date(when).toLocaleString()}` : 'never used'),
+  revoke: 'Revoke',
+  tokenError: 'That did not work. Try again.',
+  alertSent: 'Sent to Resume Editor',
+  alertFailedPrefix: 'Resume Editor rejected it (',
+  alertFailedSuffix: ')',
+  alertFailed: (status: number) => `Resume Editor rejected it (${status})`,
+  alertUnreachable: 'Could not reach Resume Editor',
+} as const

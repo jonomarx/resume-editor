@@ -1,0 +1,6 @@
+{"apiVersion":"1","jobs":[
+ {"id":"7458d4e9","title":"ML Intern","location":"New York","secondaryLocations":[{"location":"Remote - US"}],"employmentType":"Intern","isListed":true,
+  "jobUrl":"https://jobs.ashbyhq.com/acme/7458d4e9","publishedAt":"2026-08-01T10:00:00.000+00:00","descriptionPlain":"Train models.","descriptionHtml":"<p>Train models.</p>"},
+ {"id":"h","title":"Hidden Role","location":"X","isListed":false,"jobUrl":"https://jobs.ashbyhq.com/acme/h","descriptionHtml":"<p>nope</p>"},
+ {"id":"n","title":"HTML Only","location":"Y","jobUrl":"https://jobs.ashbyhq.com/acme/n","descriptionHtml":"<p>One</p><p>Two</p>"}
+]}
