@@ -204,4 +204,30 @@ class JobFeedTests {
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/jobs/1/status").cookie(u.session())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"saved\"}")).andExpect(status().isForbidden());
     }
+
+    @Test
+    void readsNeverCreateTheMasterResume() throws Exception {
+        U u = seeded();
+        list(u).andExpect(status().isOk()).andExpect(jsonPath("$.items[0].fitScore").value(0));
+        mvc.perform(get("/api/jobs/1").cookie(u.session())).andExpect(status().isOk()).andExpect(jsonPath("$.fitScore").value(0));
+        mvc.perform(CsrfSupport.put("/api/jobs/1/status").cookie(u.session()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"saved\"}")).andExpect(status().isOk());
+        org.assertj.core.api.Assertions.assertThat(
+                jdbc.queryForObject("select count(*) from resume where user_id = ?", Integer.class, u.id())).isZero();
+    }
+
+    @Test
+    void anotherUsersPostingAndStatusAre404() throws Exception {
+        U a = newUser();
+        U b = newUser();
+        reader.replace(a.id(), List.of(posting(50, "Mine", "Acme", null, "d", List.of(), "active", Instant.now())));
+        reader.replace(b.id(), List.of());
+        mvc.perform(get("/api/jobs/50").cookie(a.session())).andExpect(status().isOk());
+        mvc.perform(get("/api/jobs/50").cookie(b.session())).andExpect(status().isNotFound());
+        mvc.perform(CsrfSupport.put("/api/jobs/50/status").cookie(b.session()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"saved\"}")).andExpect(status().isNotFound());
+        list(b).andExpect(jsonPath("$.total").value(0));
+        org.assertj.core.api.Assertions.assertThat(
+                jdbc.queryForObject("select count(*) from job_user_status where user_id = ?", Integer.class, b.id())).isZero();
+    }
 }
