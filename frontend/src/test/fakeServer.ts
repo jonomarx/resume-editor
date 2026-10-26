@@ -4,6 +4,7 @@ import { createHttpApi } from '../api/http'
 import type { Api, Credentials } from '../api/types'
 import { AUTH, CSRF } from '../config/constants'
 import { createFakeRender, type FakeRender } from './fakeRender'
+import { createDummyJobsApi } from '../dummy/jobs'
 import { createFakeTags, type FakeTags } from './fakeTags'
 import { createFakeResume, type FakeResume } from './fakeResume'
 
@@ -104,6 +105,7 @@ export function createFakeServer(): FakeServer {
 }
 
 export function createFakeApi(): Api {
-  return createHttpApi(createFakeServer().fetch)
+  // Jobs come from the dummy API (DUMMY(US-050)) until the real endpoints exist.
+  return { ...createHttpApi(createFakeServer().fetch), jobs: createDummyJobsApi() }
 }
 

@@ -10,7 +10,7 @@ function renderAt(path: string, api: Api = createFakeApi()) {
   render(
     <MemoryRouter initialEntries={[path]}>
       <AuthProvider api={api}>
-        <App />
+        <App apiClient={api} />
       </AuthProvider>
     </MemoryRouter>,
   )
@@ -73,7 +73,7 @@ describe('route guard return path', () => {
     render(
       <MemoryRouter initialEntries={['/jobs?tag=java#top']}>
         <AuthProvider api={api}>
-          <App />
+          <App apiClient={api} />
           <Where />
         </AuthProvider>
       </MemoryRouter>,
@@ -84,6 +84,10 @@ describe('route guard return path', () => {
     await user.click(screen.getByRole('button', { name: 'Log in' }))
     // The location is present from the start (/login); wait for the redirect back.
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/jobs?tag=java#top'))
+    // The feed restores the filter from the return path (against the fake, not the network).
+    expect(await screen.findByLabelText('Java')).toBeChecked()
+    expect(await screen.findByText('Backend Intern')).toBeInTheDocument()
+    expect(screen.queryByText('Frontend Intern')).not.toBeInTheDocument()
   })
 })
 

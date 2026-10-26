@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { api as defaultApi } from '../api'
-import type { Api, JobPage, JobQuery, JobSummary, JobUserStatus, Tag } from '../api/types'
+import type { Api, JobQuery, JobSummary, JobUserStatus, Tag } from '../api/types'
+import { loadFeedPage, type FeedPage } from './loadFeed'
 import { JOB_FEED, JOB_FEED_LABELS as L } from '../config/constants'
 
 const STATUSES: JobUserStatus[] = ['new', 'saved', 'dismissed', 'applied']
@@ -37,18 +38,48 @@ function JobCard({ job, tagNames, onStatus, error }: { job: JobSummary; tagNames
   )
 }
 
+type StatusChoice = JobUserStatus | 'any' | ''
+
+/** Filters, sort and page live in the URL query; defaults are left out of it. "" means the default: hide dismissed. */
+function readParams(sp: URLSearchParams) {
+  const status = sp.get('status')
+  const age = Number(sp.get('maxAgeDays'))
+  const offset = Number(sp.get('offset'))
+  return {
+    sort: (sp.get('sort') === 'newest' ? 'newest' : 'fit') as JobQuery['sort'],
+    tags: sp.getAll('tag'),
+    status: (status === 'any' || STATUSES.includes(status as JobUserStatus) ? status : '') as StatusChoice,
+    maxAgeDays: (JOB_FEED.freshnessDays as readonly number[]).includes(age) ? age : 0,
+    location: sp.get('location') ?? '',
+    q: sp.get('q') ?? '',
+    offset: Number.isInteger(offset) && offset > 0 ? offset : 0,
+  }
+}
+
+function writeParams(f: ReturnType<typeof readParams>): URLSearchParams {
+  const sp = new URLSearchParams()
+  if (f.sort !== 'fit') sp.set('sort', f.sort)
+  for (const t of f.tags) sp.append('tag', t)
+  if (f.status) sp.set('status', f.status)
+  if (f.maxAgeDays) sp.set('maxAgeDays', String(f.maxAgeDays))
+  if (f.location) sp.set('location', f.location)
+  if (f.q) sp.set('q', f.q)
+  if (f.offset) sp.set('offset', String(f.offset))
+  return sp
+}
+
 export default function JobsPage({ apiClient = defaultApi }: { apiClient?: Api }) {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const filters = readParams(searchParams)
+  const { sort, tags, status, maxAgeDays, offset } = filters
+  // Offsets of the pages before this one; kept in history state because "previous" cannot be computed when dismissed postings are hidden.
+  const prevOffsets = ((useLocation().state as { prev?: number[] } | null)?.prev ?? []).filter((n) => Number.isInteger(n))
   const [vocabulary, setVocabulary] = useState<Tag[]>([])
-  const [sort, setSort] = useState<JobQuery['sort']>('fit')
-  const [tags, setTags] = useState<string[]>([])
-  const [status, setStatus] = useState<JobUserStatus | ''>('')
-  const [maxAgeDays, setMaxAgeDays] = useState(0)
-  const [location, setLocation] = useState('')
-  const [search, setSearch] = useState('')
-  // Text filters apply on submit, the rest immediately.
-  const [applied, setApplied] = useState({ location: '', q: '' })
-  const [offset, setOffset] = useState(0)
-  const [page, setPage] = useState<JobPage | null>(null)
+  // Text filters apply on submit, the rest immediately; the boxes start from the URL.
+  const [location, setLocation] = useState(filters.location)
+  const [search, setSearch] = useState(filters.q)
+  const [page, setPage] = useState<FeedPage | null>(null)
+  const [reload, setReload] = useState(0)
   const [loadError, setLoadError] = useState(false)
   const [failedId, setFailedId] = useState<number | null>(null)
 
@@ -61,24 +92,21 @@ export default function JobsPage({ apiClient = defaultApi }: { apiClient?: Api }
   }, [apiClient])
   const tagNames = useMemo(() => new Map(vocabulary.map((t) => [t.slug, t.name])), [vocabulary])
 
-  const query = useMemo<JobQuery>(
-    () => ({
+  const hideDismissed = status === ''
+  const tagKey = tags.join('\n')
+  useEffect(() => {
+    let cancelled = false
+    const query: JobQuery = {
       sort,
-      tags,
-      location: applied.location || undefined,
-      q: applied.q || undefined,
-      status: status || undefined,
+      tags: tagKey ? tagKey.split('\n') : [],
+      location: filters.location || undefined,
+      q: filters.q || undefined,
+      status: status && status !== 'any' ? status : undefined,
       maxAgeDays: maxAgeDays || undefined,
       limit: JOB_FEED.pageSize,
       offset,
-    }),
-    [sort, tags, applied, status, maxAgeDays, offset],
-  )
-
-  useEffect(() => {
-    let cancelled = false
-    apiClient.jobs
-      .list(query)
+    }
+    loadFeedPage(apiClient.jobs, query, hideDismissed)
       .then((p) => {
         if (cancelled) return
         setPage(p)
@@ -88,27 +116,23 @@ export default function JobsPage({ apiClient = defaultApi }: { apiClient?: Api }
     return () => {
       cancelled = true
     }
-  }, [apiClient, query])
+  }, [apiClient, sort, tagKey, filters.location, filters.q, status, maxAgeDays, offset, hideDismissed, reload])
 
-  /** Any filter change returns to the first page. */
-  const filter = useCallback(<T,>(set: (v: T) => void) => (v: T) => {
-    set(v)
-    setOffset(0)
-  }, [])
+  /** A filter change returns to the first page. */
+  const setFilters = (change: Partial<ReturnType<typeof readParams>>) => setSearchParams(writeParams({ ...filters, offset: 0, ...change }))
 
   async function changeStatus(id: number, next: JobUserStatus) {
     setFailedId(null)
     try {
       const updated = await apiClient.jobs.setStatus(id, next)
-      setPage((p) => {
-        if (!p) return p
-        const stays = !status || updated.userStatus === status
-        return {
-          ...p,
-          total: stays ? p.total : p.total - 1,
-          items: stays ? p.items.map((j) => (j.id === id ? updated : j)) : p.items.filter((j) => j.id !== id),
-        }
-      })
+      const stays = status === '' ? updated.userStatus !== 'dismissed' : status === 'any' || updated.userStatus === status
+      if (stays) {
+        setPage((p) => p && { ...p, items: p.items.map((j) => (j.id === id ? updated : j)) })
+      } else {
+        // The card leaves this list: drop it now and refetch so the page fills up again.
+        setPage((p) => p && { ...p, items: p.items.filter((j) => j.id !== id) })
+        setReload((n) => n + 1)
+      }
     } catch {
       setFailedId(id)
     }
@@ -116,12 +140,12 @@ export default function JobsPage({ apiClient = defaultApi }: { apiClient?: Api }
 
   function submitSearch(e: FormEvent) {
     e.preventDefault()
-    setApplied({ location: location.trim(), q: search.trim() })
-    setOffset(0)
+    setFilters({ location: location.trim(), q: search.trim() })
   }
 
-  const from = page && page.items.length ? page.offset + 1 : 0
-  const to = page ? page.offset + page.items.length : 0
+  const goTo = (target: number, prev: number[]) => setSearchParams(writeParams({ ...filters, offset: target }), { state: { prev } })
+  const from = page && page.items.length ? offset + 1 : 0
+  const to = page ? offset + page.items.length : 0
 
   return (
     <>
@@ -129,21 +153,22 @@ export default function JobsPage({ apiClient = defaultApi }: { apiClient?: Api }
       <form onSubmit={submitSearch} aria-label="Filters">
         <label>
           {L.sortLabel}
-          <select value={sort} onChange={(e) => filter(setSort)(e.target.value as JobQuery['sort'])}>
+          <select value={sort} onChange={(e) => setFilters({ sort: e.target.value as JobQuery['sort'] })}>
             <option value="fit">{L.sorts.fit}</option>
             <option value="newest">{L.sorts.newest}</option>
           </select>
         </label>
         <label>
           {L.statusLabel}
-          <select value={status} onChange={(e) => filter(setStatus)(e.target.value as JobUserStatus | '')}>
-            <option value="">{L.anyStatus}</option>
+          <select value={status} onChange={(e) => setFilters({ status: e.target.value as StatusChoice })}>
+            <option value="">{L.defaultStatus}</option>
+            <option value="any">{L.anyStatus}</option>
             {STATUSES.map((s) => <option key={s} value={s}>{L.statuses[s]}</option>)}
           </select>
         </label>
         <label>
           {L.freshnessLabel}
-          <select value={maxAgeDays} onChange={(e) => filter(setMaxAgeDays)(Number(e.target.value))}>
+          <select value={maxAgeDays} onChange={(e) => setFilters({ maxAgeDays: Number(e.target.value) })}>
             {JOB_FEED.freshnessDays.map((d) => <option key={d} value={d}>{d === 0 ? L.anyAge : L.days(d)}</option>)}
           </select>
         </label>
@@ -164,7 +189,7 @@ export default function JobsPage({ apiClient = defaultApi }: { apiClient?: Api }
               <input
                 type="checkbox"
                 checked={tags.includes(t.slug)}
-                onChange={(e) => filter(setTags)(e.target.checked ? [...tags, t.slug] : tags.filter((s) => s !== t.slug))}
+                onChange={(e) => setFilters({ tags: e.target.checked ? [...tags, t.slug] : tags.filter((s) => s !== t.slug) })}
               />
               {t.name}
             </label>
@@ -176,11 +201,11 @@ export default function JobsPage({ apiClient = defaultApi }: { apiClient?: Api }
       <ul>
         {page?.items.map((j) => <JobCard key={j.id} job={j} tagNames={tagNames} onStatus={(id, s) => void changeStatus(id, s)} error={failedId === j.id} />)}
       </ul>
-      {page && page.total > 0 && (
+      {page && (page.items.length > 0 || offset > 0) && (
         <nav aria-label="Pages">
-          <button type="button" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - JOB_FEED.pageSize))}>{L.previous}</button>{' '}
-          <span>{L.range(from, to, page.total)}</span>{' '}
-          <button type="button" disabled={to >= page.total} onClick={() => setOffset(offset + JOB_FEED.pageSize)}>{L.next}</button>
+          <button type="button" disabled={offset === 0} onClick={() => goTo(prevOffsets.length ? prevOffsets[prevOffsets.length - 1] : 0, prevOffsets.slice(0, -1))}>{L.previous}</button>{' '}
+          <span>{hideDismissed ? L.shown(page.items.length) : L.range(from, to, page.total)}</span>{' '}
+          <button type="button" disabled={!page.hasMore} onClick={() => goTo(page.next, [...prevOffsets, offset])}>{L.next}</button>
         </nav>
       )}
     </>

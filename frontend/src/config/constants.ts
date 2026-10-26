@@ -279,6 +279,7 @@ export const JOB_FEED_LABELS = {
   searchLabel: 'Search',
   applySearch: 'Search',
   statusLabel: 'Status',
+  defaultStatus: 'Not dismissed',
   anyStatus: 'Any status',
   statuses: { new: 'New', saved: 'Saved', dismissed: 'Dismissed', applied: 'Applied' },
   freshnessLabel: 'Posted within',
@@ -303,4 +304,5 @@ export const JOB_FEED_LABELS = {
   previous: 'Previous',
   next: 'Next',
   range: (from: number, to: number, total: number) => `${from}-${to} of ${total}`,
+  shown: (n: number) => (n === 1 ? 'Showing 1 posting' : `Showing ${n} postings`),
 } as const

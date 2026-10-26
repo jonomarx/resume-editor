@@ -1,6 +1,6 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { vi } from 'vitest'
 import JobsPage from './JobsPage'
 import { createDummyJobsApi } from '../dummy/jobs'
@@ -12,9 +12,15 @@ import type { Api, JobsApi, Tag } from '../api/types'
 const tag = (id: number, name: string, slug: string): Tag => ({ id, name, slug, category: 'language', aliases: [] })
 const vocabulary = [tag(1, 'Java', 'java'), tag(2, 'React', 'react'), tag(3, 'Python', 'python')]
 
-function setup(jobs: JobsApi = createDummyJobsApi()) {
+function Where() {
+  const l = useLocation()
+  return <span data-testid="where">{l.pathname + l.search}</span>
+}
+const where = () => screen.getByTestId('where').textContent
+
+function setup(jobs: JobsApi = createDummyJobsApi(), path = '/jobs') {
   const api: Api = { ...createFakeApi(), jobs, tags: { listTags: async () => vocabulary, createTag: async () => vocabulary[0] } }
-  render(<MemoryRouter><JobsPage apiClient={api} /></MemoryRouter>)
+  render(<MemoryRouter initialEntries={[path]}><JobsPage apiClient={api} /><Where /></MemoryRouter>)
   return jobs
 }
 const titles = () => screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
@@ -91,7 +97,13 @@ describe('JobsPage against the dummy jobs API', () => {
     await userEvent.click(within(backend).getByRole('button', { name: 'Unsave Backend Intern' }))
     expect(await within(backend).findByRole('button', { name: 'Save Backend Intern' })).toBeInTheDocument()
     await userEvent.click(within(backend).getByRole('button', { name: 'Dismiss Backend Intern' }))
-    expect(await within(backend).findByRole('button', { name: 'Restore Backend Intern' })).toBeInTheDocument()
+    await waitFor(() => expect(titles()).not.toContain('Backend Intern'))
+    await userEvent.selectOptions(screen.getByLabelText('Status'), 'dismissed')
+    const dismissed = await card(/Backend Intern/)
+    await userEvent.click(within(dismissed).getByRole('button', { name: 'Restore Backend Intern' }))
+    await waitFor(() => expect(screen.queryByText('Backend Intern')).not.toBeInTheDocument())
+    await userEvent.selectOptions(screen.getByLabelText('Status'), 'any')
+    expect(within(await card(/Backend Intern/)).getByRole('button', { name: 'Save Backend Intern' })).toBeInTheDocument()
   })
 
   it('drops a card that no longer matches the active status filter', async () => {
@@ -149,7 +161,109 @@ describe('JobsPage against the dummy jobs API', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
     await userEvent.selectOptions(screen.getByLabelText('Sort by'), 'newest')
     await screen.findByText('Job 1')
-    expect(calls).toEqual([0, 50, 0])
+    // Hiding dismissed postings looks one server page ahead to know whether Next has anything to show.
+    expect(calls).toEqual([0, 50, 50, 0, 50])
+  })
+})
+
+describe('dismissed postings, URL state and refilling', () => {
+  it('hides dismissed postings by default and shows them for Dismissed or Any', async () => {
+    const jobs = createDummyJobsApi()
+    await jobs.setStatus(2, 'dismissed')
+    setup(jobs)
+    await card(/Backend Intern/)
+    expect(titles()).not.toContain('Frontend Intern')
+    await userEvent.selectOptions(screen.getByLabelText('Status'), 'dismissed')
+    await screen.findByText('Frontend Intern')
+    expect(titles()).toEqual(['Frontend Intern'])
+    await userEvent.selectOptions(screen.getByLabelText('Status'), 'any')
+    await screen.findByText('Backend Intern')
+    expect(titles()).toContain('Frontend Intern')
+  })
+
+  it('round-trips every filter through the URL', async () => {
+    setup()
+    await card(/Backend Intern/)
+    expect(where()).toBe('/jobs')
+    await userEvent.click(screen.getByLabelText('Java'))
+    expect(where()).toBe('/jobs?tag=java')
+    await userEvent.selectOptions(screen.getByLabelText('Sort by'), 'newest')
+    await userEvent.selectOptions(screen.getByLabelText('Status'), 'any')
+    await userEvent.selectOptions(screen.getByLabelText('Posted within'), '30')
+    await userEvent.type(screen.getByLabelText('Location'), 'boston')
+    await userEvent.type(screen.getByLabelText('Search'), 'backend')
+    await userEvent.click(screen.getByRole('button', { name: 'Search' }))
+    expect(where()).toBe('/jobs?sort=newest&tag=java&status=any&maxAgeDays=30&location=boston&q=backend')
+  })
+
+  it('restores every filter from the URL', async () => {
+    setup(undefined, '/jobs?sort=newest&tag=java&tag=react&status=saved&maxAgeDays=7&location=remote&q=front')
+    await screen.findByText('No postings match these filters.')
+    expect(screen.getByLabelText('Sort by')).toHaveValue('newest')
+    expect(screen.getByLabelText('Java')).toBeChecked()
+    expect(screen.getByLabelText('React')).toBeChecked()
+    expect(screen.getByLabelText('Python')).not.toBeChecked()
+    expect(screen.getByLabelText('Status')).toHaveValue('saved')
+    expect(screen.getByLabelText('Posted within')).toHaveValue('7')
+    expect(screen.getByLabelText('Location')).toHaveValue('remote')
+    expect(screen.getByLabelText('Search')).toHaveValue('front')
+  })
+
+  it('falls back to defaults for junk in the URL', async () => {
+    setup(undefined, '/jobs?sort=x&status=bogus&maxAgeDays=5&offset=-3')
+    await card(/Backend Intern/)
+    expect(screen.getByLabelText('Sort by')).toHaveValue('fit')
+    expect(screen.getByLabelText('Status')).toHaveValue('')
+    expect(screen.getByLabelText('Posted within')).toHaveValue('0')
+  })
+
+  it('refills the page after a card leaves the list', async () => {
+    const base = createDummyJobsApi()
+    const template = (await base.list({ sort: 'fit', tags: [], limit: 1, offset: 0 })).items[0]
+    const all = Array.from({ length: JOB_FEED.pageSize + 5 }, (_, i) => ({ ...template, id: i + 1, title: `Job ${i + 1}`, userStatus: 'new' as const }))
+    const jobs: JobsApi = {
+      async list(q) {
+        const rows = all.filter((j) => !q.status || j.userStatus === q.status)
+        return { items: rows.slice(q.offset, q.offset + q.limit), total: rows.length, limit: q.limit, offset: q.offset }
+      },
+      async setStatus(id, status) {
+        const j = all.find((x) => x.id === id)!
+        j.userStatus = status as 'new'
+        return { ...j }
+      },
+    }
+    setup(jobs)
+    await screen.findByText('Job 1')
+    expect(titles()).toHaveLength(JOB_FEED.pageSize)
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss Job 1' }))
+    await screen.findByText('Job 51')
+    expect(screen.queryByText('Job 1')).not.toBeInTheDocument()
+    expect(titles()).toHaveLength(JOB_FEED.pageSize)
+  })
+
+  it('keeps pages full while skipping dismissed postings, and Previous goes back', async () => {
+    const base = createDummyJobsApi()
+    const template = (await base.list({ sort: 'fit', tags: [], limit: 1, offset: 0 })).items[0]
+    const n = JOB_FEED.pageSize
+    // Every other posting is dismissed, so one server page holds only n/2 visible ones.
+    const all = Array.from({ length: n * 3 }, (_, i) => ({ ...template, id: i + 1, title: `Job ${i + 1}`, userStatus: i % 2 ? ('dismissed' as const) : ('new' as const) }))
+    const jobs: JobsApi = {
+      ...base,
+      async list(q) {
+        return { items: all.slice(q.offset, q.offset + q.limit), total: all.length, limit: q.limit, offset: q.offset }
+      },
+    }
+    setup(jobs)
+    await screen.findByText('Job 1')
+    expect(titles()).toHaveLength(n)
+    expect(titles()).not.toContain('Job 2')
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await screen.findByText('Job 101')
+    expect(titles()[0]).toBe('Job 101')
+    expect(where()).toBe('/jobs?offset=100')
+    await userEvent.click(screen.getByRole('button', { name: 'Previous' }))
+    await screen.findByText('Job 1')
+    expect(where()).toBe('/jobs')
   })
 })
 

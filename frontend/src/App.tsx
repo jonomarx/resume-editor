@@ -4,6 +4,7 @@ import { useAuth } from './auth/AuthContext'
 import LoginPage from './pages/LoginPage'
 import IngestPage from './ingest/IngestPage'
 import SourcesPage from './sources/SourcesPage'
+import type { Api } from './api/types'
 import JobsPage from './jobs/JobsPage'
 import MasterResumePage from './pages/MasterResumePage'
 
@@ -11,7 +12,7 @@ function Page({ title }: { title: string }) {
   return <h1>{title}</h1>
 }
 
-export default function App() {
+export default function App({ apiClient }: { apiClient?: Api } = {}) {
   const { user, logOut } = useAuth()
   return (
     <>
@@ -26,7 +27,7 @@ export default function App() {
           <Route path="/resume" element={<MasterResumePage />} />
           <Route path="/add-job" element={<IngestPage />} />
           <Route path="/sources" element={<SourcesPage />} />
-          <Route path="/jobs" element={<JobsPage />} />
+          <Route path="/jobs" element={<JobsPage apiClient={apiClient} />} />
           <Route path="/drafts/:id" element={<Page title="Draft" />} />
         </Route>
         <Route path="*" element={<Page title="Not found" />} />
