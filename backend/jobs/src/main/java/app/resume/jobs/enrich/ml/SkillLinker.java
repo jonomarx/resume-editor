@@ -20,10 +20,16 @@ public final class SkillLinker {
     private final List<Map.Entry<String, Long>> fuzzy = new java.util.ArrayList<>();
 
     public SkillLinker(List<VocabularyTag> vocabulary) {
+        this(vocabulary, null);
+    }
+
+    /** @param taxonomy optional open-taxonomy aliases (the model was trained with them), applied after the user's own names */
+    public SkillLinker(List<VocabularyTag> vocabulary, app.resume.jobs.enrich.TaxonomyAliases taxonomy) {
         for (VocabularyTag t : vocabulary) {
             put(t.id(), t.name());
             for (String a : t.aliases()) put(t.id(), a);
         }
+        if (taxonomy != null) for (VocabularyTag t : vocabulary) for (String a : taxonomy.aliasesFor(t)) put(t.id(), a);
     }
 
     private void put(long id, String name) {

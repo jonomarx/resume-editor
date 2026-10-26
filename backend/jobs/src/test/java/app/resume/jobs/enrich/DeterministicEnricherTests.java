@@ -121,4 +121,21 @@ class DeterministicEnricherTests {
         enricher.enrich(id);
         assertThat((System.nanoTime() - t0) / 1_000_000).isLessThan(5_000);
     }
+
+    @Test
+    void mlStrategyLinksModelSpansToTheUsersVocabularyOnly() {
+        tag(userId, "Python", "language");
+        tag(userId, "Kubernetes", "framework", "k8s");
+        tag(otherUserId, "Terraform", "framework");
+        long id = posting("ML Intern", "Requirements\nExperience with Python, Kubernetes and Terraform.\nGo to market with new products.");
+        var ml = new DeterministicEnricher(jdbc, new TransactionTemplate(new DataSourceTransactionManager(
+                new DriverManagerDataSource(jdbc.getDataSource() instanceof DriverManagerDataSource d ? d.getUrl() : "", "sa", ""))),
+                vocabulary, DeterministicEnricher.TagStrategy.ML);
+
+        var r = ml.enrich(id);
+
+        assertThat(linked(id)).containsExactly("Kubernetes", "Python"); // Terraform is not in this user's vocabulary: unknown, never a tag
+        assertThat(r.proposalsCreated()).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM job_tag_proposal", Integer.class)).isZero();
+    }
 }

@@ -106,7 +106,13 @@ class DeterministicEnrichmentEvaluationTests {
             new Method("A guarded rules (default)", (d, c) -> tags(d, c, DeterministicEnricher.TagStrategy.FULL_TEXT), false),
             new Method("A sections only", (d, c) -> tags(d, c, DeterministicEnricher.TagStrategy.SECTION_SCOPED), false),
             new Method("B A + Wikidata + Linguist aliases", (d, c) -> tags(d, c, DeterministicEnricher.TagStrategy.TAXONOMY), true),
-            new Method("B+ B + O*NET expansions", (d, c) -> tags(d, c, DeterministicEnricher.TagStrategy.TAXONOMY_ONET), true));
+            new Method("B+ B + O*NET expansions", (d, c) -> tags(d, c, DeterministicEnricher.TagStrategy.TAXONOMY_ONET), true),
+            new Method("C classical ML (OpenNLP)", (d, c) -> DeterministicEnricher.mlTags(d.vocabulary, c.title, c.text), false),
+            new Method("A + C union", (d, c) -> {
+                Set<Long> u = new HashSet<>(tags(d, c, DeterministicEnricher.TagStrategy.FULL_TEXT));
+                u.addAll(DeterministicEnricher.mlTags(d.vocabulary, c.title, c.text));
+                return u;
+            }, false));
 
     static Score score(Dataset d, Method m) {
         Score total = new Score(0, 0, 0);
@@ -136,7 +142,7 @@ class DeterministicEnrichmentEvaluationTests {
             }
             bySet.put(SETS.get(i), row);
             for (Case c : d.cases) {
-                for (int k : new int[] {1, 3, 4}) {
+                for (int k : new int[] {1, 3, 4, 5}) {
                     Set<Long> got = METHODS.get(k).run.apply(d, c);
                     Set<Long> base = METHODS.get(1).run.apply(d, c);
                     if (k == 1 && !got.equals(c.tags)) System.out.println("    A differs on " + c.id + ": want " + d.names(c.tags) + " got " + d.names(got));
@@ -145,6 +151,15 @@ class DeterministicEnrichmentEvaluationTests {
             }
         }
         for (int k = 0; k < METHODS.size(); k++) print("short+long", METHODS.get(k).label, both[k]);
+        // inference time and model size of C
+        Dataset big = new Dataset(SETS.get(1));
+        int runs = 0;
+        long t0 = System.nanoTime();
+        for (int rep = 0; rep < 20; rep++) for (Case c : big.cases) { DeterministicEnricher.mlTags(big.vocabulary, c.title, c.text); runs++; }
+        double ms = (System.nanoTime() - t0) / 1e6 / runs;
+        long size;
+        try (var in = getClass().getResourceAsStream("/ml/skill-spans.bin")) { size = in.readAllBytes().length; }
+        System.out.printf("C inference: %.1f ms per 4-5 KB posting (average of %d runs, includes vocabulary linker setup); model size %d bytes%n", ms, runs, size);
         Score[] shortRow = bySet.get(SETS.get(0));
         Score[] longRow = bySet.get(SETS.get(1));
         assertThat(shortRow[0].precision()).isLessThan(0.7);

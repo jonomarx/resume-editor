@@ -14,7 +14,7 @@ public final class MlTagger {
 
     public MlTagger(SkillSpanModel model, List<VocabularyTag> vocabulary) {
         this.model = model;
-        this.linker = new SkillLinker(vocabulary);
+        this.linker = new SkillLinker(vocabulary, app.resume.jobs.enrich.TaxonomyAliases.shared(app.resume.jobs.enrich.TaxonomyAliases.ALL_SOURCES));
     }
 
     public Result tag(String title, String description) {

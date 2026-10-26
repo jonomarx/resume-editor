@@ -21,7 +21,9 @@ public class DeterministicEnricher implements Enricher {
         /** Contender B: FULL_TEXT plus aliases from Wikidata and GitHub Linguist. */
         TAXONOMY,
         /** B with O*NET acronym expansions added as a secondary source. */
-        TAXONOMY_ONET
+        TAXONOMY_ONET,
+        /** Contender C: a small trained skill-span tagger (Apache OpenNLP), spans linked to the vocabulary. */
+        ML
     }
 
     private final EnrichmentStore store;
@@ -37,10 +39,17 @@ public class DeterministicEnricher implements Enricher {
     @Override
     public Result enrich(long postingId) {
         EnrichmentStore.Posting p = store.load(postingId);
-        Set<Long> tagIds = tags(matcher(vocabulary.list(p.owner(), null), strategy), strategy, p.title(), p.description());
+        var tags = vocabulary.list(p.owner(), null);
+        Set<Long> tagIds = strategy == TagStrategy.ML ? mlTags(tags, p.title(), p.description())
+                : tags(matcher(tags, strategy), strategy, p.title(), p.description());
         Enrichment e = fields(p.title(), p.description());
         store.save(postingId, p.owner(), tagIds, e, List.of(), c -> false);
         return new Result(tagIds.size(), 0);
+    }
+
+    /** Contender C: tags linked from the model's skill spans; unknown spans are dropped here (never stored as tags). */
+    static Set<Long> mlTags(List<app.resume.vocabulary.VocabularyTag> tags, String title, String description) {
+        return new app.resume.jobs.enrich.ml.MlTagger(app.resume.jobs.enrich.ml.SkillSpanModel.bundled(), tags).tag(title, description).tags();
     }
 
     static VocabularyTagMatcher matcher(List<app.resume.vocabulary.VocabularyTag> tags, TagStrategy strategy) {

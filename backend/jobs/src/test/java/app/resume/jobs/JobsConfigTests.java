@@ -34,6 +34,7 @@ class JobsConfigTests {
         assertThat(JobsConfig.tagStrategy("rules")).isEqualTo(app.resume.jobs.enrich.DeterministicEnricher.TagStrategy.FULL_TEXT);
         assertThat(JobsConfig.tagStrategy("taxonomy")).isEqualTo(app.resume.jobs.enrich.DeterministicEnricher.TagStrategy.TAXONOMY);
         assertThat(JobsConfig.tagStrategy("Taxonomy-ONET")).isEqualTo(app.resume.jobs.enrich.DeterministicEnricher.TagStrategy.TAXONOMY_ONET);
+        assertThat(JobsConfig.tagStrategy("ML")).isEqualTo(app.resume.jobs.enrich.DeterministicEnricher.TagStrategy.ML);
         assertThatThrownBy(() -> JobsConfig.tagStrategy("magic")).isInstanceOf(IllegalStateException.class);
     }
 }
