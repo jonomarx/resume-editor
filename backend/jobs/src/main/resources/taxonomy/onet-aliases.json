@@ -1,458 +1,459 @@
 {
  "source": "O*NET 31.0 Database, software_skills.csv (USDOL/ETA), CC BY 4.0; derived and modified by this project",
- "acronyms": {
-  "ABAP": [
+ "aliases": {
+  "abap": [
    "Advanced business application programming"
   ],
-  "ABEL": [
+  "abel": [
    "Advanced boolean expression language"
   ],
-  "ABIS": [
+  "abis": [
    "Automated Biometric Identification System"
   ],
-  "ACS": [
+  "acs": [
    "Affiliated Computer Services"
   ],
-  "ACSL": [
+  "acsl": [
    "Advanced computer simulation language"
   ],
-  "ADCS": [
+  "adcs": [
    "Automated Data Collection System"
   ],
-  "ADIS": [
+  "adis": [
    "Arrival Departure Information System"
   ],
-  "AEM": [
+  "aem": [
    "Adobe Experience Manager"
   ],
-  "AHDL": [
+  "ahdl": [
    "Altera hardware description language"
   ],
-  "ALGOL": [
+  "algol": [
    "Algorithmic language"
   ],
-  "AMS": [
+  "ams": [
    "Address Management System",
    "Automated Manifest System"
   ],
-  "ANCS": [
+  "ancs": [
    "Automated National Catalog System"
   ],
-  "ANSI": [
+  "ansi": [
    "American National Standards Institute"
   ],
-  "APEX": [
+  "apex": [
    "Application Express"
   ],
-  "APL": [
+  "apl": [
    "A programming language"
   ],
-  "ASMIS": [
+  "asmis": [
    "Archeological Sites Management Information System"
   ],
-  "ASP": [
+  "asp": [
    "Active Server Pages"
   ],
-  "ATS": [
+  "ats": [
    "Athletic Trainer System",
    "Automate the Schools",
    "Automated Targeting System"
   ],
-  "AWS": [
+  "aws": [
    "Amazon Web Services"
   ],
-  "BASIC": [
+  "basic": [
    "Beginner's all-purpose symbolic instruction code"
   ],
-  "BSDL": [
+  "bsdl": [
    "Boundary scan description language"
   ],
-  "BSS": [
+  "bss": [
    "Biometric Storage System"
   ],
-  "CALI": [
+  "cali": [
    "Computer-Assisted Legal Instruction"
   ],
-  "CAML": [
+  "caml": [
    "Collaborative Application Markup Language"
   ],
-  "CASE": [
+  "case": [
    "Computer aided software engineering"
   ],
-  "CCD": [
+  "ccd": [
    "Consular Consolidated Database"
   ],
-  "CDLIS": [
+  "cdlis": [
    "Commercial driver's license information system"
   ],
-  "CDMS": [
+  "cdms": [
    "Carpet Dealer Management System",
    "Clinical data management system"
   ],
-  "CETIS": [
+  "cetis": [
    "Comprehensive Environmental Toxicity Information System"
   ],
-  "CF": [
+  "cf": [
    "Compact Framework"
   ],
-  "CIF": [
+  "cif": [
    "Corporate Information Factory"
   ],
-  "CIMS": [
+  "cims": [
    "Coordinated incident management system"
   ],
-  "CLAIMS": [
+  "claims": [
    "Computer Linked Application Information Management System"
   ],
-  "CLOS": [
+  "clos": [
    "Common Lisp Object System"
   ],
-  "CMS": [
+  "cms": [
    "Career management systems",
    "Content management systems",
    "content management system"
   ],
-  "COBOL": [
+  "cobol": [
    "Common business oriented language"
   ],
-  "CODIS": [
+  "codis": [
    "Combined DNA Index System"
   ],
-  "COM": [
+  "com": [
    "Component object model"
   ],
-  "CORAL": [
+  "coral": [
    "Computer On-line Real-time Applications Language"
   ],
-  "CPL": [
+  "cpl": [
    "Call-processing language"
   ],
-  "CPMS": [
+  "cpms": [
    "Collection Point Management System"
   ],
-  "CRS": [
+  "crs": [
    "Computer reservation system"
   ],
-  "CSLA": [
+  "csla": [
    "Component-based Scalable Logical Architecture"
   ],
-  "CSS": [
+  "css": [
    "Cascading style sheets"
   ],
-  "DBMS": [
+  "dbms": [
    "Database management system"
   ],
-  "DCOM": [
+  "dcom": [
    "Distributed component object model"
   ],
-  "DDL": [
+  "ddl": [
    "Data definition language"
   ],
-  "DENCAS": [
+  "dencas": [
    "Dental Common Access System"
   ],
-  "DHTML": [
+  "dhtml": [
    "Dynamic hypertext markup language"
   ],
-  "DITA": [
+  "dita": [
    "Darwin information typing architecture"
   ],
-  "DML": [
+  "dml": [
    "Data manipulation language"
   ],
-  "DNA": [
+  "dna": [
    "Deoxyribonucleic acid"
   ],
-  "DOM": [
+  "dom": [
    "Document Object Model"
   ],
-  "DOS": [
+  "dos": [
    "Disk operating system"
   ],
-  "DSP": [
+  "dsp": [
    "Digital Signal Processing"
   ],
-  "DTS": [
+  "dts": [
    "Data transformation services"
   ],
-  "EAG": [
+  "eag": [
    "Economic Analysis Group"
   ],
-  "EE": [
+  "ee": [
    "Enterprise Edition"
   ],
-  "EMWIN": [
+  "emwin": [
    "Emergency Managers Weather Information Network"
   ],
-  "ESIS": [
+  "esis": [
    "Ecological Site Information System"
   ],
-  "FDO": [
+  "fdo": [
    "Foundatino Directory Online"
   ],
-  "FEMIS": [
+  "femis": [
    "Federal Emergency Management Information System"
   ],
-  "GDS": [
+  "gds": [
    "Global distribution system",
    "global distribution systems"
   ],
-  "GIS": [
+  "gis": [
    "Geographic information system"
   ],
-  "GUI": [
+  "gui": [
    "Graphical user interface"
   ],
-  "HDL": [
+  "hdl": [
    "Hardware description language"
   ],
-  "HLSL": [
+  "hlsl": [
    "High Level Shader Language"
   ],
-  "HP": [
+  "hp": [
    "Hewlett Packard"
   ],
-  "HPGL": [
+  "hpgl": [
    "HP Graphics Language"
   ],
-  "HTML": [
+  "html": [
    "Hypertext markup language"
   ],
-  "IAFIS": [
+  "iafis": [
    "Integrated Automated Fingerprint Identification System"
   ],
-  "ICON": [
+  "icon": [
    "Interstate connection"
   ],
-  "IDE": [
+  "ide": [
    "Integrated Development Environment",
    "Integrated development environment"
   ],
-  "IDL": [
+  "idl": [
    "Interface definition language"
   ],
-  "IDS": [
+  "ids": [
    "Intrusion detection system"
   ],
-  "IEP": [
+  "iep": [
    "Individualized Educational Program"
   ],
-  "IMDS": [
+  "imds": [
    "International Material Data System"
   ],
-  "IMS": [
+  "ims": [
    "Information Management System"
   ],
-  "IPS": [
+  "ips": [
    "Intrusion prevention system"
   ],
-  "IPSEC": [
+  "ipsec": [
    "Internet Protocol Security"
   ],
-  "ISPF": [
+  "ispf": [
    "Interactive System Productivity Facility"
   ],
-  "ISS": [
+  "iss": [
    "Inspection Selection System"
   ],
-  "JCL": [
+  "jcl": [
    "Job control language"
   ],
-  "JEMS": [
+  "jems": [
    "Judicial Enforcement Management System"
   ],
-  "JMS": [
+  "jms": [
    "Java Message Service"
   ],
-  "JSON": [
+  "json": [
    "JavaScript Object Notation"
   ],
-  "JSP": [
+  "jsp": [
    "JavaServer Pages"
   ],
-  "LAWS": [
+  "laws": [
    "Legislative Automative Workflow System"
   ],
-  "LLVM": [
+  "llvm": [
    "Low-level virtual machine"
   ],
-  "MEL": [
+  "mel": [
    "Maya Embedded Language"
   ],
-  "MGMS": [
+  "mgms": [
    "Management System"
   ],
-  "MIB": [
+  "mib": [
    "Management information base"
   ],
-  "MRTG": [
+  "mrtg": [
    "Multi-router traffic grapher"
   ],
-  "NASIS": [
+  "nasis": [
    "National Soil Information System"
   ],
-  "NCIC": [
+  "ncic": [
    "National Crime Information Center"
   ],
-  "NCL": [
+  "ncl": [
    "NCAR Command Language"
   ],
-  "NDR": [
+  "ndr": [
    "National Driver Register"
   ],
-  "NFIRS": [
+  "nfirs": [
    "National Fire Incident Reporting System"
   ],
-  "NIBIN": [
+  "nibin": [
    "National Integrated Ballistics Information Network"
   ],
-  "NIPS": [
+  "nips": [
    "Network intrusion prevention systems"
   ],
-  "NLCD": [
+  "nlcd": [
    "National Land Cover Database"
   ],
-  "NLETS": [
+  "nlets": [
    "National Law Enforcement Telecommunications System"
   ],
-  "NRCS": [
+  "nrcs": [
    "National Resources Conservation Service"
   ],
-  "ODBMS": [
+  "odbms": [
    "Object database management system"
   ],
-  "ODS": [
+  "ods": [
    "Operational Data Store"
   ],
-  "OLAP": [
+  "olap": [
    "Online analytical processing"
   ],
-  "PDP": [
+  "pdp": [
    "PEDON Description Program"
   ],
-  "PIQ": [
+  "piq": [
    "Past Inspection Query"
   ],
-  "PLC": [
+  "plc": [
    "Programmable logic controller"
   ],
-  "PMS": [
+  "pms": [
    "Practice management software",
    "Property Management System",
    "Property management system"
   ],
-  "RACF": [
+  "racf": [
    "Resource Access Control Facility"
   ],
-  "RDMS": [
+  "rdms": [
    "Relational database management system"
   ],
-  "RMS": [
+  "rms": [
    "Railyard management software"
   ],
-  "ROV": [
+  "rov": [
    "Remote operated vehicle"
   ],
-  "RPR": [
+  "rpr": [
    "Realtors Property Resource"
   ],
-  "RSS": [
+  "rss": [
    "Really Simple Syndication"
   ],
-  "RTL": [
+  "rtl": [
    "Register transfer language"
   ],
-  "RTOS": [
+  "rtos": [
    "Real time operating system"
   ],
-  "SAM": [
+  "sam": [
    "Software asset management"
   ],
-  "SAML": [
+  "saml": [
    "Security assertion markup language"
   ],
-  "SAN": [
+  "san": [
    "Storage area network"
   ],
-  "SASS": [
+  "sass": [
    "Syntactically awesome style sheets"
   ],
-  "SCM": [
+  "scm": [
    "Source code management"
   ],
-  "SDL": [
+  "sdl": [
    "Simple DirectMedia Layer"
   ],
-  "SEO": [
+  "seo": [
    "search engine optimization"
   ],
-  "SERP": [
+  "serp": [
    "Search engine results pages"
   ],
-  "SESIS": [
+  "sesis": [
    "Special Education Student Information System"
   ],
-  "SGML": [
+  "sgml": [
    "Standard generalized markup language",
    "Standardized general markup language"
   ],
-  "SIS": [
+  "sis": [
    "Student information systems"
   ],
-  "SMTP": [
+  "smtp": [
    "Simple mail transfer protocol"
   ],
-  "SQL": [
+  "sql": [
    "Structure query language",
    "Structured query language"
   ],
-  "SQR": [
+  "sqr": [
    "Structured Query Report"
   ],
-  "SSRS": [
+  "ssrs": [
    "SQL Server Reporting Services"
   ],
-  "SSURGO": [
+  "ssurgo": [
    "Soil Survey Geographic"
   ],
-  "SVG": [
+  "svg": [
    "Scalable vector graphics"
   ],
-  "TECS": [
+  "tecs": [
    "Treasury Enforcement Communications System"
   ],
-  "TSO": [
+  "tso": [
    "Time sharing option"
   ],
-  "UID": [
+  "uid": [
    "Unique Identification"
   ],
-  "VHDL": [
+  "vhdl": [
    "VHSIC hardware description language"
   ],
-  "VHSIC": [
+  "vhsic": [
    "Very high-speed integrated circuit"
   ],
-  "VIN": [
+  "vin": [
    "Vehicle identification number"
   ],
-  "VPN": [
+  "vpn": [
    "Virtual private networking"
   ],
-  "WAN": [
+  "wan": [
    "Wide area network"
   ],
-  "WFAS": [
+  "wfas": [
    "Wildland Fire Assessment System"
   ],
-  "WIMS": [
+  "wims": [
    "Weed Information Management System"
   ],
-  "WSS": [
+  "wss": [
    "Web Soil Survey"
   ],
-  "XUI": [
+  "xui": [
    "XML User Interface"
   ]
- }
+ },
+ "licence": "CC BY 4.0"
 }

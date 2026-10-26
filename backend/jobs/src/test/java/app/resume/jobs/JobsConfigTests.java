@@ -19,10 +19,21 @@ class JobsConfigTests {
     void enricherEnvironmentVariableSelectsTheImplementation() {
         var tags = org.mockito.Mockito.mock(app.resume.vocabulary.TagVocabulary.class);
         var llm = org.mockito.Mockito.mock(app.resume.llm.LlmClient.class);
-        assertThat(JobsConfig.createEnricher("deterministic", null, null, null, tags)).isInstanceOf(app.resume.jobs.enrich.DeterministicEnricher.class);
-        assertThat(JobsConfig.createEnricher(null, null, null, null, tags)).isInstanceOf(app.resume.jobs.enrich.DeterministicEnricher.class);
-        assertThat(JobsConfig.createEnricher("llm", null, null, llm, tags)).isInstanceOf(app.resume.jobs.enrich.PostingEnricher.class);
-        assertThat(JobsConfig.createEnricher("LLM", null, null, null, tags)).isNull(); // llm chosen but no client: postings stay untagged
-        assertThatThrownBy(() -> JobsConfig.createEnricher("magic", null, null, llm, tags)).isInstanceOf(IllegalStateException.class);
+        assertThat(JobsConfig.createEnricher("deterministic", null, null, null, null, tags)).isInstanceOf(app.resume.jobs.enrich.DeterministicEnricher.class);
+        assertThat(JobsConfig.createEnricher("", null, null, null, null, tags)).isInstanceOf(app.resume.jobs.enrich.DeterministicEnricher.class); // ENRICHER= means default
+        assertThat(JobsConfig.createEnricher(null, null, null, null, null, tags)).isInstanceOf(app.resume.jobs.enrich.DeterministicEnricher.class);
+        assertThat(JobsConfig.createEnricher("llm", null, null, null, llm, tags)).isInstanceOf(app.resume.jobs.enrich.PostingEnricher.class);
+        assertThat(JobsConfig.createEnricher("LLM", null, null, null, null, tags)).isNull(); // llm chosen but no client: postings stay untagged
+        assertThatThrownBy(() -> JobsConfig.createEnricher("magic", null, null, null, llm, tags)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void tagMethodSelectsTheContender() {
+        assertThat(JobsConfig.tagStrategy(null)).isEqualTo(app.resume.jobs.enrich.DeterministicEnricher.TagStrategy.FULL_TEXT);
+        assertThat(JobsConfig.tagStrategy("")).isEqualTo(app.resume.jobs.enrich.DeterministicEnricher.TagStrategy.FULL_TEXT);
+        assertThat(JobsConfig.tagStrategy("rules")).isEqualTo(app.resume.jobs.enrich.DeterministicEnricher.TagStrategy.FULL_TEXT);
+        assertThat(JobsConfig.tagStrategy("taxonomy")).isEqualTo(app.resume.jobs.enrich.DeterministicEnricher.TagStrategy.TAXONOMY);
+        assertThat(JobsConfig.tagStrategy("Taxonomy-ONET")).isEqualTo(app.resume.jobs.enrich.DeterministicEnricher.TagStrategy.TAXONOMY_ONET);
+        assertThatThrownBy(() -> JobsConfig.tagStrategy("magic")).isInstanceOf(IllegalStateException.class);
     }
 }

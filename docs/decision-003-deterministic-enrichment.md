@@ -18,39 +18,47 @@ Status: proposed by the Job List Manager; the owner makes the final method choic
 | # | Method | Used for |
 | --- | --- | --- |
 | 1 | Naive: case-insensitive substring of every name and alias | baseline for tags |
-| 2 | Guarded vocabulary match over the whole text: word boundaries that understand `C++`, `C#`, `.NET`, `Node.js`; ambiguous names (single letters and words such as Go, R, C, Swift, Rust, Spring) only count when written exactly like the vocabulary and used in a skill-like context ("experience with", a list comma, "in", "or" and so on) | tags |
-| 3 | The same guarded match, restricted to the title and the requirement/preferred sections (found by heading heuristics); whole text when the posting has no such heading | tags |
-| 4 | Heading heuristics ("Requirements", "Qualifications", "What we're looking for", "Nice to have", "Preferred", and inline "Requirements: ...") | `basic_requirements`, `preferred_requirements` (verbatim lines, empty when no heading) |
-| 5 | Pattern rules | `season` ("Summer 2027", year required), `class_year` ("rising juniors and seniors", "Class of 2028", "graduating in 2028"), `work_authorization` (the sentence mentioning authorization, sponsorship, citizenship, clearance) |
+| 2 | **A**, guarded vocabulary match. Unambiguous names (Java, Docker, `C++`, `C#`, `.NET`, `Node.js`...) match anywhere in the text with word boundaries that understand symbols. Ambiguous names (Go, R, C, Spring, Swift, Rust and a short list of ordinary words) count only inside the title, a requirement/preferred section or an explicit "Skills:/Tech stack:" line, only written exactly like the vocabulary, only with a skill-like context ("experience with", "languages:", a list comma next to another skill; single letters need a skill word), never before a year or calendar-like word ("Spring 2027", "Spring break", "Go to", "Go beyond"), and never when negated ("Rust is not required", "no Java experience"). A posting with no headings and no skills line uses its whole text as the zone | tags |
+| 3 | The same guarded match with every name restricted to the title and the requirement sections/skills lines (whole text when the posting has none) | tags |
+| 4 | Heading heuristics ("Requirements", "Qualifications", "What we are looking for", "Nice to have", "Preferred", inline "Requirements: ..."). A section ends at the next heading, at a prose line longer than 200 characters, or at a short unknown heading line that precedes a paragraph | `basic_requirements`, `preferred_requirements` (verbatim lines, empty when no heading) |
+| 5 | Pattern rules | `season` (first "Summer 2027"-style mention that is not preceded by last/since/during/...), `class_year` (rising juniors/seniors, Class of 2028, graduating in 2028, graduation date between 2027 and 2028), `work_authorization` |
 | 6 | Structured data (JSON-LD `JobPosting`, ATS fields) | not built as an enrichment method, see below |
 
-**Structured data.** By the time the enricher runs, the JSON-LD and ATS adapters (US-036 to US-038) have already turned structured fields into the stored `title`, `company`, `location` and `description` text (Lever's requirement lists arrive as a "Requirements:" heading in the description). The fields that would help (`skills`, `qualifications`, `experienceRequirements`, `educationRequirements`) appear in none of the existing JSON-LD or ATS fixtures, and the major ATS feeds (Greenhouse, Lever, Ashby) have no skills field. `employmentType` and `datePosted` are not enrichment fields. Using structured skills would need an adapter change plus a new column and is not worth it until a real source shows the data; the heading heuristics already capture what Lever structures.
+**Work authorization is a normalized value, not a sentence:** `does_not_sponsor`, `sponsors`, `authorization_required`, or null when the posting says nothing. Sentences are judged separately; `does_not_sponsor` wins over `sponsors`, which wins over `authorization_required` (which covers "authorized to work", "eligible to work", "US citizen", "permanent resident"). "Security clearance" sentences are ignored. The LLM enricher still stores a free-text phrase in the same column; the owner should decide which form consumers (the Matcher's hard filters) expect.
+
+**Safety.** All text goes through `PostingText.normalize` first (cut at 20,000 characters, runs of blanks collapsed, at most two consecutive newlines), every repetition in every pattern is bounded, nothing is a star over a group, and `CrawlService` and `IngestProcessor` also catch `StackOverflowError` so one posting can never break a run. `HostileInputTests` runs 24 hostile shapes (including the reviewer's `"rising juniors, " x 400` that overflowed the first version) through all rules and strategies with a 1 second bound each.
+
+**Structured data.** By the time the enricher runs, the JSON-LD and ATS adapters (US-036 to US-038) have already turned structured fields into the stored `title`, `company`, `location` and `description` text (Lever's requirement lists arrive as a "Requirements:" heading in the description). The fields that would help (`skills`, `qualifications`, `experienceRequirements`, `educationRequirements`) appear in none of the existing JSON-LD or ATS fixtures, and the major ATS feeds (Greenhouse, Lever, Ashby) have no skills field. `employmentType` and `datePosted` are not enrichment fields. Using structured skills would need an adapter change plus a new column and is not worth it until a real source shows the data.
 
 ## Evaluation
 
-Fixture: `backend/jobs/src/test/resources/fixtures/enrichment/labelled-postings.json`, 16 hand-labelled postings (ATS-style, JSON-LD-style and pasted text) and a 26-tag vocabulary including `C`, `C++`, `C#`, `Go`, `R`, `Rust`, `Swift`, `.NET`, `Node.js`, with traps ("Go to our careers page", "go-getter", "Go-to-market", "R&D", "C-level", "ASP.NET", "Swift-moving"). 56 expected tag links. Reproduce with `mvn -q test -pl backend/jobs -am -Dtest=DeterministicEnrichmentEvaluationTests` (the table is printed).
+Fixtures (`backend/jobs/src/test/resources/fixtures/enrichment/`), all labelled by hand before the numbers were read:
 
-Tags:
+* `labelled-postings.json`: 16 short postings (100 to 400 characters), 56 expected tag links, a 26-tag vocabulary including `C`, `C++`, `C#`, `Go`, `R`, `Rust`, `Swift`, `.NET`, `Node.js`, written to contain traps.
+* `labelled-postings-long.json`: 4 realistic long postings (4 to 5 KB: company blurbs, responsibilities, bullets, benefits, hiring process, EEO text, other teams' technologies, "Spring 2027", "Go beyond", "Spring break", "R&D", "C-suite", "Swift response times", "Rust is not required") with 22 expected links. They were added after the independent review found that the short set did not exercise common false-positive classes.
 
-| Method | TP | FP | FN | Precision | Recall | F1 |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 naive substring | 56 | 42 | 0 | 0.57 | 1.00 | 0.73 |
-| 2 guarded, whole text | 56 | 2 | 0 | 0.97 | 1.00 | 0.98 |
-| 3 guarded, requirement sections | 48 | 1 | 8 | 0.98 | 0.86 | 0.91 |
+Reproduce with `mvn -q test -pl backend/jobs -am -Dtest=DeterministicEnrichmentEvaluationTests` (the tables are printed).
 
-Fields (exact match against labels): requirement sections present or absent 28/28; season 5/5; class year 5/5; work authorization 5/5; no spurious values on postings that do not state them.
+| Set | Method | TP | FP | FN | Precision | Recall | F1 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| short (16) | naive substring | 56 | 42 | 0 | 0.57 | 1.00 | 0.73 |
+| short (16) | A guarded rules | 54 | 1 | 2 | 0.98 | 0.96 | 0.97 |
+| short (16) | sections only | 50 | 0 | 6 | 1.00 | 0.89 | 0.94 |
+| long (4) | naive substring | 22 | 22 | 0 | 0.50 | 1.00 | 0.67 |
+| long (4) | A guarded rules | 22 | 2 | 0 | 0.92 | 1.00 | 0.96 |
+| long (4) | sections only | 18 | 0 | 4 | 1.00 | 0.82 | 0.90 |
+| both | A guarded rules | 76 | 3 | 2 | 0.96 | 0.97 | 0.97 |
+| both | sections only | 68 | 0 | 10 | 1.00 | 0.87 | 0.93 |
 
-What the errors are:
+Fields (exact match): requirement sections present or absent 28/28 (short) and 8/8 (long); season, class year and work authorization 15/15 (short) and 12/12 (long); no spurious values.
 
-* Method 2 false positives: Kubernetes named in an "About Acme" blurb (company tech, not the role), and "Security" from the line "Security clearance is not required" (a domain word used in an eligibility sentence).
-* Method 3 loses tags named outside a requirement heading (responsibilities, an unheaded "Stack:" line, prose in a posting with no headings falls back to whole text). It gains almost no precision (one fewer false positive) at a recall cost of 14 points. The "Security clearance" false positive survives scoping.
-* Rules never produced a wrong value on the fixtures, but they are not exhaustive: unusual phrasing is simply left empty.
+What the errors of A are: Kubernetes named in an "About" blurb, Kotlin named as another team's stack, "Security" from "the security team" in an embedded posting (company tech and unrelated mentions; unambiguous names match anywhere on purpose), `Go` named only in a responsibilities line (outside the zone) and `R` at the end of a "Languages: C, C++, C#, Go, R" line (a single letter needs a skill word next to it).
 
-**Caveat.** The fixtures were written and labelled by the same agent that tuned the guards, so the numbers are optimistic. They show that the guards work and where the methods trade off, not a production accuracy. Before relying on them, run both on 50 to 100 real stored postings and read the diffs; the evaluation test makes that cheap (point a loader at an export).
+**Caveat.** The fixtures were written and labelled by the same agent that wrote the guards (the long set after the review, but with the same author), and 20 postings is a small sample, so the numbers are optimistic and the confidence intervals wide. Validation on 50 to 100 real stored postings is a condition for relying on them.
 
 ## Recommendation
 
-Use method 2 (guarded vocabulary match over the whole text) for tags, method 4 for requirements, method 5 for eligibility. That is what `ENRICHER=deterministic` does (`TagStrategy.FULL_TEXT`). Method 3 is implemented and one enum constant away (`TagStrategy.SECTION_SCOPED`, tested) if the owner prefers precision over recall; I do not recommend it because missing a tag silently removes a posting from matching, while an extra tag only slightly dilutes it.
+Use method 2 (A: guarded match, whole text for unambiguous names, zone for ambiguous names) for tags, method 4 for requirements, method 5 for eligibility. That is what `ENRICHER=deterministic` does (`TagStrategy.FULL_TEXT`). Method 3 is implemented and one enum constant away if the owner prefers precision over recall; I do not recommend it because missing a tag silently removes a posting from matching (recall 0.87 against 0.97), while an extra tag only slightly dilutes it.
 
 ## Open decisions for the owner
 

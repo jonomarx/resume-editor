@@ -18,8 +18,10 @@ public class DeterministicEnricher implements Enricher {
         FULL_TEXT,
         /** Guarded match over the title and requirement sections only; the whole text when the posting has no such section. */
         SECTION_SCOPED,
-        /** Contender B: strategy FULL_TEXT plus aliases from the O*NET-derived taxonomy file. */
-        TAXONOMY
+        /** Contender B: FULL_TEXT plus aliases from Wikidata and GitHub Linguist. */
+        TAXONOMY,
+        /** B with O*NET acronym expansions added as a secondary source. */
+        TAXONOMY_ONET
     }
 
     private final EnrichmentStore store;
@@ -42,24 +44,34 @@ public class DeterministicEnricher implements Enricher {
     }
 
     static VocabularyTagMatcher matcher(List<app.resume.vocabulary.VocabularyTag> tags, TagStrategy strategy) {
-        return new VocabularyTagMatcher(tags, strategy == TagStrategy.TAXONOMY ? TaxonomyAliases.shared() : null);
+        return new VocabularyTagMatcher(tags, switch (strategy) {
+            case TAXONOMY -> TaxonomyAliases.shared(TaxonomyAliases.PRIMARY_SOURCES);
+            case TAXONOMY_ONET -> TaxonomyAliases.shared(TaxonomyAliases.ALL_SOURCES);
+            default -> null;
+        });
     }
 
     /** Tags for a posting under a strategy (also used by the comparison tests). */
     static Set<Long> tags(VocabularyTagMatcher matcher, TagStrategy strategy, String title, String description) {
         String head = title == null ? "" : title;
-        String body = description == null ? "" : description;
+        String body = PostingText.normalize(description);
+        RequirementSections.Sections sections = RequirementSections.parse(body);
+        String scoped = RequirementSections.scoped(sections);
+        String skills = RequirementSections.skillLists(body);
+        boolean structured = !scoped.isBlank() || !skills.isBlank();
+        String whole = head + "\n" + body;
+        String zone = head + "\n" + scoped + "\n" + skills;
         if (strategy == TagStrategy.SECTION_SCOPED) {
-            String scoped = RequirementSections.scoped(RequirementSections.parse(body));
-            if (!scoped.isBlank()) return matcher.match(head + "\n" + scoped, VocabularyTagMatcher.Mode.GUARDED);
+            return structured ? matcher.match(zone, zone, VocabularyTagMatcher.Mode.GUARDED) : matcher.match(whole, VocabularyTagMatcher.Mode.GUARDED);
         }
-        return matcher.match(head + "\n" + body, VocabularyTagMatcher.Mode.GUARDED);
+        // Unambiguous names count anywhere; ambiguous ones (Go, R, C, Spring...) only in the title, requirement sections and
+        // skills lists. A posting with no such structure at all (a short paste) uses its whole text as the zone.
+        return matcher.match(whole, structured ? zone : whole, VocabularyTagMatcher.Mode.GUARDED);
     }
 
     /** Requirements and eligibility fields, no tags. */
     static Enrichment fields(String title, String description) {
-        String body = description == null ? "" : description;
-        if (body.length() > VocabularyTagMatcher.MAX_TEXT) body = body.substring(0, VocabularyTagMatcher.MAX_TEXT);
+        String body = PostingText.normalize(description);
         RequirementSections.Sections s = RequirementSections.parse(body);
         String season = EligibilityRules.season(title);
         if (season == null) season = EligibilityRules.season(body);

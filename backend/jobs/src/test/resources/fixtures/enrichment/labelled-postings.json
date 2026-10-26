@@ -193,7 +193,7 @@
    ],
    "season": null,
    "classYear": "rising juniors and seniors",
-   "workAuthorization": "Must be authorized to work in the US; we cannot offer visa sponsorship.",
+   "workAuthorization": "does_not_sponsor",
    "hasBasic": true,
    "hasPreferred": true
   },
@@ -237,15 +237,15 @@
    "id": "embedded-c",
    "source": "ats",
    "title": "Embedded Software Intern",
-   "text": "You will write firmware in C and C++ for our devices.\nRequirements\nStrong C programming skills.\nFamiliarity with C++ is a plus.\nSecurity clearance is not required but US citizenship is preferred for some projects.\nExpected graduation date 2027.\n",
+   "text": "You will write firmware in C and C++ for our devices.\nRequirements\nStrong C programming skills.\nFamiliarity with C++ is a plus.\nSecurity clearance is not required. US citizenship is required for some projects.\nExpected graduation date 2027.\n",
    "tags": [
     "C",
     "C++",
     "Embedded"
    ],
    "season": null,
-   "classYear": "Expected graduation date 2027",
-   "workAuthorization": "Security clearance is not required but US citizenship is preferred for some projects.",
+   "classYear": "graduation date 2027",
+   "workAuthorization": "authorization_required",
    "hasBasic": true,
    "hasPreferred": false
   },
@@ -263,7 +263,7 @@
    ],
    "season": null,
    "classYear": null,
-   "workAuthorization": "Must be eligible to work in the United States.",
+   "workAuthorization": "authorization_required",
    "hasBasic": true,
    "hasPreferred": true
   },
@@ -310,7 +310,7 @@
    ],
    "season": null,
    "classYear": null,
-   "workAuthorization": "Candidates must be US citizens or permanent residents.",
+   "workAuthorization": "authorization_required",
    "hasBasic": true,
    "hasPreferred": true
   },
@@ -385,7 +385,7 @@
    ],
    "season": "Winter 2027",
    "classYear": "graduating in December 2027",
-   "workAuthorization": "No visa sponsorship available.",
+   "workAuthorization": "does_not_sponsor",
    "hasBasic": true,
    "hasPreferred": false
   },

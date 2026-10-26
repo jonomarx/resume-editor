@@ -1,0 +1,110 @@
+# Names of popular technology tags. The derivation scripts only look up these names, so each derived file stays small and
+# aliases can only ever attach to a tag that carries one of these names (or an alias equal to one) in a user's vocabulary.
+Java
+JavaScript
+TypeScript
+Python
+C
+C++
+C#
+Go
+R
+Rust
+Swift
+Kotlin
+Scala
+Ruby
+PHP
+Perl
+Dart
+Julia
+Haskell
+Elixir
+Erlang
+Clojure
+Lua
+MATLAB
+SQL
+HTML
+CSS
+JSON
+XML
+YAML
+Bash
+PowerShell
+Objective-C
+Assembly
+COBOL
+Fortran
+Groovy
+Solidity
+React
+Angular
+Vue.js
+Svelte
+Next.js
+Node.js
+Express
+Django
+Flask
+FastAPI
+Ruby on Rails
+Laravel
+Spring
+Spring Boot
+ASP.NET
+.NET
+jQuery
+Bootstrap
+Tailwind CSS
+GraphQL
+gRPC
+REST
+TensorFlow
+PyTorch
+Keras
+scikit-learn
+pandas
+NumPy
+Spark
+Hadoop
+Kafka
+Airflow
+Docker
+Kubernetes
+Terraform
+Ansible
+Jenkins
+Git
+GitHub
+GitLab
+Linux
+Unix
+AWS
+Azure
+Google Cloud
+PostgreSQL
+MySQL
+SQLite
+MongoDB
+Redis
+Elasticsearch
+Cassandra
+Oracle Database
+Microsoft SQL Server
+DynamoDB
+Snowflake
+Android
+iOS
+Flutter
+React Native
+Unity
+Unreal Engine
+OpenCV
+Machine Learning
+Deep Learning
+Natural Language Processing
+Computer Vision
+Continuous Integration
+Embedded
+Blockchain

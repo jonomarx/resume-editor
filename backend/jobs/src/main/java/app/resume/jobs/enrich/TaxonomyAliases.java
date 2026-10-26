@@ -12,17 +12,19 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Extra aliases for vocabulary tags from an open skills taxonomy (contender B). The data file is derived from O*NET (CC BY 4.0,
- * see taxonomy/NOTICE.md) by tools/taxonomy/derive_onet_acronyms.py: acronym to spelled-out forms ("SQL" to "Structured query
- * language"). A tag gets the expansions of an acronym only when the tag's own name or alias is that acronym, so no tags are
- * ever created. The file is untrusted: size, entry count and string lengths are capped and anything malformed is skipped.
+ * Extra aliases for vocabulary tags from open taxonomies (contender B). Each source is one small derived file under
+ * resources/taxonomy (Wikidata CC0, GitHub Linguist MIT, optionally O*NET CC BY 4.0; see NOTICE.md and tools/taxonomy) mapping a
+ * lower-cased name to aliases. A tag gets the aliases of a key only when the tag's own name or one of its aliases is that key,
+ * so no tags are ever created. The files are untrusted: size, entry count and string lengths are capped and anything malformed
+ * is skipped.
  */
 public final class TaxonomyAliases {
     static final int MAX_BYTES = 256 * 1024;
     static final int MAX_ENTRIES = 2_000;
     static final int MAX_STRING = 80;
-    private static final String RESOURCE = "/taxonomy/onet-acronyms.json";
-    private static volatile TaxonomyAliases shared;
+    public static final List<String> PRIMARY_SOURCES = List.of("wikidata-aliases.json", "linguist-aliases.json");
+    public static final List<String> ALL_SOURCES = List.of("wikidata-aliases.json", "linguist-aliases.json", "onet-aliases.json");
+    private static final java.util.concurrent.ConcurrentHashMap<List<String>, TaxonomyAliases> CACHE = new java.util.concurrent.ConcurrentHashMap<>();
 
     private final Map<String, List<String>> byAcronym; // key: lower-cased acronym
 
@@ -41,37 +43,30 @@ public final class TaxonomyAliases {
         this.byAcronym = Map.copyOf(m);
     }
 
-    /** The bundled O*NET-derived data, loaded once. An unreadable file means no taxonomy aliases, never a failure. */
-    public static TaxonomyAliases shared() {
-        TaxonomyAliases s = shared;
-        if (s == null) {
-            synchronized (TaxonomyAliases.class) {
-                if (shared == null) shared = loadBundled();
-                s = shared;
+    /** The bundled data of these sources, loaded once. An unreadable file means no aliases from it, never a failure. */
+    public static TaxonomyAliases shared(List<String> sources) {
+        return CACHE.computeIfAbsent(sources, TaxonomyAliases::loadBundled);
+    }
+
+    private static TaxonomyAliases loadBundled(List<String> sources) {
+        Map<String, List<String>> merged = new LinkedHashMap<>();
+        for (String source : sources) {
+            try (InputStream in = TaxonomyAliases.class.getResourceAsStream("/taxonomy/" + source)) {
+                if (in == null) continue;
+                byte[] bytes = in.readNBytes(MAX_BYTES + 1);
+                if (bytes.length > MAX_BYTES) continue;
+                new ObjectMapper().readTree(bytes).path("aliases").fields().forEachRemaining(e -> {
+                    List<String> l = merged.computeIfAbsent(e.getKey(), k -> new ArrayList<>());
+                    if (e.getValue().isArray()) e.getValue().forEach(x -> { if (x.isTextual() && !l.contains(x.asText())) l.add(x.asText()); });
+                });
+            } catch (IOException | RuntimeException e) {
+                // skip this source
             }
         }
-        return s;
+        return new TaxonomyAliases(merged);
     }
 
-    private static TaxonomyAliases loadBundled() {
-        try (InputStream in = TaxonomyAliases.class.getResourceAsStream(RESOURCE)) {
-            if (in == null) return new TaxonomyAliases(Map.of());
-            byte[] bytes = in.readNBytes(MAX_BYTES + 1);
-            if (bytes.length > MAX_BYTES) return new TaxonomyAliases(Map.of());
-            JsonNode acr = new ObjectMapper().readTree(bytes).path("acronyms");
-            Map<String, List<String>> m = new LinkedHashMap<>();
-            acr.fields().forEachRemaining(e -> {
-                List<String> l = new ArrayList<>();
-                if (e.getValue().isArray()) e.getValue().forEach(x -> { if (x.isTextual()) l.add(x.asText()); });
-                m.put(e.getKey(), l);
-            });
-            return new TaxonomyAliases(m);
-        } catch (IOException | RuntimeException e) {
-            return new TaxonomyAliases(Map.of());
-        }
-    }
-
-    /** Spelled-out forms to add as aliases of this tag (empty when its name and aliases are not a known acronym). */
+    /** Aliases to add to this tag (empty when its name and aliases are keys of no source). */
     public List<String> aliasesFor(VocabularyTag tag) {
         List<String> out = new ArrayList<>();
         List<String> names = new ArrayList<>();

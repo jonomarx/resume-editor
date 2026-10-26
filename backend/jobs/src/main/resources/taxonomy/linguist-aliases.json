@@ -1,0 +1,78 @@
+{
+ "source": "GitHub Linguist languages.yml (MIT, Copyright (c) 2017 GitHub, Inc.); aliases only, derived by this project",
+ "licence": "MIT",
+ "aliases": {
+  "asp.net": [
+   "aspx",
+   "aspx-vb"
+  ],
+  "assembly": [
+   "asm",
+   "nasm"
+  ],
+  "c#": [
+   "cake",
+   "cakescript",
+   "csharp"
+  ],
+  "c++": [
+   "cpp"
+  ],
+  "go": [
+   "golang"
+  ],
+  "html": [
+   "xhtml"
+  ],
+  "javascript": [
+   "node"
+  ],
+  "json": [
+   "geojson",
+   "jsonl",
+   "sarif",
+   "topojson"
+  ],
+  "matlab": [
+   "octave"
+  ],
+  "objective-c": [
+   "obj-c",
+   "objc",
+   "objectivec"
+  ],
+  "perl": [
+   "cperl"
+  ],
+  "php": [
+   "inc"
+  ],
+  "powershell": [
+   "posh",
+   "pwsh"
+  ],
+  "python": [
+   "py3",
+   "python3",
+   "rusthon"
+  ],
+  "r": [
+   "Rscript",
+   "splus"
+  ],
+  "ruby": [
+   "jruby",
+   "macruby",
+   "rake",
+   "rbx"
+  ],
+  "xml": [
+   "rss",
+   "wsdl",
+   "xsd"
+  ],
+  "yaml": [
+   "yml"
+  ]
+ }
+}

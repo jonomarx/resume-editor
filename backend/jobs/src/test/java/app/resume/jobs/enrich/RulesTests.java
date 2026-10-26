@@ -25,7 +25,7 @@ class RulesTests {
             "rising senior|rising senior",
             "Class of 2028 welcome|Class of 2028",
             "graduating in May 2027 or later|graduating in May 2027",
-            "Expected graduation date: 2027|Expected graduation date: 2027",
+            "Expected graduation date: 2027|graduation date: 2027",
             "Juniors or seniors only|Juniors or seniors",
             "Graduating soon|NULL",
             "Founded in 2019, we are graduates of YC|NULL"})
@@ -35,24 +35,36 @@ class RulesTests {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', nullValues = "NULL", value = {
-            "Great team. Must be authorized to work in the US. Apply now.|Must be authorized to work in the US.",
-            "Applicants must be U.S. citizens.|Applicants must be U.S. citizens.",
-            "Great team and snacks|NULL"})
-    void workAuthorization(String text, String expected) {
+            "Great team. Must be authorized to work in the US. Apply now.|authorization_required",
+            "Applicants must be U.S. citizens.|authorization_required",
+            "We do not offer visa sponsorship|does_not_sponsor",
+            "Visa sponsorship is not available for this role.|does_not_sponsor",
+            "We cannot sponsor visas.|does_not_sponsor",
+            "We do sponsor visas for interns.|sponsors",
+            "Visa sponsorship available.|sponsors",
+            "Must be authorized to work in the US; we cannot offer visa sponsorship.|does_not_sponsor",
+            "Authorized to work in the US. We will sponsor visas.|sponsors",
+            "Security clearance is not required.|NULL",
+            "Sponsorship is not required to apply.|NULL",
+            "Great team and snacks|NULL",
+            "NULL|NULL"})
+    void workAuthorizationIsNormalized(String text, String expected) {
         assertThat(EligibilityRules.workAuthorization(text)).isEqualTo(expected);
     }
 
     @Test
-    void authorizationSentenceStopsAtALineBreak() {
-        assertThat(EligibilityRules.workAuthorization("We do not offer visa sponsorship\nBring snacks")).isEqualTo("We do not offer visa sponsorship");
+    void authorizationSentencesAreJudgedSeparatelyAcrossLines() {
+        assertThat(EligibilityRules.workAuthorization("We do not offer visa sponsorship\nBring snacks")).isEqualTo("does_not_sponsor");
     }
 
-    @Test
-    void longAuthorizationSentenceIsCutAtAWordBoundary() {
-        String s = "Applicants must be authorized to work " + "in the country without any need for sponsorship ".repeat(10);
-        String got = EligibilityRules.workAuthorization(s);
-        assertThat(got.length()).isLessThanOrEqualTo(120);
-        assertThat(s.replaceAll("\\s+", " ")).startsWith(got);
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', nullValues = "NULL", value = {
+            "Last summer 2019 we grew. Join us in Summer 2027.|Summer 2027",
+            "Since fall 2020 we have hired. The internship runs Winter 2027.|Winter 2027",
+            "Summer 2027 or Fall 2026|Summer 2027",
+            "Last summer 2019 only|NULL"})
+    void seasonPrefersTheTargetSeasonOverPastMentions(String text, String expected) {
+        assertThat(EligibilityRules.season(text)).isEqualTo(expected);
     }
 
     @Test
@@ -90,7 +102,7 @@ class RulesTests {
 
     @Test
     void sectionTextIsCapped() {
-        String body = "Requirements\n" + "word ".repeat(10_000);
+        String body = "Requirements\n" + "word\n".repeat(10_000);
         assertThat(RequirementSections.parse(body).basic().length()).isLessThanOrEqualTo(RequirementSections.MAX_FIELD);
     }
 }

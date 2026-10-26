@@ -20,7 +20,7 @@ public final class RequirementSections {
     private static final Pattern PREFERRED = Pattern.compile("(?i)^(preferred|nice[- ]to[- ]haves?|bonus|desired|ideal|"
             + "(it'?s |it is )?a plus|extra credit|good to have|additional qualifications|great to have)\\b.*");
     private static final Pattern BASIC = Pattern.compile("(?i)^(requirements?|qualifications?|basic|minimum|required|must[- ]haves?|"
-            + "what (you'?ll|you will|we'?re looking for|you need|you bring|we need)\\b.*(bring|need|have|for)|"
+            + "what (you'?ll|you will|we'?re|we are|you|we)\\b.*(bring|need|have|for|seek)|"
             + "who you are|about you|you have|you'?ll need|skills( and experience)?|what we'?re looking for|your background)\\b.*");
     private static final Pattern OTHER = Pattern.compile("(?i)^(responsibilit\\w*|what you'?ll do|what you will do|about (us|the (role|team|company|job))|"
             + "the role|overview|description|benefits|perks|compensation|salary|pay|how to apply|equal opportunity|our (mission|values|team)|"
@@ -31,11 +31,13 @@ public final class RequirementSections {
 
     public static Sections parse(String text) {
         if (text == null) return new Sections(null, null);
+        text = PostingText.normalize(text);
         StringBuilder basic = new StringBuilder();
         StringBuilder preferred = new StringBuilder();
         Kind current = Kind.OTHER;
-        for (String raw : text.split("\n", -1)) {
-            String line = raw.strip();
+        String[] lines = text.split("\n", -1);
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i].strip();
             if (line.isEmpty()) continue;
             Kind heading = headingKind(stripMarks(line));
             if (heading != null) {
@@ -47,9 +49,26 @@ public final class RequirementSections {
                 }
                 continue;
             }
+            if (current != Kind.OTHER) {
+                // A prose paragraph, or a short unknown heading before one, ends the section: requirement items are short lines.
+                if (line.length() > LONG_LINE || i > 0 && lines[i - 1].isBlank() && looksLikeHeading(line, lines, i)) {
+                    current = Kind.OTHER;
+                    continue;
+                }
+            }
             append(current, basic, preferred, line);
         }
         return new Sections(cap(basic), cap(preferred));
+    }
+
+    private static final int LONG_LINE = 200;
+
+    private static boolean looksLikeHeading(String line, String[] lines, int i) {
+        if (line.length() > 40 || line.endsWith(".") || line.endsWith(",") || line.startsWith("-") || line.startsWith("•") || line.startsWith("*")) return false;
+        for (int k = i + 1; k < lines.length; k++) {
+            if (!lines[k].isBlank()) return lines[k].strip().length() > 100;
+        }
+        return false;
     }
 
     private static void append(Kind k, StringBuilder basic, StringBuilder preferred, String line) {
@@ -74,7 +93,23 @@ public final class RequirementSections {
     }
 
     private static String stripMarks(String line) {
-        return line.replaceAll("^[#*\\-•\\s]+|[*\\s]+$", "");
+        int a = 0, b = line.length();
+        while (a < b && "#*-•".indexOf(line.charAt(a)) >= 0 || a < b && line.charAt(a) == ' ') a++;
+        while (b > a && (line.charAt(b - 1) == '*' || line.charAt(b - 1) == ' ')) b--;
+        return line.substring(a, b);
+    }
+
+    private static final Pattern SKILL_LIST = Pattern.compile("(?i)^(?:programming languages|languages|tech(?:nolog(?:y|ies))?(?: stack)?|stack|tools|skills|"
+            + "tech stack)\\s{0,3}:\\s{0,3}(\\S.*)$");
+
+    /** Lines that are an explicit skills or tech-stack list ("Tech stack: Java, Spring"): their text, without the label. */
+    public static String skillLists(String text) {
+        StringBuilder out = new StringBuilder();
+        for (String raw : PostingText.normalize(text).split("\n", -1)) {
+            Matcher m = SKILL_LIST.matcher(stripMarks(raw.strip()));
+            if (m.matches()) out.append(m.group(1)).append('\n');
+        }
+        return out.toString();
     }
 
     // Without a colon only these whole lines count, so "Basic knowledge of Java" stays a requirement, not a heading.
@@ -82,7 +117,7 @@ public final class RequirementSections {
     private static final Pattern STRICT_PREFERRED = Pattern.compile("(?i)^(?:" + MOD + "\\s+(?:requirements?|qualifications?|skills?|experience)|"
             + "nice[- ]to[- ]haves?|bonus(?: points)?|preferred|desired|(?:it'?s )?a plus|extra credit|good to have|great to have)$");
     private static final Pattern STRICT_BASIC = Pattern.compile("(?i)^(?:requirements?|qualifications?|skills?|skills (?:and|&) experience|"
-            + "what (?:you'?ll|you will) (?:bring|need)|what you (?:bring|need|have)|what we'?re looking for|who you are|about you|"
+            + "what (?:you'?ll|you will) (?:bring|need)|what you (?:bring|need|have)|what we(?:'re| are) looking for|who you are|about you|"
             + "you have|you'?ll need|must[- ]haves?|your background|minimum (?:requirements?|qualifications?)|"
             + "basic (?:requirements?|qualifications?)|required (?:skills|qualifications?|experience))$");
     private static final Pattern STRICT_OTHER = Pattern.compile("(?i)^(?:responsibilit\\w*|what you'?ll do|what you will do|about (?:us|the (?:role|team|company|job)|you)|"

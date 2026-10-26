@@ -78,7 +78,7 @@ public class JobsConfig {
      * Returns null when the chosen one lacks what it needs (the vocabulary, or an LlmClient): postings then stay untagged.
      */
     static Enricher createEnricher(String kind, String tagMethod, JdbcTemplate jdbc, TransactionTemplate tx, LlmClient model, TagVocabulary tags) {
-        String k = kind == null ? "deterministic" : kind.strip().toLowerCase(java.util.Locale.ROOT);
+        String k = kind == null || kind.isBlank() ? "deterministic" : kind.strip().toLowerCase(java.util.Locale.ROOT);
         return switch (k) {
             case "deterministic" -> tags == null ? null
                     : new DeterministicEnricher(jdbc, tx, tags, tagStrategy(tagMethod));
@@ -87,14 +87,15 @@ public class JobsConfig {
         };
     }
 
-    /** ENRICHER_TAGS: rules (contender A, default), rules-sections, taxonomy (contender B). */
+    /** ENRICHER_TAGS: rules (contender A, default), rules-sections, taxonomy (B: Wikidata + Linguist aliases), taxonomy-onet (B plus O*NET). */
     static DeterministicEnricher.TagStrategy tagStrategy(String method) {
-        String m = method == null ? "rules" : method.strip().toLowerCase(java.util.Locale.ROOT);
+        String m = method == null || method.isBlank() ? "rules" : method.strip().toLowerCase(java.util.Locale.ROOT);
         return switch (m) {
             case "rules" -> DeterministicEnricher.TagStrategy.FULL_TEXT;
             case "rules-sections" -> DeterministicEnricher.TagStrategy.SECTION_SCOPED;
             case "taxonomy" -> DeterministicEnricher.TagStrategy.TAXONOMY;
-            default -> throw new IllegalStateException("Unknown ENRICHER_TAGS '" + method + "'; supported: rules, rules-sections, taxonomy");
+            case "taxonomy-onet" -> DeterministicEnricher.TagStrategy.TAXONOMY_ONET;
+            default -> throw new IllegalStateException("Unknown ENRICHER_TAGS '" + method + "'; supported: rules, rules-sections, taxonomy, taxonomy-onet");
         };
     }
 

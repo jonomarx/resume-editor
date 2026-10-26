@@ -1,13 +1,13 @@
 #!/usr/bin/env python3 -I
-"""Derives src/main/resources/taxonomy/onet-acronyms.json from the O*NET 31.0 database file software_skills.csv.
+"""Derives src/main/resources/taxonomy/onet-aliases.json from the O*NET 31.0 database file software_skills.csv.
 
 O*NET (USDOL/ETA) is licensed CC BY 4.0, see NOTICE-taxonomy.md. The raw file is untrusted input and is never committed:
 fetch it into an empty directory outside the repository and pass its path.
 
   mkdir /somewhere/onet && curl -o /somewhere/onet/software_skills.csv \
       https://www.onetcenter.org/dl_files/database/db_31_0_csv/software_skills.csv
-  python3 -I backend/jobs/tools/taxonomy/derive_onet_acronyms.py /somewhere/onet/software_skills.csv \
-      > backend/jobs/src/main/resources/taxonomy/onet-acronyms.json
+  python3 -I backend/jobs/tools/taxonomy/derive_onet_aliases.py /somewhere/onet/software_skills.csv \
+      > backend/jobs/src/main/resources/taxonomy/onet-aliases.json
 
 Method: O*NET "Workplace Example" entries often spell a name out and append its acronym ("Structured query language SQL").
 When the initials of the words before an all-caps token spell that token, the pair (acronym, expansion) is recorded. Only
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     found = pairs(sys.argv[1])
     doc = {
         "source": "O*NET 31.0 Database, software_skills.csv (USDOL/ETA), CC BY 4.0; derived and modified by this project",
-        "acronyms": {a: sorted(e) for a, e in sorted(found.items())},
+        "aliases": {a: sorted(e) for a, e in sorted(found.items())},
     }
     json.dump(doc, sys.stdout, indent=1, ensure_ascii=False)
     print()

@@ -248,7 +248,7 @@ public class CrawlService {
         if (enricher == null) return;
         try {
             enricher.enrich(postingId);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | StackOverflowError e) { // untrusted text must never break a run
             log.warn("enrichment of posting {} failed: {}", postingId, e.toString()); // the posting stays, untagged
         }
     }
