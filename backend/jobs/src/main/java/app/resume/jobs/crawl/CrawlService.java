@@ -10,6 +10,7 @@ import app.resume.jobs.fetch.FetchException;
 import app.resume.jobs.fetch.FetchResult;
 import app.resume.jobs.fetch.JsonLdPostingAdapter;
 import app.resume.jobs.fetch.PageFetcher;
+import app.resume.jobs.fetch.PostedDates;
 import app.resume.jobs.fetch.RobotsDisallowedException;
 import app.resume.jobs.fetch.UrlNotAllowedException;
 import java.sql.Timestamp;
@@ -184,6 +185,7 @@ public class CrawlService {
             long id;
             if (!existing.isEmpty()) {
                 id = existing.get(0)[0];
+                keepEarliestPostedAt(id, postedAt(p, now));
                 String oldHash = jdbc.queryForObject("SELECT content_hash FROM job_posting WHERE id = ?", String.class, id);
                 if (!contentHash.equals(oldHash)) {
                     jdbc.update("UPDATE job_posting SET content_hash = ?, dedupe_key = ?, title = ?, company = ?, location = ?, description = ?,"
@@ -198,9 +200,9 @@ public class CrawlService {
             } else {
                 try {
                     jdbc.update("INSERT INTO job_posting (owner_user_id, source_id, origin, canonical_url, url_hash, content_hash, dedupe_key,"
-                            + " title, company, location, description, first_seen_at, last_seen_at, created_at, updated_at)"
-                            + " VALUES (?, ?, 'crawl', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", s.userId, s.id, url, urlHash, contentHash, dedupe,
-                            p.title(), company, p.location(), p.description(), ts(now), ts(now), ts(now), ts(now));
+                            + " title, company, location, description, posted_at, first_seen_at, last_seen_at, created_at, updated_at)"
+                            + " VALUES (?, ?, 'crawl', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", s.userId, s.id, url, urlHash, contentHash, dedupe,
+                            p.title(), company, p.location(), p.description(), tsOrNull(postedAt(p, now)), ts(now), ts(now), ts(now), ts(now));
                     added++;
                 } catch (DuplicateKeyException race) {
                     // Another writer inserted it between our check and insert; the unique constraint kept it single.
@@ -242,6 +244,26 @@ public class CrawlService {
             }
         }
         return changed;
+    }
+
+    /** The source's own published date, else an unambiguous "Posted on ..." line in the text, else null (never guessed). */
+    private static Instant postedAt(ExtractedPosting p, Instant now) {
+        Instant t = PostedDates.parse(p.datePosted(), now);
+        return t != null ? t : PostedDates.fromText(p.description(), now);
+    }
+
+    private static Timestamp tsOrNull(Instant t) {
+        return t == null ? null : Timestamp.from(t);
+    }
+
+    /** Update rule: the earliest credible published date wins, so a repost never makes an old posting look new. */
+    private void keepEarliestPostedAt(long id, Instant incoming) {
+        if (incoming == null) return;
+        Timestamp stored = jdbc.queryForObject("SELECT posted_at FROM job_posting WHERE id = ?", Timestamp.class, id);
+        Instant best = PostedDates.earliest(stored == null ? null : stored.toInstant(), incoming);
+        if (stored == null || !best.equals(stored.toInstant())) {
+            jdbc.update("UPDATE job_posting SET posted_at = ? WHERE id = ?", Timestamp.from(best), id);
+        }
     }
 
     private void enrich(long postingId) {

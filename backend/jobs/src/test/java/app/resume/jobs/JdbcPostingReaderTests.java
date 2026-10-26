@@ -138,6 +138,13 @@ class JdbcPostingReaderTests {
     }
 
     @Test
+    void postedAtIsExposedWhenStored() {
+        jdbc.update("UPDATE job_posting SET posted_at = ? WHERE id = ?", Timestamp.from(Instant.parse("2026-09-01T10:00:00Z")), a1);
+        assertThat(reader.find(ada, a1).orElseThrow().postedAt()).isEqualTo(Instant.parse("2026-09-01T10:00:00Z"));
+        assertThat(reader.find(ada, a2).orElseThrow().postedAt()).isNull();
+    }
+
+    @Test
     void anotherUsersTagWithTheSameSlugDoesNotLeak() {
         assertThat(reader.find(bob, b1).orElseThrow().tags()).containsExactly("java");
         assertThat(titles(bob, q(Set.of("docker"), null, null, null, null))).isEmpty();
