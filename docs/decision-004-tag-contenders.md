@@ -42,7 +42,7 @@ Not used, by owner decision: Stack Overflow, ESCO, Lightcast, LinkedIn, Indeed. 
 Same harness as A (`DeterministicEnrichmentEvaluationTests`). Three labelled sets, all labelled before B was run:
 the 16 short and 4 long postings of decision 003, and a new set of 17 alias-style and paraphrased postings
 (`labelled-postings-aliased.json`, 39 expected links; vocabulary users have not given aliases such as "Amazon Web Services" or
-"Structured Query Language"; 4 of the 17 are paraphrases no alias list can solve, such as "neural networks" for Machine Learning).
+"Structured Query Language"; 3 of the 17 are paraphrases no alias list can solve, such as "neural networks" for Machine Learning).
 
 | Set | Method | TP | FP | FN | Precision | Recall | F1 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
