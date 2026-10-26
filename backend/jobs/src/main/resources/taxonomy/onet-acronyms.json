@@ -1,0 +1,458 @@
+{
+ "source": "O*NET 31.0 Database, software_skills.csv (USDOL/ETA), CC BY 4.0; derived and modified by this project",
+ "acronyms": {
+  "ABAP": [
+   "Advanced business application programming"
+  ],
+  "ABEL": [
+   "Advanced boolean expression language"
+  ],
+  "ABIS": [
+   "Automated Biometric Identification System"
+  ],
+  "ACS": [
+   "Affiliated Computer Services"
+  ],
+  "ACSL": [
+   "Advanced computer simulation language"
+  ],
+  "ADCS": [
+   "Automated Data Collection System"
+  ],
+  "ADIS": [
+   "Arrival Departure Information System"
+  ],
+  "AEM": [
+   "Adobe Experience Manager"
+  ],
+  "AHDL": [
+   "Altera hardware description language"
+  ],
+  "ALGOL": [
+   "Algorithmic language"
+  ],
+  "AMS": [
+   "Address Management System",
+   "Automated Manifest System"
+  ],
+  "ANCS": [
+   "Automated National Catalog System"
+  ],
+  "ANSI": [
+   "American National Standards Institute"
+  ],
+  "APEX": [
+   "Application Express"
+  ],
+  "APL": [
+   "A programming language"
+  ],
+  "ASMIS": [
+   "Archeological Sites Management Information System"
+  ],
+  "ASP": [
+   "Active Server Pages"
+  ],
+  "ATS": [
+   "Athletic Trainer System",
+   "Automate the Schools",
+   "Automated Targeting System"
+  ],
+  "AWS": [
+   "Amazon Web Services"
+  ],
+  "BASIC": [
+   "Beginner's all-purpose symbolic instruction code"
+  ],
+  "BSDL": [
+   "Boundary scan description language"
+  ],
+  "BSS": [
+   "Biometric Storage System"
+  ],
+  "CALI": [
+   "Computer-Assisted Legal Instruction"
+  ],
+  "CAML": [
+   "Collaborative Application Markup Language"
+  ],
+  "CASE": [
+   "Computer aided software engineering"
+  ],
+  "CCD": [
+   "Consular Consolidated Database"
+  ],
+  "CDLIS": [
+   "Commercial driver's license information system"
+  ],
+  "CDMS": [
+   "Carpet Dealer Management System",
+   "Clinical data management system"
+  ],
+  "CETIS": [
+   "Comprehensive Environmental Toxicity Information System"
+  ],
+  "CF": [
+   "Compact Framework"
+  ],
+  "CIF": [
+   "Corporate Information Factory"
+  ],
+  "CIMS": [
+   "Coordinated incident management system"
+  ],
+  "CLAIMS": [
+   "Computer Linked Application Information Management System"
+  ],
+  "CLOS": [
+   "Common Lisp Object System"
+  ],
+  "CMS": [
+   "Career management systems",
+   "Content management systems",
+   "content management system"
+  ],
+  "COBOL": [
+   "Common business oriented language"
+  ],
+  "CODIS": [
+   "Combined DNA Index System"
+  ],
+  "COM": [
+   "Component object model"
+  ],
+  "CORAL": [
+   "Computer On-line Real-time Applications Language"
+  ],
+  "CPL": [
+   "Call-processing language"
+  ],
+  "CPMS": [
+   "Collection Point Management System"
+  ],
+  "CRS": [
+   "Computer reservation system"
+  ],
+  "CSLA": [
+   "Component-based Scalable Logical Architecture"
+  ],
+  "CSS": [
+   "Cascading style sheets"
+  ],
+  "DBMS": [
+   "Database management system"
+  ],
+  "DCOM": [
+   "Distributed component object model"
+  ],
+  "DDL": [
+   "Data definition language"
+  ],
+  "DENCAS": [
+   "Dental Common Access System"
+  ],
+  "DHTML": [
+   "Dynamic hypertext markup language"
+  ],
+  "DITA": [
+   "Darwin information typing architecture"
+  ],
+  "DML": [
+   "Data manipulation language"
+  ],
+  "DNA": [
+   "Deoxyribonucleic acid"
+  ],
+  "DOM": [
+   "Document Object Model"
+  ],
+  "DOS": [
+   "Disk operating system"
+  ],
+  "DSP": [
+   "Digital Signal Processing"
+  ],
+  "DTS": [
+   "Data transformation services"
+  ],
+  "EAG": [
+   "Economic Analysis Group"
+  ],
+  "EE": [
+   "Enterprise Edition"
+  ],
+  "EMWIN": [
+   "Emergency Managers Weather Information Network"
+  ],
+  "ESIS": [
+   "Ecological Site Information System"
+  ],
+  "FDO": [
+   "Foundatino Directory Online"
+  ],
+  "FEMIS": [
+   "Federal Emergency Management Information System"
+  ],
+  "GDS": [
+   "Global distribution system",
+   "global distribution systems"
+  ],
+  "GIS": [
+   "Geographic information system"
+  ],
+  "GUI": [
+   "Graphical user interface"
+  ],
+  "HDL": [
+   "Hardware description language"
+  ],
+  "HLSL": [
+   "High Level Shader Language"
+  ],
+  "HP": [
+   "Hewlett Packard"
+  ],
+  "HPGL": [
+   "HP Graphics Language"
+  ],
+  "HTML": [
+   "Hypertext markup language"
+  ],
+  "IAFIS": [
+   "Integrated Automated Fingerprint Identification System"
+  ],
+  "ICON": [
+   "Interstate connection"
+  ],
+  "IDE": [
+   "Integrated Development Environment",
+   "Integrated development environment"
+  ],
+  "IDL": [
+   "Interface definition language"
+  ],
+  "IDS": [
+   "Intrusion detection system"
+  ],
+  "IEP": [
+   "Individualized Educational Program"
+  ],
+  "IMDS": [
+   "International Material Data System"
+  ],
+  "IMS": [
+   "Information Management System"
+  ],
+  "IPS": [
+   "Intrusion prevention system"
+  ],
+  "IPSEC": [
+   "Internet Protocol Security"
+  ],
+  "ISPF": [
+   "Interactive System Productivity Facility"
+  ],
+  "ISS": [
+   "Inspection Selection System"
+  ],
+  "JCL": [
+   "Job control language"
+  ],
+  "JEMS": [
+   "Judicial Enforcement Management System"
+  ],
+  "JMS": [
+   "Java Message Service"
+  ],
+  "JSON": [
+   "JavaScript Object Notation"
+  ],
+  "JSP": [
+   "JavaServer Pages"
+  ],
+  "LAWS": [
+   "Legislative Automative Workflow System"
+  ],
+  "LLVM": [
+   "Low-level virtual machine"
+  ],
+  "MEL": [
+   "Maya Embedded Language"
+  ],
+  "MGMS": [
+   "Management System"
+  ],
+  "MIB": [
+   "Management information base"
+  ],
+  "MRTG": [
+   "Multi-router traffic grapher"
+  ],
+  "NASIS": [
+   "National Soil Information System"
+  ],
+  "NCIC": [
+   "National Crime Information Center"
+  ],
+  "NCL": [
+   "NCAR Command Language"
+  ],
+  "NDR": [
+   "National Driver Register"
+  ],
+  "NFIRS": [
+   "National Fire Incident Reporting System"
+  ],
+  "NIBIN": [
+   "National Integrated Ballistics Information Network"
+  ],
+  "NIPS": [
+   "Network intrusion prevention systems"
+  ],
+  "NLCD": [
+   "National Land Cover Database"
+  ],
+  "NLETS": [
+   "National Law Enforcement Telecommunications System"
+  ],
+  "NRCS": [
+   "National Resources Conservation Service"
+  ],
+  "ODBMS": [
+   "Object database management system"
+  ],
+  "ODS": [
+   "Operational Data Store"
+  ],
+  "OLAP": [
+   "Online analytical processing"
+  ],
+  "PDP": [
+   "PEDON Description Program"
+  ],
+  "PIQ": [
+   "Past Inspection Query"
+  ],
+  "PLC": [
+   "Programmable logic controller"
+  ],
+  "PMS": [
+   "Practice management software",
+   "Property Management System",
+   "Property management system"
+  ],
+  "RACF": [
+   "Resource Access Control Facility"
+  ],
+  "RDMS": [
+   "Relational database management system"
+  ],
+  "RMS": [
+   "Railyard management software"
+  ],
+  "ROV": [
+   "Remote operated vehicle"
+  ],
+  "RPR": [
+   "Realtors Property Resource"
+  ],
+  "RSS": [
+   "Really Simple Syndication"
+  ],
+  "RTL": [
+   "Register transfer language"
+  ],
+  "RTOS": [
+   "Real time operating system"
+  ],
+  "SAM": [
+   "Software asset management"
+  ],
+  "SAML": [
+   "Security assertion markup language"
+  ],
+  "SAN": [
+   "Storage area network"
+  ],
+  "SASS": [
+   "Syntactically awesome style sheets"
+  ],
+  "SCM": [
+   "Source code management"
+  ],
+  "SDL": [
+   "Simple DirectMedia Layer"
+  ],
+  "SEO": [
+   "search engine optimization"
+  ],
+  "SERP": [
+   "Search engine results pages"
+  ],
+  "SESIS": [
+   "Special Education Student Information System"
+  ],
+  "SGML": [
+   "Standard generalized markup language",
+   "Standardized general markup language"
+  ],
+  "SIS": [
+   "Student information systems"
+  ],
+  "SMTP": [
+   "Simple mail transfer protocol"
+  ],
+  "SQL": [
+   "Structure query language",
+   "Structured query language"
+  ],
+  "SQR": [
+   "Structured Query Report"
+  ],
+  "SSRS": [
+   "SQL Server Reporting Services"
+  ],
+  "SSURGO": [
+   "Soil Survey Geographic"
+  ],
+  "SVG": [
+   "Scalable vector graphics"
+  ],
+  "TECS": [
+   "Treasury Enforcement Communications System"
+  ],
+  "TSO": [
+   "Time sharing option"
+  ],
+  "UID": [
+   "Unique Identification"
+  ],
+  "VHDL": [
+   "VHSIC hardware description language"
+  ],
+  "VHSIC": [
+   "Very high-speed integrated circuit"
+  ],
+  "VIN": [
+   "Vehicle identification number"
+  ],
+  "VPN": [
+   "Virtual private networking"
+  ],
+  "WAN": [
+   "Wide area network"
+  ],
+  "WFAS": [
+   "Wildland Fire Assessment System"
+  ],
+  "WIMS": [
+   "Weed Information Management System"
+  ],
+  "WSS": [
+   "Web Soil Survey"
+  ],
+  "XUI": [
+   "XML User Interface"
+  ]
+ }
+}

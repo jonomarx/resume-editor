@@ -64,11 +64,12 @@ public class JobsConfig {
     /** LLM-backed pieces exist only when an {@link LlmClient} bean exists (selected by LLM_PROVIDER). */
     @Bean
     CrawlService crawlService(JdbcTemplate jdbc, TransactionTemplate tx, PageFetcher fetcher, ObjectProvider<LlmClient> llm,
-            ObjectProvider<TagVocabulary> vocabulary, @Value("${app.jobs.enricher:${ENRICHER:deterministic}}") String enricherKind) {
+            ObjectProvider<TagVocabulary> vocabulary, @Value("${app.jobs.enricher:${ENRICHER:deterministic}}") String enricherKind,
+            @Value("${app.jobs.enricher.tags:${ENRICHER_TAGS:rules}}") String tagMethod) {
         LlmClient model = llm.getIfAvailable();
         return new CrawlService(jdbc, fetcher, List.<AtsFeedAdapter>of(new GreenhouseAdapter(), new LeverAdapter(), new AshbyAdapter()),
                 new JsonLdPostingAdapter(), model == null ? null : new LlmPostingExtractor(model),
-                createEnricher(enricherKind, jdbc, tx, model, vocabulary.getIfAvailable()), Instant::now,
+                createEnricher(enricherKind, tagMethod, jdbc, tx, model, vocabulary.getIfAvailable()), Instant::now,
                 CrawlService.DEFAULT_STALE_AFTER, CrawlService.DEFAULT_CLOSE_AFTER);
     }
 
@@ -76,13 +77,24 @@ public class JobsConfig {
      * Chooses the enrichment implementation from ENRICHER (app.jobs.enricher): "deterministic" (the default, no LLM) or "llm".
      * Returns null when the chosen one lacks what it needs (the vocabulary, or an LlmClient): postings then stay untagged.
      */
-    static Enricher createEnricher(String kind, JdbcTemplate jdbc, TransactionTemplate tx, LlmClient model, TagVocabulary tags) {
+    static Enricher createEnricher(String kind, String tagMethod, JdbcTemplate jdbc, TransactionTemplate tx, LlmClient model, TagVocabulary tags) {
         String k = kind == null ? "deterministic" : kind.strip().toLowerCase(java.util.Locale.ROOT);
         return switch (k) {
             case "deterministic" -> tags == null ? null
-                    : new DeterministicEnricher(jdbc, tx, tags, DeterministicEnricher.TagStrategy.FULL_TEXT);
+                    : new DeterministicEnricher(jdbc, tx, tags, tagStrategy(tagMethod));
             case "llm" -> model != null && tags != null ? new PostingEnricher(jdbc, tx, model, tags) : null;
             default -> throw new IllegalStateException("Unknown ENRICHER '" + kind + "'; supported: deterministic, llm");
+        };
+    }
+
+    /** ENRICHER_TAGS: rules (contender A, default), rules-sections, taxonomy (contender B). */
+    static DeterministicEnricher.TagStrategy tagStrategy(String method) {
+        String m = method == null ? "rules" : method.strip().toLowerCase(java.util.Locale.ROOT);
+        return switch (m) {
+            case "rules" -> DeterministicEnricher.TagStrategy.FULL_TEXT;
+            case "rules-sections" -> DeterministicEnricher.TagStrategy.SECTION_SCOPED;
+            case "taxonomy" -> DeterministicEnricher.TagStrategy.TAXONOMY;
+            default -> throw new IllegalStateException("Unknown ENRICHER_TAGS '" + method + "'; supported: rules, rules-sections, taxonomy");
         };
     }
 
@@ -93,10 +105,11 @@ public class JobsConfig {
 
     @Bean
     IngestProcessor ingestProcessor(JdbcTemplate jdbc, TransactionTemplate tx, PageFetcher fetcher, ObjectProvider<LlmClient> llm,
-            ObjectProvider<TagVocabulary> vocabulary, @Value("${app.jobs.enricher:${ENRICHER:deterministic}}") String enricherKind) {
+            ObjectProvider<TagVocabulary> vocabulary, @Value("${app.jobs.enricher:${ENRICHER:deterministic}}") String enricherKind,
+            @Value("${app.jobs.enricher.tags:${ENRICHER_TAGS:rules}}") String tagMethod) {
         LlmClient model = llm.getIfAvailable();
         return new IngestProcessor(jdbc, fetcher, new JsonLdPostingAdapter(), model == null ? null : new LlmPostingExtractor(model),
-                createEnricher(enricherKind, jdbc, tx, model, vocabulary.getIfAvailable()), Instant::now);
+                createEnricher(enricherKind, tagMethod, jdbc, tx, model, vocabulary.getIfAvailable()), Instant::now);
     }
 
     /** Ingest events are processed on a small pool so POST /api/ingest can answer 202 at once. */

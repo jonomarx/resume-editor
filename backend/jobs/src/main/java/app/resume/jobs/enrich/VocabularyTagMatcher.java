@@ -37,10 +37,16 @@ public final class VocabularyTagMatcher {
     private final List<Term> terms = new ArrayList<>();
 
     public VocabularyTagMatcher(List<VocabularyTag> vocabulary) {
+        this(vocabulary, null);
+    }
+
+    /** @param taxonomy extra aliases per tag from an open taxonomy (contender B), or null; the same guards apply to them */
+    public VocabularyTagMatcher(List<VocabularyTag> vocabulary, TaxonomyAliases taxonomy) {
         for (VocabularyTag t : vocabulary) {
             List<String> names = new ArrayList<>();
             names.add(t.name());
             names.addAll(t.aliases());
+            if (taxonomy != null) names.addAll(taxonomy.aliasesFor(t));
             for (String n : names) {
                 if (n == null) continue;
                 n = n.strip();
