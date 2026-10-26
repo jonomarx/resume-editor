@@ -40,3 +40,8 @@ app:
   storage:
     type: ${FILE_STORAGE:local}
     data-dir: ${DATA_DIR:./data}
+  jobs:
+    fetch:
+      # TEST/E2E ONLY. When true the job pipeline may fetch loopback and private addresses (a fixture site on localhost),
+      # which switches the SSRF protection off. Leave it false in every deployment.
+      allow-private-hosts: ${JOBS_ALLOW_PRIVATE_HOSTS:false}
