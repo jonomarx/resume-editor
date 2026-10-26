@@ -17,7 +17,11 @@ public class DeterministicEnricher implements Enricher {
         /** Guarded vocabulary match over the whole text. */
         FULL_TEXT,
         /** Guarded match over the title and requirement sections only; the whole text when the posting has no such section. */
-        SECTION_SCOPED
+        SECTION_SCOPED,
+        /** Contender B: FULL_TEXT plus aliases from Wikidata and GitHub Linguist. */
+        TAXONOMY,
+        /** B with O*NET acronym expansions added as a secondary source. */
+        TAXONOMY_ONET
     }
 
     private final EnrichmentStore store;
@@ -33,10 +37,18 @@ public class DeterministicEnricher implements Enricher {
     @Override
     public Result enrich(long postingId) {
         EnrichmentStore.Posting p = store.load(postingId);
-        Set<Long> tagIds = tags(new VocabularyTagMatcher(vocabulary.list(p.owner(), null)), strategy, p.title(), p.description());
+        Set<Long> tagIds = tags(matcher(vocabulary.list(p.owner(), null), strategy), strategy, p.title(), p.description());
         Enrichment e = fields(p.title(), p.description());
         store.save(postingId, p.owner(), tagIds, e, List.of(), c -> false);
         return new Result(tagIds.size(), 0);
+    }
+
+    static VocabularyTagMatcher matcher(List<app.resume.vocabulary.VocabularyTag> tags, TagStrategy strategy) {
+        return new VocabularyTagMatcher(tags, switch (strategy) {
+            case TAXONOMY -> TaxonomyAliases.shared(TaxonomyAliases.PRIMARY_SOURCES);
+            case TAXONOMY_ONET -> TaxonomyAliases.shared(TaxonomyAliases.ALL_SOURCES);
+            default -> null;
+        });
     }
 
     /** Tags for a posting under a strategy (also used by the comparison tests). */

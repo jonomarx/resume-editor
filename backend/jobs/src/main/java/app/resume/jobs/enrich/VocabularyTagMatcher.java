@@ -49,19 +49,38 @@ public final class VocabularyTagMatcher {
     private final List<Term> terms = new ArrayList<>();
 
     public VocabularyTagMatcher(List<VocabularyTag> vocabulary) {
+        this(vocabulary, null);
+    }
+
+    /** @param taxonomy extra aliases per tag from an open taxonomy (contender B), or null; the same guards apply to them */
+    public VocabularyTagMatcher(List<VocabularyTag> vocabulary, TaxonomyAliases taxonomy) {
+        // Every name and alias the user's vocabulary already has: a taxonomy alias equal to one of them is never added (it would
+        // steal or duplicate it).
+        Set<String> own = new java.util.HashSet<>();
         for (VocabularyTag t : vocabulary) {
-            List<String> names = new ArrayList<>();
-            names.add(t.name());
-            names.addAll(t.aliases());
-            for (String n : names) {
-                if (n == null) continue;
-                n = n.strip();
-                if (n.isEmpty() || n.length() > MAX_TERM) continue;
-                boolean letter = n.length() == 1 && Character.isLetter(n.charAt(0));
-                boolean ambiguous = letter || AMBIGUOUS.contains(n.toLowerCase(Locale.ROOT));
-                terms.add(new Term(t.id(), n, ambiguous, letter, boundary(n, ambiguous)));
+            own.add(t.name().strip().toLowerCase(Locale.ROOT));
+            for (String a : t.aliases()) own.add(a.strip().toLowerCase(Locale.ROOT));
+        }
+        for (VocabularyTag t : vocabulary) {
+            addTerms(t.id(), t.name(), false);
+            for (String a : t.aliases()) addTerms(t.id(), a, false);
+            if (taxonomy != null) {
+                for (String a : taxonomy.aliasesFor(t)) {
+                    if (!own.contains(a.strip().toLowerCase(Locale.ROOT))) addTerms(t.id(), a, true);
+                }
             }
         }
+    }
+
+    private void addTerms(long tagId, String n, boolean fromTaxonomy) {
+        if (n == null) return;
+        n = n.strip();
+        if (n.isEmpty() || n.length() > MAX_TERM) return;
+        boolean letter = n.length() == 1 && Character.isLetter(n.charAt(0));
+        // A short single-word taxonomy alias ("node", "cake", "es") is as risky as a short ordinary word: same strict guards.
+        boolean shortWord = fromTaxonomy && n.length() <= 4 && n.indexOf(' ') < 0 && n.chars().allMatch(Character::isLetter);
+        boolean ambiguous = letter || shortWord || AMBIGUOUS.contains(n.toLowerCase(Locale.ROOT));
+        terms.add(new Term(tagId, n, ambiguous, letter, boundary(n, ambiguous)));
     }
 
     /** Letters and digits on either side disqualify; so do a following + or # (C vs C++), and for ambiguous names a hyphen or ampersand. */

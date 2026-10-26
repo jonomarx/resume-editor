@@ -92,35 +92,66 @@ class DeterministicEnrichmentEvaluationTests {
         System.out.printf("  %-14s %-44s tp=%3d fp=%3d fn=%3d precision=%.2f recall=%.2f f1=%.2f%n", set, method, s.tp, s.fp, s.fn, s.precision(), s.recall(), s.f1());
     }
 
+    record Method(String label, BiFunction<Dataset, Case, Set<Long>> run, boolean taxonomy) {}
+
+    static final List<String> SETS = List.of("labelled-postings.json", "labelled-postings-long.json", "labelled-postings-aliased.json");
+    static final List<String> SET_NAMES = List.of("short(16)", "long(4)", "aliased(17)");
+
+    static Set<Long> tags(Dataset d, Case c, DeterministicEnricher.TagStrategy strategy) {
+        return DeterministicEnricher.tags(DeterministicEnricher.matcher(d.vocabulary, strategy), strategy, c.title, c.text);
+    }
+
+    static final List<Method> METHODS = List.of(
+            new Method("naive substring", (d, c) -> new VocabularyTagMatcher(d.vocabulary).match(c.title + "\n" + c.text, VocabularyTagMatcher.Mode.NAIVE), false),
+            new Method("A guarded rules (default)", (d, c) -> tags(d, c, DeterministicEnricher.TagStrategy.FULL_TEXT), false),
+            new Method("A sections only", (d, c) -> tags(d, c, DeterministicEnricher.TagStrategy.SECTION_SCOPED), false),
+            new Method("B A + Wikidata + Linguist aliases", (d, c) -> tags(d, c, DeterministicEnricher.TagStrategy.TAXONOMY), true),
+            new Method("B+ B + O*NET expansions", (d, c) -> tags(d, c, DeterministicEnricher.TagStrategy.TAXONOMY_ONET), true));
+
+    static Score score(Dataset d, Method m) {
+        Score total = new Score(0, 0, 0);
+        for (Case c : d.cases) {
+            Set<Long> got = m.run.apply(d, c);
+            int tp = 0, fp = 0, fn = 0;
+            for (Long g : got) if (c.tags.contains(g)) tp++; else fp++;
+            for (Long w : c.tags) if (!got.contains(w)) fn++;
+            total = total.plus(new Score(tp, fp, fn));
+        }
+        return total;
+    }
+
     @Test
     void tagMethodsCompared() throws Exception {
-        System.out.println("\nTAG METHODS (A = guarded rules)");
-        Score[][] all = new Score[3][];
-        int i = 0;
-        for (String file : List.of("labelled-postings.json", "labelled-postings-long.json")) {
-            Dataset d = new Dataset(file);
-            Score naive = d.score((m, c) -> m.match(c.title + "\n" + c.text, VocabularyTagMatcher.Mode.NAIVE));
-            Score a = d.score((m, c) -> DeterministicEnricher.tags(m, DeterministicEnricher.TagStrategy.FULL_TEXT, c.title, c.text));
-            Score scoped = d.score((m, c) -> DeterministicEnricher.tags(m, DeterministicEnricher.TagStrategy.SECTION_SCOPED, c.title, c.text));
-            String set = file.replace("labelled-postings", "set").replace(".json", "").replace("set-", "set ");
-            set = set.equals("set") ? "short(16)" : "long(4)";
-            print(set, "naive substring", naive);
-            print(set, "A guarded rules (default)", a);
-            print(set, "sections only", scoped);
-            all[i++] = new Score[] {naive, a, scoped};
+        System.out.println("\nTAG METHODS");
+        Score[] both = new Score[METHODS.size()];
+        java.util.Arrays.fill(both, new Score(0, 0, 0));
+        Map<String, Score[]> bySet = new HashMap<>();
+        for (int i = 0; i < SETS.size(); i++) {
+            Dataset d = new Dataset(SETS.get(i));
+            Score[] row = new Score[METHODS.size()];
+            for (int k = 0; k < METHODS.size(); k++) {
+                row[k] = score(d, METHODS.get(k));
+                print(SET_NAMES.get(i), METHODS.get(k).label, row[k]);
+                if (i < 2) both[k] = both[k].plus(row[k]);
+            }
+            bySet.put(SETS.get(i), row);
             for (Case c : d.cases) {
-                Set<Long> got = DeterministicEnricher.tags(new VocabularyTagMatcher(d.vocabulary), DeterministicEnricher.TagStrategy.FULL_TEXT, c.title, c.text);
-                if (!got.equals(c.tags)) System.out.println("    A differs on " + c.id + ": want " + d.names(c.tags) + " got " + d.names(got));
+                for (int k : new int[] {1, 3, 4}) {
+                    Set<Long> got = METHODS.get(k).run.apply(d, c);
+                    Set<Long> base = METHODS.get(1).run.apply(d, c);
+                    if (k == 1 && !got.equals(c.tags)) System.out.println("    A differs on " + c.id + ": want " + d.names(c.tags) + " got " + d.names(got));
+                    if (k > 1 && !got.equals(base)) System.out.println("    " + METHODS.get(k).label.split(" ")[0] + " vs A on " + c.id + ": want " + d.names(c.tags) + " A " + d.names(base) + " got " + d.names(got));
+                }
             }
         }
-        print("both", "naive substring", all[0][0].plus(all[1][0]));
-        print("both", "A guarded rules (default)", all[0][1].plus(all[1][1]));
-        print("both", "sections only", all[0][2].plus(all[1][2]));
-        assertThat(all[0][0].precision()).isLessThan(0.7);
-        assertThat(all[0][1].precision()).isGreaterThanOrEqualTo(0.9);
-        assertThat(all[0][1].recall()).isGreaterThanOrEqualTo(0.9);
-        assertThat(all[1][1].precision()).isGreaterThanOrEqualTo(0.7);
-        assertThat(all[1][1].recall()).isGreaterThanOrEqualTo(0.8);
+        for (int k = 0; k < METHODS.size(); k++) print("short+long", METHODS.get(k).label, both[k]);
+        Score[] shortRow = bySet.get(SETS.get(0));
+        Score[] longRow = bySet.get(SETS.get(1));
+        assertThat(shortRow[0].precision()).isLessThan(0.7);
+        assertThat(shortRow[1].precision()).isGreaterThanOrEqualTo(0.9);
+        assertThat(shortRow[1].recall()).isGreaterThanOrEqualTo(0.9);
+        assertThat(longRow[1].precision()).isGreaterThanOrEqualTo(0.7);
+        assertThat(longRow[1].recall()).isGreaterThanOrEqualTo(0.8);
     }
 
     @Test

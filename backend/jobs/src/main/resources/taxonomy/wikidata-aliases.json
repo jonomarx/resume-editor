@@ -1,0 +1,183 @@
+{
+ "source": "Wikidata (CC0) English altLabels of software items; derived by this project",
+ "licence": "CC0",
+ "aliases": {
+  "angular": [
+   "Angular 2+"
+  ],
+  "ansible": [
+   "ansible software"
+  ],
+  "c": [
+   "C language",
+   "C programming language"
+  ],
+  "c#": [
+   "Microsoft Java"
+  ],
+  "cobol": [
+   "Common Business-Oriented Language"
+  ],
+  "dart": [
+   "ECMA-408",
+   "Google Dart"
+  ],
+  "django": [
+   "Django Project"
+  ],
+  "docker": [
+   "Docker software",
+   "WMDocker",
+   "wmdocker"
+  ],
+  "git": [
+   "content tracker",
+   "the stupid content tracker"
+  ],
+  "go": [
+   "Go programming language"
+  ],
+  "haskell": [
+   "Haskell programming language"
+  ],
+  "java": [
+   "java programming language"
+  ],
+  "jenkins": [
+   "Hudson"
+  ],
+  "julia": [
+   "Julia programming language",
+   "JuliaLang",
+   "The Julia Language"
+  ],
+  "kubernetes": [
+   "K8s",
+   "container orchestrator"
+  ],
+  "lua": [
+   "Lua language"
+  ],
+  "matlab": [
+   "MATrix LABoratory",
+   "Matrix Laboratory"
+  ],
+  "microsoft sql server": [
+   "MS SQL",
+   "MS SQL Server",
+   "MS SQL-Server",
+   "MS SQLServer",
+   "MS-SQL",
+   "MS-SQL Server",
+   "MSSQL",
+   "SQL Server",
+   "Windows SQL"
+  ],
+  "next.js": [
+   "NextJS"
+  ],
+  "node.js": [
+   "Node",
+   "NodeJS"
+  ],
+  "objective-c": [
+   "Obj-C programming language",
+   "Objc",
+   "Objective C programming language",
+   "Objective-C programming language"
+  ],
+  "oracle database": [
+   "Oracle",
+   "Oracle DBMS",
+   "Oracle RDBMS"
+  ],
+  "perl": [
+   "Pearl",
+   "Perl/CGI"
+  ],
+  "php": [
+   "PHP Hypertext Preprocessor",
+   "PHP programming language"
+  ],
+  "python": [
+   "Python Programming Language",
+   "Python computer language",
+   "Python language",
+   "Python programming language",
+   "Python.org"
+  ],
+  "pytorch": [
+   "torch"
+  ],
+  "r": [
+   "GNU R",
+   "GNU S",
+   "R language",
+   "R programming language",
+   "The R Project for Statistical Computing"
+  ],
+  "react": [
+   "React.js",
+   "Reactjs"
+  ],
+  "ruby": [
+   "Ruby language",
+   "Ruby programming language"
+  ],
+  "ruby on rails": [
+   "Rails",
+   "RoR"
+  ],
+  "rust": [
+   "Rust language",
+   "Rust programming language"
+  ],
+  "scala": [
+   "Scala programming language"
+  ],
+  "scikit-learn": [
+   "scikit",
+   "scikits.learn",
+   "sklearn"
+  ],
+  "spark": [
+   "Spark App",
+   "Spark Mail"
+  ],
+  "sql": [
+   "Structural Query Language"
+  ],
+  "svelte": [
+   "sveltejs"
+  ],
+  "swift": [
+   "Apple Swift",
+   "Swift language",
+   "Swift programming language",
+   "Swift.org",
+   "Swiftlang"
+  ],
+  "tailwind css": [
+   "Tailwind",
+   "TailwindCSS"
+  ],
+  "terraform": [
+   "HashiCorp Terraform"
+  ],
+  "typescript": [
+   "TS"
+  ],
+  "vue.js": [
+   "Vue",
+   "VueJS"
+  ],
+  "xml": [
+   "Extensible Markup Language",
+   "eXtensible Markup Language"
+  ],
+  "yaml": [
+   "YAML Ain't Markup Language",
+   "Yet Another Markup Language"
+  ]
+ }
+}

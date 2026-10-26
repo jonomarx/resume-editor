@@ -1,0 +1,505 @@
+{
+ "vocabulary": [
+  {
+   "name": "Java",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "JavaScript",
+   "category": "language",
+   "aliases": [
+    "JS"
+   ]
+  },
+  {
+   "name": "TypeScript",
+   "category": "language",
+   "aliases": [
+    "TS"
+   ]
+  },
+  {
+   "name": "Python",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "C",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "C++",
+   "category": "language",
+   "aliases": [
+    "cpp"
+   ]
+  },
+  {
+   "name": "C#",
+   "category": "language",
+   "aliases": [
+    "csharp"
+   ]
+  },
+  {
+   "name": "Go",
+   "category": "language",
+   "aliases": [
+    "Golang"
+   ]
+  },
+  {
+   "name": "R",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "Rust",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "Swift",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "SQL",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "Kotlin",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "React",
+   "category": "framework",
+   "aliases": [
+    "reactjs",
+    "react.js"
+   ]
+  },
+  {
+   "name": "Node.js",
+   "category": "framework",
+   "aliases": [
+    "node",
+    "nodejs"
+   ]
+  },
+  {
+   "name": ".NET",
+   "category": "framework",
+   "aliases": [
+    "dotnet"
+   ]
+  },
+  {
+   "name": "Spring",
+   "category": "framework",
+   "aliases": [
+    "spring boot"
+   ]
+  },
+  {
+   "name": "Kubernetes",
+   "category": "framework",
+   "aliases": [
+    "k8s"
+   ]
+  },
+  {
+   "name": "Docker",
+   "category": "framework",
+   "aliases": []
+  },
+  {
+   "name": "AWS",
+   "category": "framework",
+   "aliases": []
+  },
+  {
+   "name": "Machine Learning",
+   "category": "domain",
+   "aliases": [
+    "ML"
+   ]
+  },
+  {
+   "name": "Backend",
+   "category": "role_type",
+   "aliases": [
+    "back-end"
+   ]
+  },
+  {
+   "name": "Frontend",
+   "category": "role_type",
+   "aliases": [
+    "front-end"
+   ]
+  },
+  {
+   "name": "Security",
+   "category": "domain",
+   "aliases": []
+  },
+  {
+   "name": "Data Science",
+   "category": "domain",
+   "aliases": []
+  },
+  {
+   "name": "Embedded",
+   "category": "domain",
+   "aliases": []
+  },
+  {
+   "name": "HTML",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "CSS",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "JSON",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "PHP",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "PostgreSQL",
+   "category": "framework",
+   "aliases": []
+  },
+  {
+   "name": "Linux",
+   "category": "framework",
+   "aliases": []
+  },
+  {
+   "name": "Git",
+   "category": "framework",
+   "aliases": []
+  },
+  {
+   "name": "Terraform",
+   "category": "framework",
+   "aliases": []
+  },
+  {
+   "name": "GraphQL",
+   "category": "framework",
+   "aliases": []
+  },
+  {
+   "name": "Redis",
+   "category": "framework",
+   "aliases": []
+  },
+  {
+   "name": "Continuous Integration",
+   "category": "domain",
+   "aliases": []
+  },
+  {
+   "name": "Natural Language Processing",
+   "category": "domain",
+   "aliases": []
+  },
+  {
+   "name": "Computer Vision",
+   "category": "domain",
+   "aliases": []
+  }
+ ],
+ "postings": [
+  {
+   "id": "al-aws",
+   "source": "mixed",
+   "kind": "alias",
+   "title": "Cloud Infrastructure Intern",
+   "text": "Requirements\nHands-on experience with Amazon Web Services, such as EC2 and S3.\nFamiliarity with Terraform.\n",
+   "tags": [
+    "AWS",
+    "Terraform"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": null,
+   "hasPreferred": null
+  },
+  {
+   "id": "al-sql",
+   "source": "mixed",
+   "kind": "alias",
+   "title": "Data Analyst Intern",
+   "text": "Requirements:\nComfortable writing queries in Structured Query Language.\nExperience with PostgreSQL.\n",
+   "tags": [
+    "SQL",
+    "PostgreSQL"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": null,
+   "hasPreferred": null
+  },
+  {
+   "id": "al-postgres",
+   "source": "mixed",
+   "kind": "alias",
+   "title": "Backend Intern",
+   "text": "What you'll bring\nSolid grounding in Postgres and Redis. Java development experience.\n",
+   "tags": [
+    "PostgreSQL",
+    "Redis",
+    "Java"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": null,
+   "hasPreferred": null
+  },
+  {
+   "id": "al-web",
+   "source": "mixed",
+   "kind": "alias",
+   "title": "Web Developer Intern",
+   "text": "Requirements\nBuild pages with Hypertext Markup Language, Cascading Style Sheets and vanilla JavaScript.\n",
+   "tags": [
+    "HTML",
+    "CSS",
+    "JavaScript"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": null,
+   "hasPreferred": null
+  },
+  {
+   "id": "al-php",
+   "source": "mixed",
+   "kind": "alias",
+   "title": "Legacy Systems Intern",
+   "text": "You will maintain our legacy Hypertext Preprocessor code base and migrate pieces to Python.\n",
+   "tags": [
+    "PHP",
+    "Python"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": null,
+   "hasPreferred": null
+  },
+  {
+   "id": "al-json",
+   "source": "mixed",
+   "kind": "alias",
+   "title": "Integration Intern",
+   "text": "Requirements\nParse and validate JavaScript Object Notation payloads from partner APIs.\n",
+   "tags": [
+    "JSON"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": null,
+   "hasPreferred": null
+  },
+  {
+   "id": "al-nn",
+   "source": "mixed",
+   "kind": "paraphrase",
+   "title": "Computer Vision Research Intern",
+   "text": "Requirements\nTrain neural networks and deep learning models for image classification.\nPython.\n",
+   "tags": [
+    "Machine Learning",
+    "Computer Vision",
+    "Python"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": null,
+   "hasPreferred": null
+  },
+  {
+   "id": "al-nlp",
+   "source": "mixed",
+   "kind": "paraphrase",
+   "title": "Applied Scientist Intern",
+   "text": "Work on natural language processing and large language models.\nRequirements\nStrong Python.\n",
+   "tags": [
+    "Natural Language Processing",
+    "Python"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": null,
+   "hasPreferred": null
+  },
+  {
+   "id": "al-git",
+   "source": "mixed",
+   "kind": "alias",
+   "title": "Software Engineer Intern",
+   "text": "Requirements\nComfortable on the Linux command line.\nDaily use of Git for version control.\n",
+   "tags": [
+    "Linux",
+    "Git"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": null,
+   "hasPreferred": null
+  },
+  {
+   "id": "al-graphql",
+   "source": "mixed",
+   "kind": "alias",
+   "title": "API Intern",
+   "text": "Requirements\nExperience writing GraphQL APIs on Node.\n",
+   "tags": [
+    "GraphQL",
+    "Node.js"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": null,
+   "hasPreferred": null
+  },
+  {
+   "id": "al-orchestration",
+   "source": "mixed",
+   "kind": "paraphrase",
+   "title": "Platform Intern",
+   "text": "Requirements\nUnderstanding of container orchestration and Docker images.\n",
+   "tags": [
+    "Kubernetes",
+    "Docker"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": null,
+   "hasPreferred": null
+  },
+  {
+   "id": "al-ci",
+   "source": "mixed",
+   "kind": "alias",
+   "title": "Release Engineering Intern",
+   "text": "Requirements\nExperience with continuous integration and delivery pipelines.\nScripting in Python.\n",
+   "tags": [
+    "Continuous Integration",
+    "Python"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": null,
+   "hasPreferred": null
+  },
+  {
+   "id": "al-traps",
+   "source": "mixed",
+   "kind": "alias",
+   "title": "Strategy Intern",
+   "text": "Work with our C-level executives and the R&D team; go to market planning.\nRequirements\nExcellent writing. Ability to go beyond the brief.\n",
+   "tags": [],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": null,
+   "hasPreferred": null
+  },
+  {
+   "id": "al-r",
+   "source": "mixed",
+   "kind": "alias",
+   "title": "Statistics Intern",
+   "text": "Requirements\nStatistical computing in R.\nCoursework in machine learning.\n",
+   "tags": [
+    "R",
+    "Machine Learning"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": null,
+   "hasPreferred": null
+  },
+  {
+   "id": "al-spring",
+   "source": "mixed",
+   "kind": "alias",
+   "title": "Java Developer Intern",
+   "text": "Requirements\nSpring Boot microservices in Java.\nDocker and k8s a plus.\n",
+   "tags": [
+    "Spring",
+    "Java",
+    "Docker",
+    "Kubernetes"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": null,
+   "hasPreferred": null
+  },
+  {
+   "id": "al-ts",
+   "source": "mixed",
+   "kind": "alias",
+   "title": "Frontend Intern",
+   "text": "Requirements\nModern JS and TS, React hooks, CSS.\n",
+   "tags": [
+    "JavaScript",
+    "TypeScript",
+    "React",
+    "CSS"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": null,
+   "hasPreferred": null
+  },
+  {
+   "id": "al-dotnet",
+   "source": "mixed",
+   "kind": "alias",
+   "title": "Enterprise Intern",
+   "text": "Requirements\nMicrosoft .NET Framework and C#. Structured Query Language for reporting.\n",
+   "tags": [
+    ".NET",
+    "C#",
+    "SQL"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": null,
+   "hasPreferred": null
+  }
+ ]
+}
