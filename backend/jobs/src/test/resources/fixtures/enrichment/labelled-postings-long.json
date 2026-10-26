@@ -1,0 +1,238 @@
+{
+ "vocabulary": [
+  {
+   "name": "Java",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "JavaScript",
+   "category": "language",
+   "aliases": [
+    "JS"
+   ]
+  },
+  {
+   "name": "TypeScript",
+   "category": "language",
+   "aliases": [
+    "TS"
+   ]
+  },
+  {
+   "name": "Python",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "C",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "C++",
+   "category": "language",
+   "aliases": [
+    "cpp"
+   ]
+  },
+  {
+   "name": "C#",
+   "category": "language",
+   "aliases": [
+    "csharp"
+   ]
+  },
+  {
+   "name": "Go",
+   "category": "language",
+   "aliases": [
+    "Golang"
+   ]
+  },
+  {
+   "name": "R",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "Rust",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "Swift",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "SQL",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "Kotlin",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "React",
+   "category": "framework",
+   "aliases": [
+    "reactjs",
+    "react.js"
+   ]
+  },
+  {
+   "name": "Node.js",
+   "category": "framework",
+   "aliases": [
+    "node",
+    "nodejs"
+   ]
+  },
+  {
+   "name": ".NET",
+   "category": "framework",
+   "aliases": [
+    "dotnet"
+   ]
+  },
+  {
+   "name": "Spring",
+   "category": "framework",
+   "aliases": [
+    "spring boot"
+   ]
+  },
+  {
+   "name": "Kubernetes",
+   "category": "framework",
+   "aliases": [
+    "k8s"
+   ]
+  },
+  {
+   "name": "Docker",
+   "category": "framework",
+   "aliases": []
+  },
+  {
+   "name": "AWS",
+   "category": "framework",
+   "aliases": []
+  },
+  {
+   "name": "Machine Learning",
+   "category": "domain",
+   "aliases": [
+    "ML"
+   ]
+  },
+  {
+   "name": "Backend",
+   "category": "role_type",
+   "aliases": [
+    "back-end"
+   ]
+  },
+  {
+   "name": "Frontend",
+   "category": "role_type",
+   "aliases": [
+    "front-end"
+   ]
+  },
+  {
+   "name": "Security",
+   "category": "domain",
+   "aliases": []
+  },
+  {
+   "name": "Data Science",
+   "category": "domain",
+   "aliases": []
+  },
+  {
+   "name": "Embedded",
+   "category": "domain",
+   "aliases": []
+  }
+ ],
+ "postings": [
+  {
+   "id": "long-fintech",
+   "source": "long",
+   "title": "Software Engineer Intern (Payments Platform), Summer 2027",
+   "text": "About Northwind Payments\nNorthwind Payments was founded in 2014 and processes more than four billion dollars a year for small businesses across North America. Our engineering organization of roughly 180 people is split into product teams that own their services from design through production support. We are headquartered in Chicago with hubs in Toronto and Austin, and most teams work in a hybrid model with two or three days a week in the office.\n\nOur infrastructure runs on Amazon Web Services and we are in the middle of moving our remaining monolith to services. The company has been named a top workplace by regional press for four years in a row, and we invest heavily in mentorship. Every intern is paired with a mentor and a buddy, and every intern ships to production within the first four weeks.\n\nAbout the internship\nThis is a twelve week paid internship for Summer 2027. You will join the Payments Platform team, which owns the ledger, the settlement pipeline and the public merchant API. You will work on a real project from day one, and you will present your work to the whole engineering organization at the end of the summer.\n\nWhat you'll do\nDesign and build backend services in Java and Spring Boot that handle settlement and reconciliation.\nWrite and tune SQL queries against our reporting database, and review query plans with your mentor.\nPackage and deploy your services with Docker, and learn how we run them on Kubernetes.\nAdd automated tests and dashboards, and take part in our weekly on-call shadowing program.\nGo beyond your project: join design reviews, read incident reports and ask questions.\n\nRequirements\nCurrently pursuing a Bachelor's or Master's degree in Computer Science, Engineering or a related field.\nGraduating in December 2027 or later.\nSolid programming fundamentals and experience with Java or a similar object-oriented language.\nWorking knowledge of SQL and relational databases.\nStrong communication skills and a habit of asking good questions.\nMust be authorized to work in the United States. We are not able to offer visa sponsorship for this role.\n\nNice to have\nExperience with Spring or another web framework.\nFamiliarity with Docker or Kubernetes.\nExposure to AWS.\nInterest in financial systems or payments.\n\nBenefits\nCompetitive hourly pay, a relocation stipend, a four day weekend in the middle of the summer, subsidized lunches in every office, and a fully paid commuter pass. Interns also get an end of summer celebration and Spring break style trips are not part of the program, but we do plan a team offsite.\n\nHow we hire\nOur process has four steps and usually takes about three weeks from application to offer. First, a recruiter reads every application and replies within a week, whether or not we move forward. Second, there is a thirty minute conversation with a recruiter about your interests, your timing and what you hope to learn. Third, there is one technical conversation of about an hour with two engineers, where you will work through a problem together and talk about a project you are proud of. Finally, there is a short conversation with the hiring manager about the team and the project. We try to make decisions within three business days of the last conversation, and we give feedback to everyone who asks for it. We do not use take home assignments, and we never ask candidates to work for free.\n\n\nLife during the internship\nInterns start together on the first Monday with a half day orientation that covers the tools, the team structure and what to expect from the summer. Each week has a few fixed points: a team planning meeting on Monday, a lunch with other interns on Wednesday, and a demo hour on Friday where anyone can show what they have been working on. Between those, your calendar is yours. We encourage interns to book time with people outside their team, because some of the best conversations of the summer come from curiosity about what the next team over is doing. A mid-point check-in with your manager and mentor is built into the schedule, and so is a final review where we talk about what went well and what you want to do next.\n\n\nFrequently asked questions\nCan I work remotely? Teams set their own policy, and your recruiter will tell you what applies to the team you are matched with. Will I get a return offer? Many interns do; we decide based on your impact, your growth and the needs of the team, and we tell you our decision before the internship ends. What equipment will I get? A laptop, a monitor if you work in an office, and the accounts you need on your first day. Can I apply to more than one role? Yes, but please tell your recruiter so we can coordinate. How long do I have to accept an offer? We give at least two weeks, and longer if you are still waiting on other companies. If you have any other questions, reply to any email from your recruiter.\n\n\nEqual opportunity\nNorthwind Payments is an equal opportunity employer. We do not discriminate on the basis of race, color, religion, sex, national origin, age, disability or veteran status. If you need an accommodation during the interview process, tell your recruiter and we will make the arrangements.\n",
+   "tags": [
+    "Java",
+    "Spring",
+    "SQL",
+    "Docker",
+    "Kubernetes",
+    "AWS",
+    "Backend"
+   ],
+   "season": "Summer 2027",
+   "classYear": "Graduating in December 2027",
+   "workAuthorization": "does_not_sponsor",
+   "hasBasic": true,
+   "hasPreferred": true
+  },
+  {
+   "id": "long-ml",
+   "source": "long",
+   "title": "Machine Learning Intern, Research Engineering",
+   "text": "Who we are\nBluefin Labs builds forecasting tools for energy markets. Our R&D group of 40 researchers and engineers develops models that predict demand across thousands of sites, and our products are used by utilities in nine countries. We are a remote friendly company, and our research team publishes at major conferences every year.\n\nThe team\nYou will join the Forecasting Research team. The team trains models on large time series datasets, evaluates them against strict baselines and hands the best ones to the platform team for deployment. Our research stack is Python, with a growing amount of our tooling in Rust for speed. A small part of the team writes C++ extensions for the numerical kernels.\n\nYour project\nInterns own one research question end to end. Past projects include a probabilistic model for solar output, a study of how forecast errors propagate into trading decisions, and a faster training loop for our largest sequence model. Your mentor will help you scope a question in the first week, and you will have a weekly review with the research lead.\n\nResponsibilities:\n- Implement and evaluate machine learning models for time series forecasting\n- Build data pipelines in Python and write clear experiment reports\n- Profile and speed up training code; Rust or C++ experience is a bonus, but Rust is not required\n- Present results to the team every other week\n- Go to the weekly reading group and share papers\n\nWhat we are looking for:\n- Pursuing a PhD or Master's degree in statistics, machine learning, computer science or a related field\n- Strong Python skills and experience with a numerical computing library\n- A solid grounding in probability and statistics; experience with R is helpful\n- Class of 2028 or 2029 preferred\n- Curiosity and a track record of finishing projects\n\nNice to have:\n- Publications at machine learning venues\n- Experience with distributed training\n- Contributions to open source projects\n\nLogistics\nThe internship runs for twelve weeks in Spring 2027 or Summer 2027, and the start date is flexible. We offer a competitive stipend and a home office allowance. Interns who need visa sponsorship are welcome to apply; we sponsor visas for the whole internship through our legal partner. We value: Swift response times to questions, honest feedback and learning in the open.\n\nOur data science group shares an office floor with the platform team, and a lunch is organized every Thursday. We believe in diversity and welcome applicants of every background.\n\nLife during the internship\nInterns start together on the first Monday with a half day orientation that covers the tools, the team structure and what to expect from the summer. Each week has a few fixed points: a team planning meeting on Monday, a lunch with other interns on Wednesday, and a demo hour on Friday where anyone can show what they have been working on. Between those, your calendar is yours. We encourage interns to book time with people outside their team, because some of the best conversations of the summer come from curiosity about what the next team over is doing. A mid-point check-in with your manager and mentor is built into the schedule, and so is a final review where we talk about what went well and what you want to do next.\n\n\nFrequently asked questions\nCan I work remotely? Teams set their own policy, and your recruiter will tell you what applies to the team you are matched with. Will I get a return offer? Many interns do; we decide based on your impact, your growth and the needs of the team, and we tell you our decision before the internship ends. What equipment will I get? A laptop, a monitor if you work in an office, and the accounts you need on your first day. Can I apply to more than one role? Yes, but please tell your recruiter so we can coordinate. How long do I have to accept an offer? We give at least two weeks, and longer if you are still waiting on other companies. If you have any other questions, reply to any email from your recruiter.\n\n\nOur values\nWe care about the people who use our work, and we try to make decisions with them in mind. We write things down, because a clear document helps everyone, including people who join later. We give feedback early and kindly, and we expect to receive it the same way. We share credit, and we take responsibility for mistakes without blame. We pay attention to the details that make work reliable, and we also remember that most problems are best solved by talking to a colleague. Interns are treated as full members of the team and are expected to speak up in meetings, ask for help and share ideas.\n\n\nHow to apply\nSend your resume, a short note about the research question you would like to work on, and links to any code or papers. We review applications on a rolling basis and reply to everyone.\n",
+   "tags": [
+    "Machine Learning",
+    "Python",
+    "C++",
+    "R",
+    "Data Science"
+   ],
+   "season": "Spring 2027",
+   "classYear": "Class of 2028",
+   "workAuthorization": "sponsors",
+   "hasBasic": true,
+   "hasPreferred": true
+  },
+  {
+   "id": "long-web",
+   "source": "long",
+   "title": "Frontend Engineering Intern - Spring 2027",
+   "text": "Join us in Spring 2027 as a Frontend Engineering Intern at Lumen Retail, the team behind one of the largest independent home goods stores online. We serve over two million shoppers every month, and almost every one of them touches the code you will write.\n\nAbout the role\nYou will work with a team of six engineers and two designers on the shopping experience: the product pages, the cart and the checkout flow. The team ships to production several times a day behind feature flags, and every change is measured. You will pair with a senior engineer for the first month, then take ownership of a feature.\n\nOur stack\nTech stack: TypeScript, React, Node.js, GraphQL\nWe also run a small amount of Kotlin on the Android app, and our mobile team writes Swift for iOS, so you will sometimes pair with them on shared designs.\n\nResponsibilities\n\u2022 Build accessible and fast user interface components in React and TypeScript\n\u2022 Work with designers to turn prototypes into production code\n\u2022 Improve page speed and track it with our performance dashboards\n\u2022 Write unit and end to end tests\n\u2022 Go to market planning sessions with the merchandising team to understand what shoppers need\n\nQualifications\n\u2022 Enrolled in a degree program in Computer Science or a related field\n\u2022 Experience with JavaScript or TypeScript and a modern framework such as React\n\u2022 Familiarity with HTML and CSS and how browsers work\n\u2022 Rising juniors and seniors are encouraged to apply\n\u2022 Excellent teamwork\n\nPreferred\n\u2022 Experience with Node.js\n\u2022 Interest in design systems\n\u2022 Experience with testing tools\n\nBenefits: Spring break is not a thing for interns, but we offer paid time off, flexible hours and a learning budget. Free coffee, a standing desk and a monthly team lunch are all included. The C-suite hosts a quarterly Q&A for all interns, and our CEO answers every question.\n\nFrequently asked questions\nCan I work remotely? Teams set their own policy, and your recruiter will tell you what applies to the team you are matched with. Will I get a return offer? Many interns do; we decide based on your impact, your growth and the needs of the team, and we tell you our decision before the internship ends. What equipment will I get? A laptop, a monitor if you work in an office, and the accounts you need on your first day. Can I apply to more than one role? Yes, but please tell your recruiter so we can coordinate. How long do I have to accept an offer? We give at least two weeks, and longer if you are still waiting on other companies. If you have any other questions, reply to any email from your recruiter.\n\n\nOur values\nWe care about the people who use our work, and we try to make decisions with them in mind. We write things down, because a clear document helps everyone, including people who join later. We give feedback early and kindly, and we expect to receive it the same way. We share credit, and we take responsibility for mistakes without blame. We pay attention to the details that make work reliable, and we also remember that most problems are best solved by talking to a colleague. Interns are treated as full members of the team and are expected to speak up in meetings, ask for help and share ideas.\n\n\nHow we hire\nOur process has four steps and usually takes about three weeks from application to offer. First, a recruiter reads every application and replies within a week, whether or not we move forward. Second, there is a thirty minute conversation with a recruiter about your interests, your timing and what you hope to learn. Third, there is one technical conversation of about an hour with two engineers, where you will work through a problem together and talk about a project you are proud of. Finally, there is a short conversation with the hiring manager about the team and the project. We try to make decisions within three business days of the last conversation, and we give feedback to everyone who asks for it. We do not use take home assignments, and we never ask candidates to work for free.\n\n\nAdditional information\nLumen Retail is committed to a diverse team. Our R&D budget has doubled since last year, and we are growing the frontend team quickly. Applicants must have the right to work in the country where the role is based. Please note that we cannot sponsor visas for internships.\n",
+   "tags": [
+    "TypeScript",
+    "React",
+    "Node.js",
+    "JavaScript",
+    "Frontend"
+   ],
+   "season": "Spring 2027",
+   "classYear": "Rising juniors and seniors",
+   "workAuthorization": "does_not_sponsor",
+   "hasBasic": true,
+   "hasPreferred": true
+  },
+  {
+   "id": "long-embedded",
+   "source": "long",
+   "title": "Embedded Systems Intern",
+   "text": "Company overview\nIronbridge Controls designs motor controllers and sensors for industrial automation. For forty years our products have run on factory floors and in warehouses, and our firmware is deployed on millions of devices. Our engineering offices are in Pittsburgh and Munich.\n\nPosition summary\nThe embedded systems team is looking for an intern for the fall term. You will work on the firmware for our next generation motor controller, helping to bring up new hardware, write drivers and build the test harness that runs on every commit.\n\nKey responsibilities\n- Write and review firmware in C and C++ for ARM microcontrollers.\n- Write Python scripts to automate hardware tests and generate reports.\n- Help bring up new boards, debug with oscilloscopes and logic analyzers, and document the results.\n- Contribute to our secure boot and update process, working with the security team.\n- Take part in code reviews and weekly planning.\n\nMinimum qualifications\n- Pursuing a degree in Electrical Engineering, Computer Engineering or Computer Science.\n- Strong C programming skills and a good understanding of pointers, memory and interrupts.\n- Experience with a version control system.\n- Expected graduation date between 2027 and 2028.\n\nPreferred qualifications\n- Experience with C++ in an embedded environment.\n- Familiarity with RTOS concepts.\n- Knowledge of communication protocols such as SPI, I2C and CAN.\n- Experience with Docker based build environments.\n\nThe internship takes place in Fall 2026, with a start date in early September. Hours are flexible during exams. Our offices have a quiet room, a hardware lab with plenty of benches and a kitchen where the team eats lunch together. Last summer 2025 interns built a small robot that now sits in the lobby.\n\nBecause some products are exported, candidates must be U.S. citizens or permanent residents. Security clearance is not required. We do not offer visa sponsorship.\n\nOur values\nWe care about the people who use our work, and we try to make decisions with them in mind. We write things down, because a clear document helps everyone, including people who join later. We give feedback early and kindly, and we expect to receive it the same way. We share credit, and we take responsibility for mistakes without blame. We pay attention to the details that make work reliable, and we also remember that most problems are best solved by talking to a colleague. Interns are treated as full members of the team and are expected to speak up in meetings, ask for help and share ideas.\n\n\nHow we hire\nOur process has four steps and usually takes about three weeks from application to offer. First, a recruiter reads every application and replies within a week, whether or not we move forward. Second, there is a thirty minute conversation with a recruiter about your interests, your timing and what you hope to learn. Third, there is one technical conversation of about an hour with two engineers, where you will work through a problem together and talk about a project you are proud of. Finally, there is a short conversation with the hiring manager about the team and the project. We try to make decisions within three business days of the last conversation, and we give feedback to everyone who asks for it. We do not use take home assignments, and we never ask candidates to work for free.\n\n\nLife during the internship\nInterns start together on the first Monday with a half day orientation that covers the tools, the team structure and what to expect from the summer. Each week has a few fixed points: a team planning meeting on Monday, a lunch with other interns on Wednesday, and a demo hour on Friday where anyone can show what they have been working on. Between those, your calendar is yours. We encourage interns to book time with people outside their team, because some of the best conversations of the summer come from curiosity about what the next team over is doing. A mid-point check-in with your manager and mentor is built into the schedule, and so is a final review where we talk about what went well and what you want to do next.\n\n\nIronbridge Controls is an equal opportunity employer. Rate: 5 or R is not a thing here; what matters is that you are curious, careful and keen to learn how real hardware behaves. Vitamin C, and more fruit, is always available in the kitchen.\n",
+   "tags": [
+    "C",
+    "C++",
+    "Python",
+    "Embedded",
+    "Docker"
+   ],
+   "season": "Fall 2026",
+   "classYear": "graduation date between 2027 and 2028",
+   "workAuthorization": "does_not_sponsor",
+   "hasBasic": true,
+   "hasPreferred": true
+  }
+ ]
+}

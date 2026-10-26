@@ -15,6 +15,7 @@ docker compose up -d --build --wait postgres redis renderer
 docker build -t resume-editor-app:e2e .
 P=$(basename "$PWD" | tr '[:upper:]' '[:lower:]')   # compose project name (the directory name)
 docker create --name resume-e2e-app --network "${P}_default" -p 8080:8080 \
+  --add-host fixture-site.example:10.0.0.5 -e APP_JOBS_DAILY_RUN_CRON='*/15 * * * * *' \
   -e DB_PASSWORD \
   -e DB_URL=jdbc:postgresql://postgres:5432/resume -e REDIS_HOST=redis \
   -e RENDERER_URL=http://renderer:8080 resume-editor-app:e2e
@@ -34,6 +35,8 @@ docker compose down -v
 ```
 
 The first render compiles with TeX Live and takes a few seconds.
+
+The sources spec needs two settings on the app container (shown above): `--add-host fixture-site.example:10.0.0.5` makes a name that resolves to a private address, and `APP_JOBS_DAILY_RUN_CRON` runs the crawl every 15 seconds instead of daily at 06:00. The SSRF policy refuses private and loopback targets, so a crawl of a local fixture site cannot succeed; the spec asserts that refusal (`url_not_allowed`) on the Sources page. Postings are created through the paste and bookmarklet paths with a JSON-LD page (no LLM), served by a small fixture server the spec starts on 127.0.0.1 (a different origin from the app, which exercises the bookmarklet's CORS call). There is no job feed page or `GET /api/jobs` yet, so the posting is confirmed through the ingest event (`status: done`, `jobId` set).
 
 Each run uses freshly generated usernames, so reruns against the same database do not collide.
 Failure traces and the HTML report go to `test-results/` and `playwright-report/` (git-ignored).

@@ -1,7 +1,7 @@
 package app.resume.jobs.ingest;
 
 import app.resume.jobs.PostingNormalizer;
-import app.resume.jobs.enrich.PostingEnricher;
+import app.resume.jobs.enrich.Enricher;
 import app.resume.jobs.extract.ExtractionOutputException;
 import app.resume.jobs.extract.LlmPostingExtractor;
 import app.resume.jobs.fetch.ExtractedPosting;
@@ -37,10 +37,10 @@ public class IngestProcessor {
     private final PageFetcher fetcher;
     private final JsonLdPostingAdapter jsonLd;
     private final LlmPostingExtractor llm; // may be null
-    private final PostingEnricher enricher; // may be null
+    private final Enricher enricher; // may be null
     private final Supplier<Instant> clock;
 
-    public IngestProcessor(JdbcTemplate jdbc, PageFetcher fetcher, JsonLdPostingAdapter jsonLd, LlmPostingExtractor llm, PostingEnricher enricher,
+    public IngestProcessor(JdbcTemplate jdbc, PageFetcher fetcher, JsonLdPostingAdapter jsonLd, LlmPostingExtractor llm, Enricher enricher,
             Supplier<Instant> clock) {
         this.jdbc = jdbc;
         this.fetcher = fetcher;
@@ -181,7 +181,7 @@ public class IngestProcessor {
         if (created && enricher != null) {
             try {
                 enricher.enrich(id);
-            } catch (RuntimeException ex) {
+            } catch (RuntimeException | StackOverflowError ex) { // untrusted text must never break a run
                 log.warn("enrichment of posting {} failed: {}", id, ex.toString());
             }
         }

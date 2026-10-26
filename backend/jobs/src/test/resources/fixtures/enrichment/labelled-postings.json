@@ -1,0 +1,425 @@
+{
+ "vocabulary": [
+  {
+   "name": "Java",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "JavaScript",
+   "category": "language",
+   "aliases": [
+    "JS"
+   ]
+  },
+  {
+   "name": "TypeScript",
+   "category": "language",
+   "aliases": [
+    "TS"
+   ]
+  },
+  {
+   "name": "Python",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "C",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "C++",
+   "category": "language",
+   "aliases": [
+    "cpp"
+   ]
+  },
+  {
+   "name": "C#",
+   "category": "language",
+   "aliases": [
+    "csharp"
+   ]
+  },
+  {
+   "name": "Go",
+   "category": "language",
+   "aliases": [
+    "Golang"
+   ]
+  },
+  {
+   "name": "R",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "Rust",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "Swift",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "SQL",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "Kotlin",
+   "category": "language",
+   "aliases": []
+  },
+  {
+   "name": "React",
+   "category": "framework",
+   "aliases": [
+    "reactjs",
+    "react.js"
+   ]
+  },
+  {
+   "name": "Node.js",
+   "category": "framework",
+   "aliases": [
+    "node",
+    "nodejs"
+   ]
+  },
+  {
+   "name": ".NET",
+   "category": "framework",
+   "aliases": [
+    "dotnet"
+   ]
+  },
+  {
+   "name": "Spring",
+   "category": "framework",
+   "aliases": [
+    "spring boot"
+   ]
+  },
+  {
+   "name": "Kubernetes",
+   "category": "framework",
+   "aliases": [
+    "k8s"
+   ]
+  },
+  {
+   "name": "Docker",
+   "category": "framework",
+   "aliases": []
+  },
+  {
+   "name": "AWS",
+   "category": "framework",
+   "aliases": []
+  },
+  {
+   "name": "Machine Learning",
+   "category": "domain",
+   "aliases": [
+    "ML"
+   ]
+  },
+  {
+   "name": "Backend",
+   "category": "role_type",
+   "aliases": [
+    "back-end"
+   ]
+  },
+  {
+   "name": "Frontend",
+   "category": "role_type",
+   "aliases": [
+    "front-end"
+   ]
+  },
+  {
+   "name": "Security",
+   "category": "domain",
+   "aliases": []
+  },
+  {
+   "name": "Data Science",
+   "category": "domain",
+   "aliases": []
+  },
+  {
+   "name": "Embedded",
+   "category": "domain",
+   "aliases": []
+  }
+ ],
+ "postings": [
+  {
+   "id": "gh-swe-java",
+   "source": "ats",
+   "title": "Software Engineer Intern, Summer 2027",
+   "text": "About Acme\nAcme builds payment tools for thousands of merchants. Our platform runs on Kubernetes and handles millions of requests.\n\nWhat you'll do\nBuild backend services in Java and Spring Boot.\nShip features end to end with a small team.\n\nRequirements\nCurrently enrolled in a BS or MS program in Computer Science.\nExperience with Java and SQL.\nGraduating in 2028 or 2029.\n\nNice to have\nFamiliarity with Docker.\nExposure to AWS.\n\nBenefits\nCompetitive pay. Hybrid schedule.\n",
+   "tags": [
+    "Java",
+    "Spring",
+    "SQL",
+    "Docker",
+    "AWS",
+    "Backend"
+   ],
+   "season": "Summer 2027",
+   "classYear": "Graduating in 2028 or 2029",
+   "workAuthorization": null,
+   "hasBasic": true,
+   "hasPreferred": true
+  },
+  {
+   "id": "lever-frontend",
+   "source": "ats",
+   "title": "Frontend Engineering Intern",
+   "text": "Help us build the product UI.\nRequirements:\nProficiency in JavaScript or TypeScript\nExperience with React\nComfort with HTML and CSS\nPreferred qualifications:\nExperience with Node.js\nOpen to rising juniors and seniors. Must be authorized to work in the US; we cannot offer visa sponsorship.\n",
+   "tags": [
+    "JavaScript",
+    "TypeScript",
+    "React",
+    "Node.js",
+    "Frontend"
+   ],
+   "season": null,
+   "classYear": "rising juniors and seniors",
+   "workAuthorization": "does_not_sponsor",
+   "hasBasic": true,
+   "hasPreferred": true
+  },
+  {
+   "id": "jsonld-go",
+   "source": "jsonld",
+   "title": "Platform Intern (Go)",
+   "text": "Join the platform team. Go to our careers page to learn more about the team.\nYou will write services in Go and deploy them with Docker.\nQualifications\nProgramming experience in Go, Python or Rust.\nKnowledge of Linux.\nWe value R&D and curiosity. Go-to-market experience is not required.\n",
+   "tags": [
+    "Go",
+    "Python",
+    "Rust",
+    "Docker"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": true,
+   "hasPreferred": false
+  },
+  {
+   "id": "plain-r",
+   "source": "paste",
+   "title": "Data Science Intern",
+   "text": "Data Science Intern - Summer 2026\nOur R&D group analyses clinical trial data.\nQualifications\nSkills in R, Python and SQL.\nCoursework in statistics or machine learning.\nBonus\nExperience with Kubernetes is a plus.\n",
+   "tags": [
+    "R",
+    "Python",
+    "SQL",
+    "Machine Learning",
+    "Data Science",
+    "Kubernetes"
+   ],
+   "season": "Summer 2026",
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": true,
+   "hasPreferred": true
+  },
+  {
+   "id": "embedded-c",
+   "source": "ats",
+   "title": "Embedded Software Intern",
+   "text": "You will write firmware in C and C++ for our devices.\nRequirements\nStrong C programming skills.\nFamiliarity with C++ is a plus.\nSecurity clearance is not required. US citizenship is required for some projects.\nExpected graduation date 2027.\n",
+   "tags": [
+    "C",
+    "C++",
+    "Embedded"
+   ],
+   "season": null,
+   "classYear": "graduation date 2027",
+   "workAuthorization": "authorization_required",
+   "hasBasic": true,
+   "hasPreferred": false
+  },
+  {
+   "id": "dotnet",
+   "source": "jsonld",
+   "title": "Software Engineer Intern - .NET",
+   "text": "We build line-of-business software with C# and .NET on Azure.\nMinimum qualifications\nExperience with C# or Java.\nKnowledge of SQL Server.\nPreferred\nExperience with ASP.NET MVC, Docker.\nMust be eligible to work in the United States.\n",
+   "tags": [
+    "C#",
+    ".NET",
+    "Java",
+    "SQL",
+    "Docker"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": "authorization_required",
+   "hasBasic": true,
+   "hasPreferred": true
+  },
+  {
+   "id": "ml-research",
+   "source": "paste",
+   "title": "Machine Learning Research Intern, Fall 2027",
+   "text": "Work with our research team on large-scale ML systems.\nWhat we're looking for:\nPursuing a PhD or MS. Strong Python.\nExperience with machine learning frameworks.\nPublications are a plus.\nClass of 2028 or 2029.\n",
+   "tags": [
+    "Python",
+    "Machine Learning"
+   ],
+   "season": "Fall 2027",
+   "classYear": "Class of 2028",
+   "workAuthorization": null,
+   "hasBasic": true,
+   "hasPreferred": false
+  },
+  {
+   "id": "swift-ios",
+   "source": "ats",
+   "title": "iOS Engineering Intern",
+   "text": "Build our iOS app in Swift.\nRequirements\nExperience with Swift or Kotlin\nYou can move quickly and ship.\nWe are an equal opportunity employer. Swift-moving teams only.\n",
+   "tags": [
+    "Swift",
+    "Kotlin"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": true,
+   "hasPreferred": false
+  },
+  {
+   "id": "sec",
+   "source": "jsonld",
+   "title": "Security Engineering Intern",
+   "text": "Help secure our products.\nResponsibilities\nReview code in Python and Go for vulnerabilities.\nQualifications\nInterest in application security.\nBasic knowledge of networking.\nNice to have\nExperience with Rust.\nCandidates must be US citizens or permanent residents.\n",
+   "tags": [
+    "Python",
+    "Go",
+    "Rust",
+    "Security"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": "authorization_required",
+   "hasBasic": true,
+   "hasPreferred": true
+  },
+  {
+   "id": "no-headings",
+   "source": "paste",
+   "title": "Backend Intern",
+   "text": "We need a backend intern who knows Java, Spring and PostgreSQL. You will pair with senior engineers on APIs.\nBring Docker experience if you have it. Summer 2027 start, 12 weeks.\n",
+   "tags": [
+    "Java",
+    "Spring",
+    "Docker",
+    "Backend"
+   ],
+   "season": "Summer 2027",
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": null,
+   "hasPreferred": null
+  },
+  {
+   "id": "go-lang-prose",
+   "source": "paste",
+   "title": "Intern",
+   "text": "Let's go! We offer a go-getter culture, a great place to go for growth, and lunch.\nRequirements\nAbility to work in a team.\n",
+   "tags": [],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": true,
+   "hasPreferred": false
+  },
+  {
+   "id": "c-level",
+   "source": "paste",
+   "title": "Product Operations Intern",
+   "text": "Work directly with our C-level team and the R&D leads. Plan A or plan B, you decide.\nRequirements\nExcellent communication.\nSpreadsheet skills.\n",
+   "tags": [],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": true,
+   "hasPreferred": false
+  },
+  {
+   "id": "node-aliases",
+   "source": "ats",
+   "title": "Full Stack Intern",
+   "text": "Stack: nodejs, reactjs, k8s, TS.\nRequirements\nExperience with JS and Node.\nPreferred\nGolang or cpp a plus.\n",
+   "tags": [
+    "Node.js",
+    "React",
+    "Kubernetes",
+    "TypeScript",
+    "JavaScript",
+    "Go",
+    "C++"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": true,
+   "hasPreferred": true
+  },
+  {
+   "id": "fall-eligibility",
+   "source": "jsonld",
+   "title": "Software Intern",
+   "text": "Open to students graduating in December 2027 or later. Internship runs Winter 2027.\nNo visa sponsorship available.\nRequirements\nPython.\n",
+   "tags": [
+    "Python"
+   ],
+   "season": "Winter 2027",
+   "classYear": "graduating in December 2027",
+   "workAuthorization": "does_not_sponsor",
+   "hasBasic": true,
+   "hasPreferred": false
+  },
+  {
+   "id": "tricky-lists",
+   "source": "ats",
+   "title": "Systems Intern",
+   "text": "Requirements\nLanguages: C, C++, C#, Go, R\nTools: Docker/Kubernetes\nPrior internships in finance a plus.\n",
+   "tags": [
+    "C",
+    "C++",
+    "C#",
+    "Go",
+    "R",
+    "Docker",
+    "Kubernetes"
+   ],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": true,
+   "hasPreferred": false
+  },
+  {
+   "id": "empty-ish",
+   "source": "paste",
+   "title": "Marketing Intern",
+   "text": "Help with campaigns. No technical skills needed.",
+   "tags": [],
+   "season": null,
+   "classYear": null,
+   "workAuthorization": null,
+   "hasBasic": null,
+   "hasPreferred": null
+  }
+ ]
+}

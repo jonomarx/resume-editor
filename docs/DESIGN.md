@@ -59,7 +59,7 @@ AGENTS.md        agent guide (root)
 | --- | --- | --- | --- |
 | `FileStorage` | `FILE_STORAGE` | `local` | `s3` |
 | `Matcher` | `MATCHER` | `tags` | `hybrid`, `llm-rerank` |
-| `LlmClient` | `LLM_PROVIDER` | one provider (open question 1) | others |
+| `LlmClient` | `LLM_PROVIDER` | `none` (no LLM; `fake` in tests) | one real provider (Epic 6, open question 1), others |
 
 ## 3. Data and storage
 
@@ -183,16 +183,16 @@ Merge gate (role branch to `integration`) runs in two stages. Feature gate: all 
 
 ## 10. Decisions and open questions
 
-**Decided:** Spring serves the Vite build, no SSR; server-side LaTeX; GitHub Projects; Maven multi-module; pnpm; username and password sign-in (other methods later); H2 then Postgres in Docker; interfaces by environment variable; Job List Manager does not match; matching by tags in the controller; career pages you provide; drafts never pull from master; no nesting below one subsection level; contract stories get deep review by another agent plus your approval.
+**Decided:** Spring serves the Vite build, no SSR; server-side LaTeX; GitHub Projects; Maven multi-module; pnpm; username and password sign-in (other methods later); H2 then Postgres in Docker; interfaces by environment variable; Job List Manager does not match; matching by tags in the controller; career pages you provide; drafts never pull from master; no nesting below one subsection level; contract stories get deep review by another agent plus your approval; real LLM support is deferred to Epic 6, and until then LLM features are placeholders (`LLM_PROVIDER=none`) and posting enrichment is deterministic (US-109).
 
 **Open**
 
-1. Which LLM provider and monthly budget, and which embeddings provider if we reach US-055?
+1. Which LLM provider and monthly budget, and which embeddings provider if we reach US-055? (Deferred: needed before Epic 6.)
 2. Which career pages go in first? (Needed before Epic 2 is useful.)
 
 ## Appendix A: stories
 
-Roles: B Backend, F Frontend, J Job List Manager, I Integration, H you. **Depends on**: prerequisites. Those in the story's own role must be Done (reviewed, merged to the role branch); a `contract` prerequisite must be merged into `integration` (the owner merges contract stories as soon as they are approved). A prerequisite owned by another role never blocks: the story builds against a dummy implementation until the real one is ready, and only the first two kinds become blocked-by relations on the board. **Dummy until ready**: other roles' pieces the story needs; use dummy data until the real implementation is ready (see `AGENTS.md`). `review:deep` applies to US-003, 006, 013, 014, 028, 037, 041, 060, 064 and the last story before each integration story; all others get a light review.
+Roles: B Backend, F Frontend, J Job List Manager, I Integration, H you. **Depends on**: prerequisites. Those in the story's own role must be Done (reviewed, merged to the role branch); a `contract` prerequisite must be merged into `integration` (the owner merges contract stories as soon as they are approved). A prerequisite owned by another role never blocks: the story builds against a dummy implementation until the real one is ready, and only the first two kinds become blocked-by relations on the board. **Dummy until ready**: other roles' pieces the story needs; use dummy data until the real implementation is ready (see `AGENTS.md`). `review:deep` applies to US-003, 006, 013, 014, 028, 037, 041, 060, 064, 106, 109, 110 and the last story before each integration story; all others get a light review.
 
 ### Epic 0: Foundations (merge M0)
 
@@ -251,7 +251,6 @@ Roles: B Backend, F Frontend, J Job List Manager, I Integration, H you. **Depend
 | US-045 | F | Paste box and bookmarklet generator | US-007, US-028 | Ingest endpoint (US-041) |
 | US-046 | I | E2E: add source (local fixture site) then see postings; paste a posting and see it | US-035, US-041, US-044, US-045 | none |
 | US-036 | J | Later: headless-browser fetcher (Playwright) | US-033 | none |
-| US-039 | J | Later: LLM-generated extraction recipes (tier 2) | US-033, US-038 | `LlmClient` (US-037) |
 
 ### Epic 3: Feed and matching (merge M3)
 
@@ -259,11 +258,10 @@ Roles: B Backend, F Frontend, J Job List Manager, I Integration, H you. **Depend
 | --- | --- | --- | --- | --- |
 | US-050 | B | Jobs list, detail, status endpoints with filters, reading postings through an interface in `common` | US-006, US-028 | Posting data and tags (US-030, US-040) |
 | US-051 | B | `Matcher` (`MATCHER`): tag overlap, full-text, hard filters, per-request scoring | US-021, US-050 | none |
-| US-052 | B | Starter tag list: LLM proposes tags and categories from your master resume; you approve or edit | US-020, US-021 | `LlmClient` (US-037) |
 | US-053 | F | Job feed page with tag multi-select and other filters, sort by fit, save and dismiss | US-007, US-028 | Jobs endpoints (US-050) |
 | US-054 | I | E2E: seeded master and postings produce a ranked feed | US-050, US-051, US-053 | none |
-| US-055 | B | Later: embeddings with pgvector and requirement coverage | US-051 | none |
-| US-056 | B | Later: LLM rerank with explanations | US-037, US-055 | none |
+| US-109 | J | Deterministic (non-LLM) posting enrichment: explore and compare methods (vocabulary match, structured data, section and pattern rules) | US-040 | none |
+| US-110 | B | `LLM_PROVIDER=none`: explicit no-LLM mode, clean `llm_unavailable`, availability signal for the UI (`contract`) | US-037 | none |
 
 ### Epic 4: Drafts and cutdown (merge M4)
 
@@ -274,7 +272,6 @@ Roles: B Backend, F Frontend, J Job List Manager, I Integration, H you. **Depend
 | US-062 | F | Draft page: job details left, editor and page meter right | US-028, US-053, US-061 | Draft endpoints (US-060) |
 | US-064 | B | Deterministic cutdown: score, select, loop on render to exactly one page | US-051, US-060 | none |
 | US-065 | F | Cutdown UI: run, review per-node changes, accept or reject, undo | US-028, US-062 | Cutdown endpoint (US-064) |
-| US-066 | B | LLM tighten mode with a no-new-claims check | US-037, US-064 | none |
 | US-067 | I | E2E: click a job, get a draft, cut down, export a one-page PDF | US-060, US-062, US-064, US-065 | none |
 
 ### Epic 5: Hardening (after M4)
@@ -283,9 +280,24 @@ Roles: B Backend, F Frontend, J Job List Manager, I Integration, H you. **Depend
 | --- | --- | --- | --- | --- |
 | US-070 | B | Backups for Postgres and `DATA_DIR`; scheduled orphan reconciliation worker driven by `file_registry` | US-014, US-060 | none |
 | US-071 | B | Rate and size limits on render and ingest | US-013 | Ingest endpoint (US-041) |
-| US-072 | B | Structured logs and metrics for render and LLM usage | US-013 | Crawl records (US-035) |
+| US-072 | B | Structured logs and metrics for render and crawl (LLM usage moved to US-111) | US-013 | Crawl records (US-035) |
 | US-073 | F | Loading, empty, and error states everywhere | US-067 | none |
 | US-074 | I | Concurrency tests on Postgres: simultaneous saves, crawl versus ingest, claim locks | US-014, US-035, US-041 | none |
 | US-075 | I | Dummy-data sweep: find any remaining `DUMMY` marker and open a swap card for its owner | US-067 | none |
 
-**Suggested build order:** M0, M1, paste ingest plus feed (M3), drafts with manual cutdown, deterministic cutdown, then the daily run over your career pages.
+### Epic 6: Real LLM integration (once a provider is chosen)
+
+Until this epic, every LLM feature is a placeholder: `LLM_PROVIDER=none` makes calls fail with `llm_unavailable`, the UI disables those features, and postings are enriched deterministically (US-109). This epic can start any time after the provider and budget are decided (open question 1); it does not block M3 or M4.
+
+| ID | Role | Story | Depends on | Dummy until ready |
+| --- | --- | --- | --- | --- |
+| US-106 | B | First real LLM provider and monthly budget enforcement | US-037 | none |
+| US-039 | J | LLM-generated extraction recipes (tier 2) | US-033, US-038 | `LlmClient` (US-106) |
+| US-052 | B | Starter tag list: LLM proposes tags and categories from your master resume; you approve or edit | US-020, US-021 | `LlmClient` (US-106) |
+| US-055 | B | Embeddings with pgvector and requirement coverage | US-051 | none |
+| US-056 | B | LLM rerank with explanations | US-055, US-106 | none |
+| US-066 | B | LLM tighten mode with a no-new-claims check | US-064, US-106 | none |
+| US-111 | B | Logs and metrics for LLM usage (split from US-072) | US-106 | none |
+| US-112 | I | E2E: LLM extraction and enrichment against the real provider | US-106 | none |
+
+**Suggested build order:** M0, M1, paste ingest plus feed (M3), drafts with manual cutdown, deterministic cutdown, then the daily run over your career pages; real LLM features (Epic 6) once a provider is chosen.
