@@ -54,6 +54,13 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <!-- US-115 contender C: Apache OpenNLP (Apache 2.0). A maximum-entropy sequence tagger (NameFinder) for skill spans: pure
+           Java, no native code, deterministic inference from a small model file, and a training API in the same jar. -->
+      <groupId>org.apache.opennlp</groupId>
+      <artifactId>opennlp-tools</artifactId>
+      <version>2.5.4</version>
+    </dependency>
+    <dependency>
       <groupId>com.h2database</groupId>
       <artifactId>h2</artifactId>
       <scope>test</scope>

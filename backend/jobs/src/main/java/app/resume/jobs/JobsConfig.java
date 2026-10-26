@@ -87,7 +87,7 @@ public class JobsConfig {
         };
     }
 
-    /** ENRICHER_TAGS: rules (contender A, default), rules-sections, taxonomy (B: Wikidata + Linguist aliases), taxonomy-onet (B plus O*NET). */
+    /** ENRICHER_TAGS: rules (contender A, default), rules-sections, taxonomy (B: Wikidata + Linguist aliases), taxonomy-onet (B plus O*NET), ml (C). */
     static DeterministicEnricher.TagStrategy tagStrategy(String method) {
         String m = method == null || method.isBlank() ? "rules" : method.strip().toLowerCase(java.util.Locale.ROOT);
         return switch (m) {
@@ -95,7 +95,8 @@ public class JobsConfig {
             case "rules-sections" -> DeterministicEnricher.TagStrategy.SECTION_SCOPED;
             case "taxonomy" -> DeterministicEnricher.TagStrategy.TAXONOMY;
             case "taxonomy-onet" -> DeterministicEnricher.TagStrategy.TAXONOMY_ONET;
-            default -> throw new IllegalStateException("Unknown ENRICHER_TAGS '" + method + "'; supported: rules, rules-sections, taxonomy, taxonomy-onet");
+            case "ml" -> DeterministicEnricher.TagStrategy.ML;
+            default -> throw new IllegalStateException("Unknown ENRICHER_TAGS '" + method + "'; supported: rules, rules-sections, taxonomy, taxonomy-onet, ml");
         };
     }
 
