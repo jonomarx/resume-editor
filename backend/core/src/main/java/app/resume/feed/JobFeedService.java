@@ -16,6 +16,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -56,6 +58,10 @@ public class JobFeedService {
     private final ResumeService resumes;
     private final NodeTagIndex nodeTags;
 
+    private static final Logger log = LoggerFactory.getLogger(JobFeedService.class);
+    static final long WARN_INTERVAL_MS = 60_000;
+    private final java.util.concurrent.atomic.AtomicLong lastWarn = new java.util.concurrent.atomic.AtomicLong();
+
     public JobFeedService(ObjectProvider<PostingReader> postings, JdbcTemplate jdbc, ResumeService resumes, NodeTagIndex nodeTags) {
         this.postings = postings;
         this.jdbc = jdbc;
@@ -63,9 +69,27 @@ public class JobFeedService {
         this.nodeTags = nodeTags;
     }
 
+    /** Logs at startup when no reader exists, so the empty feed is explained. */
+    @jakarta.annotation.PostConstruct
+    void warnAtStartup() {
+        if (postings.getIfAvailable() == null) warnNoReader(true);
+    }
+
+    private void warnNoReader(boolean force) {
+        long now = System.currentTimeMillis();
+        long last = lastWarn.get();
+        if ((force || now - last >= WARN_INTERVAL_MS) && lastWarn.compareAndSet(last, now)) {
+            log.warn("No PostingReader bean is configured (the jobs module's reader has not landed and the dummy profile is off): "
+                    + "the job feed is empty and every posting is 404");
+        }
+    }
+
     public Page list(long userId, Filters f) {
         PostingReader reader = postings.getIfAvailable();
-        if (reader == null) return new Page(List.of(), 0, f.limit(), f.offset());
+        if (reader == null) {
+            warnNoReader(false);
+            return new Page(List.of(), 0, f.limit(), f.offset());
+        }
         Map<Long, Long> drafts = drafts(userId);
         Instant since = f.maxAgeDays() == null ? null : Instant.now().minus(f.maxAgeDays(), ChronoUnit.DAYS);
         List<PostingView> found = reader.search(userId,
@@ -127,6 +151,7 @@ public class JobFeedService {
 
     private Optional<PostingView> load(long userId, long jobId) {
         PostingReader reader = postings.getIfAvailable();
+        if (reader == null) warnNoReader(false);
         return reader == null ? Optional.empty() : reader.find(userId, jobId);
     }
 
@@ -154,8 +179,8 @@ public class JobFeedService {
     }
 
     private Set<String> masterTags(long userId) {
-        long master = resumes.masterId(userId);
-        return nodeTags.entries(master).stream().map(NodeTagIndex.Entry::slug).collect(Collectors.toCollection(HashSet::new));
+        // A missing master means no fit, not a write: reads never create it.
+        return resumes.findMasterId(userId).stream().flatMap(master -> nodeTags.entries(master).stream()).map(NodeTagIndex.Entry::slug).collect(Collectors.toCollection(HashSet::new));
     }
 
     private static Job summary(PostingView p, JobUserStatus st, Long draftId, int score) {

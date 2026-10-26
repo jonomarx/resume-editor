@@ -150,10 +150,6 @@ public class ResumeService {
     }
 
     /** The master's id, creating it (version 1, starter tree) if the user has none. */
-    public long masterId(long userId) {
-        return ensureMaster(userId);
-    }
-
     private long ensureMaster(long userId) {
         Optional<Long> existing = findMaster(userId);
         if (existing.isPresent()) return existing.get();
@@ -162,6 +158,11 @@ public class ResumeService {
         } catch (DataIntegrityViolationException lostRace) { // unique (user_id, kind, job_posting_id): the other creator won
             return findMaster(userId).orElseThrow(() -> lostRace);
         }
+    }
+
+    /** The master's id if the user has one; never creates it (for read-only callers such as the feed). */
+    public Optional<Long> findMasterId(long userId) {
+        return findMaster(userId);
     }
 
     private Optional<Long> findMaster(long userId) {
