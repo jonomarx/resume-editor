@@ -1,7 +1,7 @@
 package app.resume.jobs.crawl;
 
 import app.resume.jobs.PostingNormalizer;
-import app.resume.jobs.enrich.PostingEnricher;
+import app.resume.jobs.enrich.Enricher;
 import app.resume.jobs.extract.ExtractionOutputException;
 import app.resume.jobs.extract.LlmPostingExtractor;
 import app.resume.jobs.fetch.AtsFeedAdapter;
@@ -52,13 +52,13 @@ public class CrawlService {
     private final List<AtsFeedAdapter> atsAdapters;
     private final JsonLdPostingAdapter jsonLd;
     private final LlmPostingExtractor llm; // null when no LLM is configured
-    private final PostingEnricher enricher; // null when enrichment is not configured
+    private final Enricher enricher; // null when enrichment is not configured
     private final java.util.function.Supplier<Instant> clock;
     private final int staleAfter;
     private final int closeAfter;
 
     public CrawlService(JdbcTemplate jdbc, PageFetcher fetcher, List<AtsFeedAdapter> atsAdapters, JsonLdPostingAdapter jsonLd,
-            LlmPostingExtractor llm, PostingEnricher enricher, java.util.function.Supplier<Instant> clock, int staleAfter,
+            LlmPostingExtractor llm, Enricher enricher, java.util.function.Supplier<Instant> clock, int staleAfter,
             int closeAfter) {
         this.jdbc = jdbc;
         this.fetcher = fetcher;
