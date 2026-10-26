@@ -4,6 +4,7 @@ import { useAuth } from './auth/AuthContext'
 import LoginPage from './pages/LoginPage'
 import IngestPage from './ingest/IngestPage'
 import SourcesPage from './sources/SourcesPage'
+import JobsPage from './jobs/JobsPage'
 import MasterResumePage from './pages/MasterResumePage'
 
 function Page({ title }: { title: string }) {
@@ -25,7 +26,7 @@ export default function App() {
           <Route path="/resume" element={<MasterResumePage />} />
           <Route path="/add-job" element={<IngestPage />} />
           <Route path="/sources" element={<SourcesPage />} />
-          <Route path="/jobs" element={<Page title="Jobs" />} />
+          <Route path="/jobs" element={<JobsPage />} />
           <Route path="/drafts/:id" element={<Page title="Draft" />} />
         </Route>
         <Route path="*" element={<Page title="Not found" />} />

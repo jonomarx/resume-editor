@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import App from './App'
@@ -82,7 +82,8 @@ describe('route guard return path', () => {
     await user.type(await screen.findByLabelText('Username'), 'ada')
     await user.type(screen.getByLabelText('Password'), 'correct-horse')
     await user.click(screen.getByRole('button', { name: 'Log in' }))
-    expect(await screen.findByTestId('where')).toHaveTextContent('/jobs?tag=java#top')
+    // The location is present from the start (/login); wait for the redirect back.
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/jobs?tag=java#top'))
   })
 })
 
