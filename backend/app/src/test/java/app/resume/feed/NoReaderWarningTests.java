@@ -13,7 +13,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 @ExtendWith(OutputCaptureExtension.class)
 class NoReaderWarningTests {
     JobFeedService service() {
-        return new JobFeedService(new StaticListableBeanFactory().getBeanProvider(app.resume.jobs.PostingReader.class), null, null, null);
+        return new JobFeedService(new StaticListableBeanFactory().getBeanProvider(app.resume.jobs.PostingReader.class), null, null, null, null);
     }
 
     static final JobFeedService.Filters F = new JobFeedService.Filters(false, java.util.Set.of(), null, null, null, null, 50, 0);

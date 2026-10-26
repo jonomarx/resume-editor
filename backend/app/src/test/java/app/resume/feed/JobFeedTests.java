@@ -94,7 +94,7 @@ class JobFeedTests {
                 .andExpect(jsonPath("$.items[0].userStatus").value("new"))
                 .andExpect(jsonPath("$.items[0].postingStatus").value("stale"))
                 .andExpect(jsonPath("$.items[0].draftId").value((Object) null))
-                .andExpect(jsonPath("$.items[1].id").value(1)).andExpect(jsonPath("$.items[1].fitScore").value(50))
+                .andExpect(jsonPath("$.items[1].id").value(1)).andExpect(jsonPath("$.items[1].fitScore").value(40))
                 .andExpect(jsonPath("$.items[2].id").value(2)).andExpect(jsonPath("$.items[2].fitScore").value(0));
     }
 
@@ -165,7 +165,7 @@ class JobFeedTests {
                 .andExpect(jsonPath("$.eligibility.workAuthorization").value((Object) null))
                 .andExpect(jsonPath("$.fit.matchedTags[0]").value("java"))
                 .andExpect(jsonPath("$.fit.missingTags[0]").value("postgresql"))
-                .andExpect(jsonPath("$.fitScore").value(50)).andExpect(jsonPath("$.basicRequirements[0]").value("basic"));
+                .andExpect(jsonPath("$.fitScore").value(40)).andExpect(jsonPath("$.basicRequirements[0]").value("basic"));
         mvc.perform(get("/api/jobs/999").cookie(u.session())).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("not_found"));
     }
