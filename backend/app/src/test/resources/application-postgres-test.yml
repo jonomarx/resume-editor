@@ -1,3 +1,5 @@
 app:
+  llm:
+    provider: fake
   storage:
     data-dir: target/test-data/${random.uuid}

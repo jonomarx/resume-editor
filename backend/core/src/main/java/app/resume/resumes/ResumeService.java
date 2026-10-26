@@ -160,6 +160,11 @@ public class ResumeService {
         }
     }
 
+    /** The master's id if the user has one; never creates it (for read-only callers such as the feed). */
+    public Optional<Long> findMasterId(long userId) {
+        return findMaster(userId);
+    }
+
     private Optional<Long> findMaster(long userId) {
         List<Long> ids = jdbc.queryForList(
                 "select id from resume where user_id = ? and kind = 'MASTER' and job_posting_id = 0", Long.class, userId);

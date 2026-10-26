@@ -48,6 +48,12 @@ test('auth: login returns a user', async () => {
   assert.equal((await res.json()).username, 'ada');
 });
 
+test('capabilities: reports whether LLM features work', async () => {
+  const res = await fetch(`${base}/api/capabilities`, { headers: json });
+  assert.equal(res.status, 200);
+  assert.equal(typeof (await res.json()).llmAvailable, 'boolean');
+});
+
 test('auth: /api/me returns a user', async () => {
   const res = await fetch(`${base}/api/me`, { headers: json });
   assert.equal(res.status, 200);

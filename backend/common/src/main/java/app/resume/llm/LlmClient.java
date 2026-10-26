@@ -10,6 +10,13 @@ package app.resume.llm;
  *
  * <p>Failures are {@link LlmException}s whose {@link LlmException#code()} is a stable machine-readable code
  * (`llm_unavailable`, `llm_budget_exceeded`, `llm_invalid_output`), the same codes the API contract uses.
+ *
+ * <p><b>No-LLM mode.</b> `LLM_PROVIDER=none` (the default for running the app) selects a client whose every call, both
+ * {@link #complete} and {@link #completeJson}, throws {@link LlmUnavailableException} at once without contacting anything.
+ * Callers must treat that as a normal outcome, not a crash: free-text extraction records `llm_unavailable` on the ingest
+ * event, enrichment leaves the posting untagged (or uses the deterministic enricher where configured), and `llm_tighten`
+ * cutdown answers 503 `llm_unavailable`. `GET /api/capabilities` tells the UI whether LLM features work. `fake` (tests) and
+ * unknown values are described in the README; an unknown value stops startup.
  */
 public interface LlmClient {
     /** The model's raw answer. */

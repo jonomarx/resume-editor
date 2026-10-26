@@ -26,7 +26,7 @@ JDK 21, Maven, Node 24 LTS, pnpm 12.14.0, and Docker with Compose.
 
 `docker-compose.yml` starts Postgres and Redis (and the renderer). `DB_PASSWORD` is required; use any local value and never commit it. See `.env.example` for the other variables.
 
-**Settings.** Operational settings live in `backend/app/src/main/resources/application.yml`, the only place with defaults; an environment variable overrides one where the file names it: `DB_URL`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `FILE_STORAGE`, `DATA_DIR`, `LLM_PROVIDER` (`fake` by default), `RENDERER_URL`, and `MAX_ORPHAN_KEY_ATTEMPTS` (default 20: how many orphaned storage keys one version number may skip before a save fails). Limits fixed by the API contract (password length, tag name, alias and slug lengths) are code constants, not settings.
+**Settings.** Operational settings live in `backend/app/src/main/resources/application.yml`, the only place with defaults; an environment variable overrides one where the file names it: `DB_URL`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `FILE_STORAGE`, `DATA_DIR`, `MATCHER` (`tags` by default), `LLM_PROVIDER` (`none` by default: every LLM call throws `llm_unavailable`, free-text paste extraction records `llm_unavailable` on the ingest event, `llm_tighten` answers 503, and `GET /api/capabilities` reports `llmAvailable: false`; `fake` is for tests; an unknown value stops startup), `RENDERER_URL`, and `MAX_ORPHAN_KEY_ATTEMPTS` (default 20: how many orphaned storage keys one version number may skip before a save fails). Limits fixed by the API contract (password length, tag name, alias and slug lengths) are code constants, not settings.
 
 ### Whole stack in Docker (serves the app on :8080)
 

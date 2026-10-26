@@ -9,4 +9,9 @@ package app.resume.llm;
  */
 public interface LlmProvider {
     String generate(LlmRequest request);
+
+    /** Whether calls can succeed at all; false only for {@link NoLlmProvider}. Feeds {@code GET /api/capabilities}. */
+    default boolean available() {
+        return true;
+    }
 }
