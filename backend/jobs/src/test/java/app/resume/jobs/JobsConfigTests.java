@@ -20,6 +20,7 @@ class JobsConfigTests {
         var tags = org.mockito.Mockito.mock(app.resume.vocabulary.TagVocabulary.class);
         var llm = org.mockito.Mockito.mock(app.resume.llm.LlmClient.class);
         assertThat(JobsConfig.createEnricher("deterministic", null, null, null, tags)).isInstanceOf(app.resume.jobs.enrich.DeterministicEnricher.class);
+        assertThat(JobsConfig.createEnricher("", null, null, null, tags)).isInstanceOf(app.resume.jobs.enrich.DeterministicEnricher.class); // ENRICHER= means default
         assertThat(JobsConfig.createEnricher(null, null, null, null, tags)).isInstanceOf(app.resume.jobs.enrich.DeterministicEnricher.class);
         assertThat(JobsConfig.createEnricher("llm", null, null, llm, tags)).isInstanceOf(app.resume.jobs.enrich.PostingEnricher.class);
         assertThat(JobsConfig.createEnricher("LLM", null, null, null, tags)).isNull(); // llm chosen but no client: postings stay untagged

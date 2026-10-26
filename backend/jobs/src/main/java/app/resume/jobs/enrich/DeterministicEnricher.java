@@ -42,18 +42,24 @@ public class DeterministicEnricher implements Enricher {
     /** Tags for a posting under a strategy (also used by the comparison tests). */
     static Set<Long> tags(VocabularyTagMatcher matcher, TagStrategy strategy, String title, String description) {
         String head = title == null ? "" : title;
-        String body = description == null ? "" : description;
+        String body = PostingText.normalize(description);
+        RequirementSections.Sections sections = RequirementSections.parse(body);
+        String scoped = RequirementSections.scoped(sections);
+        String skills = RequirementSections.skillLists(body);
+        boolean structured = !scoped.isBlank() || !skills.isBlank();
+        String whole = head + "\n" + body;
+        String zone = head + "\n" + scoped + "\n" + skills;
         if (strategy == TagStrategy.SECTION_SCOPED) {
-            String scoped = RequirementSections.scoped(RequirementSections.parse(body));
-            if (!scoped.isBlank()) return matcher.match(head + "\n" + scoped, VocabularyTagMatcher.Mode.GUARDED);
+            return structured ? matcher.match(zone, zone, VocabularyTagMatcher.Mode.GUARDED) : matcher.match(whole, VocabularyTagMatcher.Mode.GUARDED);
         }
-        return matcher.match(head + "\n" + body, VocabularyTagMatcher.Mode.GUARDED);
+        // Unambiguous names count anywhere; ambiguous ones (Go, R, C, Spring...) only in the title, requirement sections and
+        // skills lists. A posting with no such structure at all (a short paste) uses its whole text as the zone.
+        return matcher.match(whole, structured ? zone : whole, VocabularyTagMatcher.Mode.GUARDED);
     }
 
     /** Requirements and eligibility fields, no tags. */
     static Enrichment fields(String title, String description) {
-        String body = description == null ? "" : description;
-        if (body.length() > VocabularyTagMatcher.MAX_TEXT) body = body.substring(0, VocabularyTagMatcher.MAX_TEXT);
+        String body = PostingText.normalize(description);
         RequirementSections.Sections s = RequirementSections.parse(body);
         String season = EligibilityRules.season(title);
         if (season == null) season = EligibilityRules.season(body);

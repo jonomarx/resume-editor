@@ -181,7 +181,7 @@ public class IngestProcessor {
         if (created && enricher != null) {
             try {
                 enricher.enrich(id);
-            } catch (RuntimeException ex) {
+            } catch (RuntimeException | StackOverflowError ex) { // untrusted text must never break a run
                 log.warn("enrichment of posting {} failed: {}", id, ex.toString());
             }
         }

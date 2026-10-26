@@ -14,7 +14,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 class VocabularyTagMatcherTests {
-    static final List<String> NAMES = List.of("C", "C++", "C#", "Go", "R", "Java", "JavaScript", ".NET", "Node.js", "React", "Rust", "Swift");
+    static final List<String> NAMES = List.of("C", "C++", "C#", "Go", "R", "Java", "JavaScript", ".NET", "Node.js", "React", "Rust", "Swift", "Spring");
     static final List<VocabularyTag> VOCAB = new ArrayList<>();
 
     static {
@@ -54,7 +54,25 @@ class VocabularyTagMatcherTests {
                 row("Swift-moving team that rusts nothing", new String[0]),
                 row("C-level team, plan A or plan B", new String[0]),
                 row("JavaScriptCore internals", new String[0]),
-                row("", new String[0]));
+                row("", new String[0]),
+                // reviewer's false-positive classes: bullets, headings, colons, years, negation
+                row("- Go to market with new products", new String[0]),
+                row("Responsibilities:\nGo beyond expectations", new String[0]),
+                row("* Rust is not required here", new String[0]),
+                row("We value: Swift response times", new String[0]),
+                row("Join us in Spring 2027", new String[0]),
+                row("Benefits: Spring break off", new String[0]),
+                row("Rate: 5 or R", new String[0]),
+                row("Vitamin C, and more", new String[0]),
+                row("Go is not required", new String[0]),
+                row("No Java experience required", new String[0]),
+                row("Java experience; Rust is not needed", "Java"),
+                row("Experience with Go and Rust", "Go", "Rust"),
+                row("Skills in R, Java and Go", "R", "Java", "Go"),
+                row("Backend services in Spring", "Spring"),
+                row("Experience with Spring Boot", "Spring"),
+                row("Proficiency in Swift", "Swift"),
+                row("Swift", new String[0]));
     }
 
     @ParameterizedTest

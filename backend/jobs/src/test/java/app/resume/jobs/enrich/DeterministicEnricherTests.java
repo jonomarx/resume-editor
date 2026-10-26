@@ -81,7 +81,7 @@ class DeterministicEnricherTests {
         assertThat(row.get("basic_requirements")).isEqualTo("Experience with Java and reactjs.\nGraduating in 2028.");
         assertThat(row.get("preferred_requirements")).isEqualTo("Kotlin.");
         assertThat(row.get("season")).isEqualTo("Summer 2027");
-        assertThat(row.get("work_authorization")).isEqualTo("Must be authorized to work in the US.");
+        assertThat(row.get("work_authorization")).isEqualTo("authorization_required");
         assertThat(row.get("class_year")).isEqualTo("Graduating in 2028");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM job_tag_proposal", Integer.class)).isZero();
     }

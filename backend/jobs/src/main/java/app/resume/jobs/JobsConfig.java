@@ -77,7 +77,7 @@ public class JobsConfig {
      * Returns null when the chosen one lacks what it needs (the vocabulary, or an LlmClient): postings then stay untagged.
      */
     static Enricher createEnricher(String kind, JdbcTemplate jdbc, TransactionTemplate tx, LlmClient model, TagVocabulary tags) {
-        String k = kind == null ? "deterministic" : kind.strip().toLowerCase(java.util.Locale.ROOT);
+        String k = kind == null || kind.isBlank() ? "deterministic" : kind.strip().toLowerCase(java.util.Locale.ROOT);
         return switch (k) {
             case "deterministic" -> tags == null ? null
                     : new DeterministicEnricher(jdbc, tx, tags, DeterministicEnricher.TagStrategy.FULL_TEXT);
