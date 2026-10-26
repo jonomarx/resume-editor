@@ -60,7 +60,10 @@ jobs:
           docker network create --internal e2e-render
           docker run -d --name renderer --network e2e-render --read-only --tmpfs /work:rw,size=64m,uid=10001 \
             --cap-drop ALL --security-opt no-new-privileges --pids-limit 128 --memory 512m resume-renderer:e2e
+          # The sources spec (US-046) needs a name that resolves to a private address (the SSRF policy must refuse it) and a
+          # crawl every 15 seconds instead of daily at 06:00.
           docker run -d --name app --network e2e_default -p 8080:8080 \
+            --add-host fixture-site.example:10.0.0.5 -e APP_JOBS_DAILY_RUN_CRON='*/15 * * * * *' \
             -e DB_URL=jdbc:postgresql://postgres:5432/resume -e DB_PASSWORD -e REDIS_HOST=redis \
             -e RENDERER_URL=http://renderer:8080 resume-editor-app:e2e
           docker network connect e2e-render app
