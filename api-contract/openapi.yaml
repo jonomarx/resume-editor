@@ -1,10 +1,11 @@
 openapi: 3.0.3
 info:
   title: Resume Editor API
-  version: 0.6.0
+  version: 0.7.0
   description: |
     Contract v0 (US-003, fixes in US-076 and US-097): auth, master resume, tags, render. Contract v1 (US-028, version
-    0.6.0, additive): sources, ingest, jobs, drafts, cutdown.
+    0.6.0, additive): sources, ingest, jobs, drafts, cutdown. US-110 (0.7.0, additive): `GET /api/capabilities`; failed
+    ingest events carry the code `llm_unavailable` when no LLM is configured (`LLM_PROVIDER=none`).
     Changed only through stories labeled `contract`.
 
     Conventions
@@ -172,6 +173,24 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
               example: { code: unauthorized, message: Sign in required }
+  /api/capabilities:
+    get:
+      tags: [auth]
+      operationId: getCapabilities
+      summary: Which optional features this server has
+      description: |
+        Lets the UI hide or disable features that cannot work. `llmAvailable` is false while no LLM provider is
+        configured (`LLM_PROVIDER=none`, the default): then `llm_tighten` cutdown returns 503 `llm_unavailable` and pasted
+        free text cannot be read (the ingest event fails with the code `llm_unavailable`). Ingesting a URL or HTML that
+        carries structured posting data still works.
+      responses:
+        '200':
+          description: The capabilities
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Capabilities' }
+              example: { llmAvailable: false }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /api/resumes/master:
     get:
       tags: [resume]
@@ -2027,6 +2046,11 @@ components:
           properties:
             code: { type: string }
             message: { type: string }
+    Capabilities:
+      type: object
+      required: [llmAvailable]
+      properties:
+        llmAvailable: { type: boolean, description: False when no LLM provider is configured }
     JobUserStatus:
       type: string
       enum: [new, saved, dismissed, applied]

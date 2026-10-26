@@ -116,11 +116,12 @@ class LlmClientTests {
     }
 
     @Test
-    void theDefaultProviderIsTheFakeAndAnUnknownProviderStopsStartup() {
-        assertThat(wired.complete(REQ)).isEqualTo("{}"); // LLM_PROVIDER defaults to fake
+    void theTestProfileUsesTheFakeAndAnUnknownProviderStopsStartup() {
+        assertThat(wired.complete(REQ)).isEqualTo("{}"); // the test profile selects fake explicitly; the app default is none (LlmNoneTests)
         assertThat(wired.completeJson(REQ, "{\"type\":\"object\"}")).isEqualTo("{}");
         assertThatThrownBy(() -> new LlmConfig().llmProvider("gpt-something"))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("Unknown LLM_PROVIDER");
         assertThat(new LlmConfig().llmProvider("fake")).isInstanceOf(FakeLlmProvider.class);
+        assertThat(new LlmConfig().llmProvider("none")).isInstanceOf(NoLlmProvider.class);
     }
 }

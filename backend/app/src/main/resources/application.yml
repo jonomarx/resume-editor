@@ -30,7 +30,7 @@ app:
     timeout-seconds: 30
     connect-timeout-seconds: 3
   llm:
-    provider: ${LLM_PROVIDER:fake}
+    provider: ${LLM_PROVIDER:none}
   render:
     max-bytes: 1000000
   resumes:

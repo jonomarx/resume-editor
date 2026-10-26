@@ -71,6 +71,13 @@ public class JobsConfig {
                 CrawlService.DEFAULT_STALE_AFTER, CrawlService.DEFAULT_CLOSE_AFTER);
     }
 
+    /** The real PostingReader (core's feed reads postings only through the port). Not active with the dummy profile, which has its own. */
+    @Bean
+    @org.springframework.context.annotation.Profile("!dummy")
+    PostingReader postingReader(JdbcTemplate jdbc) {
+        return new JdbcPostingReader(jdbc);
+    }
+
     @Bean
     IngestTokenService ingestTokenService(JdbcTemplate jdbc) {
         return new IngestTokenService(jdbc, Instant::now);

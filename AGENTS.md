@@ -54,7 +54,7 @@ If you are blocked, comment on the card with the exact reason and take another c
 ```
 # Set Status: BACKLOG, TODO, DOING, TO-REVIEW, DONE, ARCHIVE
 gh project item-edit 1 --owner jonomarx --url <issue url> --field Status --value DOING
-# Set Epic (0 to 5)
+# Set Epic (0 to 6)
 gh project item-edit 1 --owner jonomarx --url <issue url> --field Epic --value 0
 # Put a new issue on the board
 gh project item-add 1 --owner jonomarx --url <issue url>
