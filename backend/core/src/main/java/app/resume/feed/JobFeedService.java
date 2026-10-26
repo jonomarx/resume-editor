@@ -57,16 +57,19 @@ public class JobFeedService {
     private final JdbcTemplate jdbc;
     private final ResumeService resumes;
     private final NodeTagIndex nodeTags;
+    private final Matcher matcher;
 
     private static final Logger log = LoggerFactory.getLogger(JobFeedService.class);
     static final long WARN_INTERVAL_MS = 60_000;
     private final java.util.concurrent.atomic.AtomicLong lastWarn = new java.util.concurrent.atomic.AtomicLong();
 
-    public JobFeedService(ObjectProvider<PostingReader> postings, JdbcTemplate jdbc, ResumeService resumes, NodeTagIndex nodeTags) {
+    public JobFeedService(ObjectProvider<PostingReader> postings, JdbcTemplate jdbc, ResumeService resumes, NodeTagIndex nodeTags,
+            Matcher matcher) {
         this.postings = postings;
         this.jdbc = jdbc;
         this.resumes = resumes;
         this.nodeTags = nodeTags;
+        this.matcher = matcher;
     }
 
     /** Logs at startup when no reader exists, so the empty feed is explained. */
@@ -97,11 +100,14 @@ public class JobFeedService {
         Map<Long, JobUserStatus> statuses = statuses(userId);
         Set<String> master = masterTags(userId);
 
+        Map<Long, Matcher.Match> matches = matcher.match(master, found, corpus(reader, userId, drafts.keySet()), Matcher.HardFilters.NONE);
         List<Job> jobs = new ArrayList<>();
         for (PostingView p : found) {
+            Matcher.Match m = matches.get(p.id());
+            if (m == null) continue; // excluded by a hard filter
             JobUserStatus st = statuses.getOrDefault(p.id(), JobUserStatus.NEW);
             if (f.status() != null && f.status() != st) continue;
-            jobs.add(summary(p, st, drafts.get(p.id()), FitScorer.score(p.tags(), master).score()));
+            jobs.add(summary(p, st, drafts.get(p.id()), m.score()));
         }
         Comparator<Job> order = f.sortNewest()
                 ? Comparator.comparing(Job::firstSeenAt).reversed().thenComparingLong(Job::id)
@@ -115,7 +121,8 @@ public class JobFeedService {
     public Optional<JobDetail> detail(long userId, long jobId) {
         return load(userId, jobId).map(p -> {
             Set<String> master = masterTags(userId);
-            FitScorer.Fit fit = FitScorer.score(p.tags(), master);
+            Matcher.Match fit = matcher.match(master, List.of(p), corpus(postings.getObject(), userId, drafts(userId).keySet()),
+                    Matcher.HardFilters.NONE).get(p.id());
             Job s = summary(p, statusOf(userId, jobId), drafts(userId).get(jobId), fit.score());
             return new JobDetail(s.id(), s.title(), s.company(), s.location(), s.url(), s.description(),
                     s.basicRequirements(), s.preferredRequirements(), s.tags(), s.fitScore(), s.userStatus(),
@@ -134,8 +141,8 @@ public class JobFeedService {
         } else {
             upsert(userId, jobId, status);
         }
-        return p.map(v -> summary(v, status, drafts(userId).get(jobId),
-                FitScorer.score(v.tags(), masterTags(userId)).score()));
+        return p.map(v -> summary(v, status, drafts(userId).get(jobId), matcher.match(masterTags(userId), List.of(v),
+                corpus(postings.getObject(), userId, drafts(userId).keySet()), Matcher.HardFilters.NONE).get(v.id()).score()));
     }
 
     /** Update-then-insert; the primary key makes two racing first writes safe: the loser retries as an update. */
@@ -147,6 +154,11 @@ public class JobFeedService {
         } catch (DuplicateKeyException lostRace) {
             jdbc.update(update, status.wire(), userId, jobId);
         }
+    }
+
+    /** Every posting of the user, for tag rarity weights (so scores do not depend on the request's filters). */
+    private List<PostingView> corpus(PostingReader reader, long userId, Set<Long> draftPostings) {
+        return reader.search(userId, new PostingQuery(null, null, null, null, draftPostings));
     }
 
     private Optional<PostingView> load(long userId, long jobId) {
