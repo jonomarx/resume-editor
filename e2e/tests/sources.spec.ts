@@ -102,11 +102,13 @@ test('paste a posting: added, duplicate recognised, unreadable text fails visibl
   await expect(page.getByRole('status')).toContainText('You already added this posting.')
   expect((await events(page)).filter((e) => e.status === 'done')).toHaveLength(1)
 
-  // Free text needs an LLM; the default LLM_PROVIDER=fake answers nothing usable, so the failure is shown.
+  // Free text needs an LLM; with no usable LLM configured, so the failure is shown.
   await pastePosting(page, 'text', `Software Engineering Intern at Fixture Co ${title}. Apply now.`)
   await expect(page.getByRole('status')).toContainText('Could not process it', { timeout: 30_000 })
   const failed = (await events(page)).find((e) => e.status === 'failed')
-  expect(failed?.error?.code).toBe('extraction_failed')
+  // BUG #270: backend US-110 makes LLM_PROVIDER=none the default, so the code becomes llm_unavailable once
+  // role/backend reaches integration. Accept both until then; the next step tightens this to llm_unavailable.
+  expect(['llm_unavailable', 'extraction_failed']).toContain(failed?.error?.code)
 })
 
 test('bookmarklet posts cross-origin with a bearer token (CORS), and a revoked token is refused', async ({ page, request }) => {
