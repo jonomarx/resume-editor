@@ -17,6 +17,9 @@ export type IngestAccepted = components['schemas']['IngestAccepted']
 export type IngestEvent = components['schemas']['IngestEvent']
 export type IngestToken = components['schemas']['IngestToken']
 export type CreatedIngestToken = components['schemas']['CreatedIngestToken']
+export type JobSummary = components['schemas']['JobSummary']
+export type JobPage = components['schemas']['JobPage']
+export type JobUserStatus = components['schemas']['JobUserStatus']
 export type RenderResult = components['schemas']['RenderResult']
 
 /** Error thrown by any API client call; mirrors the contract's Error schema. */
@@ -94,7 +97,28 @@ export interface IngestApi {
   revokeToken(id: number): Promise<void>
 }
 
+/** Query of the job feed (operationId listJobs). Empty or undefined fields are left out of the request. */
+export interface JobQuery {
+  sort: 'fit' | 'newest'
+  /** Tag slugs; a posting must carry every one. */
+  tags: string[]
+  location?: string
+  status?: JobUserStatus
+  maxAgeDays?: number
+  q?: string
+  limit: number
+  offset: number
+}
+
+/** Job feed (operationIds listJobs, setJobStatus). */
+export interface JobsApi {
+  list(query: JobQuery): Promise<JobPage>
+  /** Sets the user's own status for a posting; resolves to the posting. */
+  setStatus(id: number, status: JobUserStatus): Promise<JobSummary>
+}
+
 export interface Api {
+  jobs: JobsApi
   ingest: IngestApi
   sources: SourcesApi
   tags: TagsApi

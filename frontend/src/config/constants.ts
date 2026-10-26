@@ -262,3 +262,45 @@ export const INGEST_LABELS = {
   alertFailed: (status: number) => `Resume Editor rejected it (${status})`,
   alertUnreachable: 'Could not reach Resume Editor',
 } as const
+
+export const JOB_FEED = {
+  pageSize: 50,
+  /** Freshness choices; 0 means any age. */
+  freshnessDays: [0, 1, 7, 30],
+} as const
+
+export const JOB_FEED_LABELS = {
+  heading: 'Jobs',
+  sortLabel: 'Sort by',
+  sorts: { fit: 'Best fit', newest: 'Newest' },
+  tagsLegend: 'Tags',
+  noVocabulary: 'No tags in the vocabulary yet.',
+  locationLabel: 'Location',
+  searchLabel: 'Search',
+  applySearch: 'Search',
+  statusLabel: 'Status',
+  anyStatus: 'Any status',
+  statuses: { new: 'New', saved: 'Saved', dismissed: 'Dismissed', applied: 'Applied' },
+  freshnessLabel: 'Posted within',
+  anyAge: 'Any time',
+  days: (n: number) => (n === 1 ? 'Last day' : `Last ${n} days`),
+  none: 'No postings match these filters.',
+  loadFailed: 'Could not load the job feed.',
+  actionFailed: 'Could not update that posting. Try again.',
+  fit: (score: number) => `Fit ${score}`,
+  noLocation: 'Location not listed',
+  noDescription: 'No description.',
+  basic: 'Basic requirements',
+  preferred: 'Preferred requirements',
+  noRequirements: 'None listed',
+  noTags: 'No tags',
+  save: 'Save',
+  unsave: 'Unsave',
+  dismiss: 'Dismiss',
+  restore: 'Restore',
+  openPosting: 'View posting',
+  openDraft: 'Open draft',
+  previous: 'Previous',
+  next: 'Next',
+  range: (from: number, to: number, total: number) => `${from}-${to} of ${total}`,
+} as const

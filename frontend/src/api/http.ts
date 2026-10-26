@@ -1,5 +1,5 @@
 import { CSRF } from '../config/constants'
-import { ApiError, type Api, type ApiErrorBody, type RenderResult, type CreatedIngestToken, type IngestAccepted, type IngestEvent, type IngestToken, type Source, type SourceHealth, type Tag, type ResumeDocument, type ResumeVersionSummary, type User } from './types'
+import { ApiError, type Api, type ApiErrorBody, type RenderResult, type CreatedIngestToken, type IngestAccepted, type IngestEvent, type IngestToken, type JobPage, type JobSummary, type Source, type SourceHealth, type Tag, type ResumeDocument, type ResumeVersionSummary, type User } from './types'
 
 const MUTATING = new Set(['POST', 'PUT', 'DELETE'])
 
@@ -81,6 +81,18 @@ export function createHttpApi(fetchImpl: typeof fetch = (...a) => fetch(...a)): 
         if (!res.ok) throw await toError(res)
       },
       health: async () => json<SourceHealth[]>(await request('GET', '/api/source-health')),
+    },
+    jobs: {
+      list: async (q) => {
+        const params = new URLSearchParams({ sort: q.sort, limit: String(q.limit), offset: String(q.offset) })
+        for (const t of q.tags) params.append('tag', t)
+        if (q.location) params.set('location', q.location)
+        if (q.status) params.set('status', q.status)
+        if (q.maxAgeDays) params.set('maxAgeDays', String(q.maxAgeDays))
+        if (q.q) params.set('q', q.q)
+        return json<JobPage>(await request('GET', `/api/jobs?${params}`))
+      },
+      setStatus: async (id, status) => json<JobSummary>(await request('PUT', `/api/jobs/${id}/status`, { status })),
     },
     tags: {
       listTags: async () => json<Tag[]>(await request('GET', '/api/tags')),
