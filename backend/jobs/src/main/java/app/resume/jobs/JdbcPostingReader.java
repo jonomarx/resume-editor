@@ -21,7 +21,7 @@ public class JdbcPostingReader implements PostingReader {
     private static final int TAG_CHUNK = 500;
     private static final String COLUMNS = "p.id, p.title, p.company, p.location, p.canonical_url, p.description, p.basic_requirements,"
             + " p.preferred_requirements, p.season, p.work_authorization, p.class_year, p.status, p.origin, p.source_id,"
-            + " p.first_seen_at, p.last_seen_at";
+            + " p.first_seen_at, p.last_seen_at, p.posted_at";
 
     private final JdbcTemplate jdbc;
 
@@ -78,14 +78,14 @@ public class JdbcPostingReader implements PostingReader {
 
     private record Row(long id, String title, String company, String location, String url, String description, String basic,
             String preferred, String season, String workAuthorization, String classYear, String status, String origin, Long sourceId,
-            Instant firstSeen, Instant lastSeen) {}
+            Instant firstSeen, Instant lastSeen, Instant postedAt) {}
 
     private static Row row(java.sql.ResultSet rs) throws java.sql.SQLException {
         long source = rs.getLong(14);
         Long sourceId = rs.wasNull() ? null : source;
         return new Row(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6),
                 rs.getString(7), rs.getString(8), rs.getString(9), rs.getString(10), rs.getString(11), rs.getString(12),
-                rs.getString(13), sourceId, instant(rs.getTimestamp(15)), instant(rs.getTimestamp(16)));
+                rs.getString(13), sourceId, instant(rs.getTimestamp(15)), instant(rs.getTimestamp(16)), instant(rs.getTimestamp(17)));
     }
 
     private static Instant instant(Timestamp t) {
@@ -105,7 +105,7 @@ public class JdbcPostingReader implements PostingReader {
         for (Row r : rows) {
             out.add(new PostingView(r.id, r.title, r.company, r.location, r.url, r.description, lines(r.basic), lines(r.preferred),
                     tags.getOrDefault(r.id, List.of()), r.season, r.workAuthorization, r.classYear, r.status, r.origin, r.sourceId,
-                    null, r.firstSeen, r.lastSeen));
+                    r.postedAt, r.firstSeen, r.lastSeen));
         }
         return out;
     }

@@ -29,8 +29,7 @@ public class GreenhouseAdapter implements AtsFeedAdapter {
             out.add(new ExtractedPosting(title, AtsSupport.text(j, "company_name"),
                     AtsSupport.text(j.get("location"), "name"), AtsSupport.htmlToText(AtsSupport.text(j, "content")),
                     AtsSupport.text(j, "absolute_url"),
-                    AtsSupport.text(j, "first_published") != null ? AtsSupport.text(j, "first_published")
-                            : AtsSupport.text(j, "updated_at"),
+                    AtsSupport.text(j, "first_published"), // updated_at is the last edit, not the publication date
                     null));
         }
         return out;

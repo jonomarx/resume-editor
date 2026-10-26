@@ -5,6 +5,7 @@ import app.resume.jobs.enrich.PostingEnricher;
 import app.resume.jobs.extract.ExtractionOutputException;
 import app.resume.jobs.extract.LlmPostingExtractor;
 import app.resume.jobs.fetch.ExtractedPosting;
+import app.resume.jobs.fetch.PostedDates;
 import app.resume.jobs.fetch.FetchException;
 import app.resume.jobs.fetch.FetchResult;
 import app.resume.jobs.fetch.JsonLdPostingAdapter;
@@ -169,11 +170,14 @@ public class IngestProcessor {
         List<Long> byRole = jdbc.queryForList("SELECT id FROM job_posting WHERE owner_user_id = ? AND dedupe_key = ? ORDER BY id", Long.class, e.userId, dedupe);
         if (!byRole.isEmpty()) return byRole.get(0);
         Timestamp now = Timestamp.from(clock.get());
+        Instant postedInstant = PostedDates.parse(p.datePosted(), clock.get());
+        if (postedInstant == null) postedInstant = PostedDates.fromText(p.description(), clock.get());
+        Timestamp postedAt = postedInstant == null ? null : Timestamp.from(postedInstant);
         boolean created = true;
         try {
             jdbc.update("INSERT INTO job_posting (owner_user_id, source_id, origin, canonical_url, url_hash, content_hash, dedupe_key, title, company,"
-                    + " location, description, first_seen_at, last_seen_at, created_at, updated_at) VALUES (?, NULL, 'ingest', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    e.userId, url, urlHash, contentHash, dedupe, p.title(), company, p.location(), p.description(), now, now, now, now);
+                    + " location, description, posted_at, first_seen_at, last_seen_at, created_at, updated_at) VALUES (?, NULL, 'ingest', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    e.userId, url, urlHash, contentHash, dedupe, p.title(), company, p.location(), p.description(), postedAt, now, now, now, now);
         } catch (DuplicateKeyException race) {
             created = false; // a crawl (or another ingest) stored the same URL first; the unique constraint kept it single
         }
